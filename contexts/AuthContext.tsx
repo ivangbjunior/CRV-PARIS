@@ -45,16 +45,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const response: any = await Promise.race([fetchPromise, timeoutPromise]);
 
       if (response.error || !response.data) {
-        console.warn('Perfil não encontrado ou erro, usando OPERADOR fallback:', response.error);
-        setUser({ id: userId, email, role: UserRole.OPERADOR });
+        console.error('Perfil não encontrado ou erro de conexão:', response.error);
+        // CORREÇÃO CRÍTICA: 
+        // Removemos o fallback que setava UserRole.OPERADOR.
+        // Se não for possível verificar o papel do usuário, definimos como null.
+        // Isso previne que Admins virem Operadores por erro de rede.
+        setUser(null);
       } else {
         const safeRole = parseRole(response.data.role);
         setUser({ id: userId, email, role: safeRole });
       }
     } catch (e) {
       console.error('Erro crítico ou timeout ao buscar perfil', e);
-      // Fallback final de segurança
-      setUser({ id: userId, email, role: UserRole.OPERADOR });
+      // Em caso de erro crítico, não assumimos nenhum papel.
+      setUser(null);
     } finally {
       setLoading(false);
     }
@@ -92,8 +96,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (session?.user) {
         // Se o usuário mudou ou é login, busca perfil
-        // Nota: Evita setar loading=true aqui para não piscar a tela se já estiver carregado,
-        // mas garante que perfil seja atualizado
         await fetchUserProfile(session.user.id, session.user.email!);
       } else {
         setUser(null);
