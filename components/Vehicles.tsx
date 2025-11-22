@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Vehicle, ContractType, VehicleType, DailyLog, UserRole, UserProfile } from '../types';
 import { storageService } from '../services/storage';
@@ -8,37 +7,31 @@ import {
   Plus, Edit2, Trash2, Save, X, Car, Truck, Search, History, 
   Calendar as CalendarIcon, MapPin, User, Filter, Printer, Loader2, Eye
 } from 'lucide-react';
+import { PrintHeader } from './PrintHeader';
 
 const Vehicles: React.FC = () => {
   const { user } = useAuth();
   const isFinanceiro = user?.role === UserRole.FINANCEIRO;
-  // RH e Gerencia só podem ver, não podem editar/excluir/criar
   const isReadOnly = isFinanceiro || user?.role === UserRole.RH || user?.role === UserRole.GERENCIA;
 
   const [loading, setLoading] = useState(true);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [filteredVehicles, setFilteredVehicles] = useState<Vehicle[]>([]);
-  const [logs, setLogs] = useState<DailyLog[]>([]); // Store logs to calculate status
+  const [logs, setLogs] = useState<DailyLog[]>([]);
   
-  // Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [filterContract, setFilterContract] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [filterType, setFilterType] = useState('');
   
-  // Form visibility
   const [showForm, setShowForm] = useState(false);
-  
-  // Edit / Create State
   const [isEditing, setIsEditing] = useState(false);
   const [currentVehicle, setCurrentVehicle] = useState<Partial<Vehicle>>({});
   const [foremenList, setForemenList] = useState<string[]>([]);
   
-  // Delete Modal State
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [vehicleToDelete, setVehicleToDelete] = useState<string | null>(null);
 
-  // History Modal State
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [historyLogs, setHistoryLogs] = useState<DailyLog[]>([]);
   const [selectedVehicleForHistory, setSelectedVehicleForHistory] = useState<Vehicle | null>(null);
@@ -52,9 +45,7 @@ const Vehicles: React.FC = () => {
     window.print();
   };
 
-  // Helper to get the effective status string for filtering
   const getCalculatedStatus = (vehicle: Vehicle, currentLogs: DailyLog[]) => {
-    // Se foi marcado manualmente como inativo (ex: vendido), respeita
     if (vehicle.status === 'INATIVO') return 'INATIVO';
 
     const vehicleLogs = currentLogs
@@ -65,11 +56,10 @@ const Vehicles: React.FC = () => {
 
     if (lastLog && lastLog.nonOperatingReason) {
       const reason = lastLog.nonOperatingReason;
-      // EXCEPTION: Se for "SEM SINAL" ou "NÃO LIGOU", o status deve permanecer ATIVO (Visualmente verde)
       if (reason === 'SEM SINAL' || reason === 'NÃO LIGOU') {
         return 'ATIVO';
       }
-      return reason; // 'OFICINA', 'GARAGEM', 'EM MANUTENÇÃO'
+      return reason;
     }
 
     return 'ATIVO';
@@ -84,11 +74,8 @@ const Vehicles: React.FC = () => {
           v.contract.toLowerCase().includes(lowerTerm);
        
        const matchesContract = !filterContract || v.contract === filterContract;
-       
-       // Calculate status dynamically for filtering to match the display
        const currentStatus = getCalculatedStatus(v, logs);
        const matchesStatus = !filterStatus || currentStatus === filterStatus;
-       
        const matchesType = !filterType || v.type === filterType;
 
        return matchesSearch && matchesContract && matchesStatus && matchesType;
@@ -123,7 +110,6 @@ const Vehicles: React.FC = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    // Force Uppercase
     setCurrentVehicle(prev => ({ ...prev, [name]: value.toUpperCase() }));
   };
 
@@ -142,7 +128,7 @@ const Vehicles: React.FC = () => {
       municipality: currentVehicle.municipality ? currentVehicle.municipality.toUpperCase() : '',
       foreman: currentVehicle.foreman ? currentVehicle.foreman.toUpperCase() : '',
       type: currentVehicle.type as VehicleType || VehicleType.PICK_UP,
-      status: 'ATIVO' // Default, as option was removed
+      status: 'ATIVO'
     };
 
     setLoading(true);
@@ -152,7 +138,7 @@ const Vehicles: React.FC = () => {
   };
 
   const handleEdit = (vehicle: Vehicle) => {
-    if (isReadOnly) return; // Security check
+    if (isReadOnly) return;
     setCurrentVehicle(vehicle);
     setIsEditing(true);
     setShowForm(true);
@@ -160,7 +146,7 @@ const Vehicles: React.FC = () => {
   };
 
   const confirmDelete = (id: string) => {
-    if (isReadOnly) return; // Security check
+    if (isReadOnly) return;
     setVehicleToDelete(id);
     setShowDeleteModal(true);
   };
@@ -177,7 +163,7 @@ const Vehicles: React.FC = () => {
 
   const showHistory = async (vehicle: Vehicle) => {
     setSelectedVehicleForHistory(vehicle);
-    setHistoryDateRange({ start: '', end: '' }); // Reset filters on open
+    setHistoryDateRange({ start: '', end: '' });
     
     const vehicleLogs = logs
       .filter(log => log.vehicleId === vehicle.id)
@@ -223,14 +209,12 @@ const Vehicles: React.FC = () => {
     setShowForm(false);
   };
 
-  // Helper to avoid timezone issues
   const formatDateDisplay = (dateString: string) => {
     if (!dateString) return '-';
     const [year, month, day] = dateString.split('-');
     return `${day}/${month}/${year}`;
   };
 
-  // Helper for contract colors
   const getContractColor = (contract: string) => {
     switch (contract) {
       case ContractType.MANUTENCAO: return 'bg-blue-100 text-blue-800 border-blue-200';
@@ -245,7 +229,6 @@ const Vehicles: React.FC = () => {
     }
   };
 
-  // Helper to determine Real Status based on Last Log
   const getVehicleStatusDisplay = (vehicle: Vehicle) => {
     const vehicleLogs = logs
       .filter(l => l.vehicleId === vehicle.id)
@@ -294,16 +277,18 @@ const Vehicles: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      {/* Print Header - Hidden in screen view */}
-      <div className="hidden print:block mb-6 text-center">
-        <h1 className="text-2xl font-bold text-black">Relatório de Veículos da Frota</h1>
-        <p className="text-sm text-gray-600">
-          CRV-PARIS | Gerado em: {new Date().toLocaleDateString()} às {new Date().toLocaleTimeString()}
-        </p>
-        <p className="text-xs text-gray-500 mt-1">
-          Total de Veículos Listados: {filteredVehicles.length}
-        </p>
-      </div>
+      
+      {/* PRINT HEADER */}
+      <PrintHeader 
+        title="Relatório de Frota"
+        subtitle="Cadastro Geral de Veículos"
+        details={
+            <>
+                <span>Total: {filteredVehicles.length} Veículos</span>
+                <span>Contratos: {Array.from(new Set(filteredVehicles.map(v => v.contract))).length}</span>
+            </>
+        }
+      />
 
       {/* Modals - Hidden on Print */}
       <div className="print:hidden">
@@ -328,9 +313,6 @@ const Vehicles: React.FC = () => {
                   <h3 className="font-bold text-lg">Histórico de Movimentação</h3>
                   <p className="text-slate-300 text-xs">
                     {selectedVehicleForHistory.plate} - {selectedVehicleForHistory.type}
-                    <span className="block opacity-70 mt-1 font-normal italic">
-                      (Exibindo alterações de Motorista, Contrato ou Município)
-                    </span>
                   </p>
                 </div>
               </div>
@@ -347,36 +329,22 @@ const Vehicles: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-slate-500">De</span>
-                    <div className="relative">
-                        <CalendarIcon size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
-                        <input 
-                            type="date" 
-                            value={historyDateRange.start}
-                            onChange={(e) => setHistoryDateRange(prev => ({ ...prev, start: e.target.value }))}
-                            className="border border-slate-300 rounded pl-8 pr-2 py-1 text-sm text-slate-700 focus:outline-none focus:border-blue-500 shadow-sm bg-white"
-                        />
-                    </div>
+                    <input 
+                        type="date" 
+                        value={historyDateRange.start}
+                        onChange={(e) => setHistoryDateRange(prev => ({ ...prev, start: e.target.value }))}
+                        className="border border-slate-300 rounded pl-2 pr-2 py-1 text-sm text-slate-700"
+                    />
                 </div>
                 <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-slate-500">Até</span>
-                    <div className="relative">
-                        <CalendarIcon size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
-                        <input 
-                            type="date" 
-                            value={historyDateRange.end}
-                            onChange={(e) => setHistoryDateRange(prev => ({ ...prev, end: e.target.value }))}
-                            className="border border-slate-300 rounded pl-8 pr-2 py-1 text-sm text-slate-700 focus:outline-none focus:border-blue-500 shadow-sm bg-white"
-                        />
-                    </div>
+                    <input 
+                        type="date" 
+                        value={historyDateRange.end}
+                        onChange={(e) => setHistoryDateRange(prev => ({ ...prev, end: e.target.value }))}
+                        className="border border-slate-300 rounded pl-2 pr-2 py-1 text-sm text-slate-700"
+                    />
                 </div>
-                {(historyDateRange.start || historyDateRange.end) && (
-                    <button 
-                        onClick={() => setHistoryDateRange({ start: '', end: '' })}
-                        className="text-xs font-bold text-red-600 hover:bg-red-50 px-3 py-1.5 rounded transition-colors flex items-center gap-1"
-                    >
-                        <X size={14} /> Limpar
-                    </button>
-                )}
             </div>
 
             <div className="flex-1 overflow-y-auto p-6">
@@ -400,49 +368,15 @@ const Vehicles: React.FC = () => {
                  return (
                     <div className="relative border-l-2 border-slate-200 ml-3 space-y-8 pl-8 py-2">
                     {filteredHistoryLogs.map((log) => {
-                        const getHistoryStatusParams = (reason?: string) => {
-                            if (reason === 'SEM SINAL' || reason === 'NÃO LIGOU') {
-                            return { 
-                                label: 'ATIVO', 
-                                className: 'bg-green-100 text-green-700 border-green-200', 
-                                dotColor: 'bg-green-600' 
-                            };
-                            }
-                            if (reason === 'GARAGEM') {
-                                return { label: 'GARAGEM', className: 'bg-yellow-100 text-yellow-800 border-yellow-200', dotColor: 'bg-yellow-500' };
-                            }
-                            if (reason === 'OFICINA' || reason === 'EM MANUTENÇÃO') {
-                                return { label: reason, className: 'bg-red-100 text-red-700 border-red-200', dotColor: 'bg-red-500' };
-                            }
-                            if (reason === 'INATIVO') { 
-                                return { label: 'INATIVO', className: 'bg-slate-100 text-slate-700 border-slate-200', dotColor: 'bg-slate-500' };
-                            }
-                            return { 
-                            label: 'ATIVO', 
-                            className: 'bg-green-100 text-green-700 border-green-200', 
-                            dotColor: 'bg-green-600' 
-                            };
-                        };
-
-                        const statusParams = getHistoryStatusParams(log.nonOperatingReason);
-
                         return (
                         <div key={log.id} className="relative group">
-                        {/* Timeline Dot */}
-                        <div className="absolute -left-[41px] top-0 w-5 h-5 bg-blue-100 border-4 border-blue-600 rounded-full group-hover:scale-110 transition-transform"></div>
+                        <div className="absolute -left-[41px] top-0 w-5 h-5 bg-blue-100 border-4 border-blue-600 rounded-full"></div>
                         
                         <div className="bg-slate-50 rounded-lg border border-slate-200 p-4 hover:shadow-md transition-shadow">
                             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-3">
                                 <div className="flex items-center gap-2 text-slate-800 font-bold">
                                 <CalendarIcon size={16} />
                                 <span>{formatDateDisplay(log.date)}</span>
-                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ml-2 ${statusParams.className}`}>
-                                    <div className={`w-1.5 h-1.5 rounded-full ${statusParams.dotColor}`}></div>
-                                    {statusParams.label}
-                                </span>
-                                </div>
-                                <div className="text-xs text-slate-500 bg-white px-2 py-1 rounded border border-slate-200">
-                                Registro de Movimentação
                                 </div>
                             </div>
 
@@ -452,7 +386,7 @@ const Vehicles: React.FC = () => {
                                 <div>
                                 <p className="text-xs text-slate-500 uppercase font-bold">Motorista</p>
                                 <p className="text-slate-800 font-bold text-sm">
-                                    {log.historicalDriver || (vehicles.find(v => v.id === log.vehicleId)?.driverName) || "N/A"}
+                                    {log.historicalDriver || "N/A"}
                                 </p>
                                 </div>
                             </div>
@@ -462,7 +396,7 @@ const Vehicles: React.FC = () => {
                                 <div>
                                 <p className="text-xs text-slate-500 uppercase font-bold">Município</p>
                                 <p className="text-slate-800 font-bold text-sm">
-                                    {log.historicalMunicipality || (vehicles.find(v => v.id === log.vehicleId)?.municipality) || "N/A"}
+                                    {log.historicalMunicipality || "N/A"}
                                 </p>
                                 </div>
                             </div>
@@ -472,7 +406,7 @@ const Vehicles: React.FC = () => {
                                 <div>
                                 <p className="text-xs text-slate-500 uppercase font-bold">Contrato</p>
                                 <p className="text-slate-800 font-bold text-sm">
-                                    {log.historicalContract || (vehicles.find(v => v.id === log.vehicleId)?.contract) || "N/A"}
+                                    {log.historicalContract || "N/A"}
                                 </p>
                                 </div>
                             </div>
@@ -485,12 +419,7 @@ const Vehicles: React.FC = () => {
                })()}
             </div>
             <div className="bg-slate-50 p-4 border-t text-right">
-              <button 
-                onClick={() => setShowHistoryModal(false)}
-                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg font-medium"
-              >
-                Fechar
-              </button>
+              <button onClick={() => setShowHistoryModal(false)} className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg font-medium">Fechar</button>
             </div>
           </div>
         </div>
@@ -531,35 +460,22 @@ const Vehicles: React.FC = () => {
           />
         </div>
         
-        {/* Filters Row */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full lg:w-auto">
-           <select
-             value={filterContract}
-             onChange={(e) => setFilterContract(e.target.value)}
-             className={selectFilterClass}
-           >
+           <select value={filterContract} onChange={(e) => setFilterContract(e.target.value)} className={selectFilterClass}>
              <option value="">Contrato: Todos</option>
              {Object.values(ContractType).map(type => (
                <option key={type} value={type}>{type}</option>
              ))}
            </select>
 
-           <select
-             value={filterType}
-             onChange={(e) => setFilterType(e.target.value)}
-             className={selectFilterClass}
-           >
+           <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className={selectFilterClass}>
              <option value="">Tipo: Todos</option>
              {Object.values(VehicleType).map(type => (
                <option key={type} value={type}>{type}</option>
              ))}
            </select>
 
-           <select
-             value={filterStatus}
-             onChange={(e) => setFilterStatus(e.target.value)}
-             className={selectFilterClass}
-           >
+           <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className={selectFilterClass}>
              <option value="">Status Atual: Todos</option>
              <option value="ATIVO">ATIVO</option>
              <option value="OFICINA">OFICINA</option>
@@ -570,7 +486,6 @@ const Vehicles: React.FC = () => {
         </div>
       </div>
       
-      {/* New Button Row - Between Filters and List - HIDDEN FOR READ ONLY ROLES */}
       {!isReadOnly && (
         <div className="flex justify-start print:hidden">
             <button
@@ -586,7 +501,6 @@ const Vehicles: React.FC = () => {
         </div>
       )}
 
-      {/* Form Section (Collapsible) - Hidden on Print and for Read Only */}
       <div className="print:hidden">
         {showForm && !isReadOnly && (
           <div className="bg-white rounded-xl shadow-lg border border-slate-200 p-6 animate-in fade-in slide-in-from-top-4 duration-300">
@@ -603,135 +517,61 @@ const Vehicles: React.FC = () => {
             </div>
 
             <form onSubmit={handleSave} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              
               <div>
                 <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Placa</label>
-                <input
-                  type="text"
-                  name="plate"
-                  value={currentVehicle.plate || ''}
-                  onChange={handleInputChange}
-                  placeholder="ABC-1234"
-                  required
-                  className={`${inputClass} uppercase font-mono`}
-                />
+                <input type="text" name="plate" value={currentVehicle.plate || ''} onChange={handleInputChange} placeholder="ABC-1234" required className={`${inputClass} uppercase font-mono`} />
               </div>
 
               <div>
                 <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Tipo do Veículo</label>
-                <select
-                  name="type"
-                  value={currentVehicle.type || ''}
-                  onChange={handleInputChange}
-                  required
-                  className={inputClass}
-                >
+                <select name="type" value={currentVehicle.type || ''} onChange={handleInputChange} required className={inputClass}>
                   <option value="">Selecione...</option>
-                  {Object.values(VehicleType).map(type => (
-                    <option key={type} value={type}>{type}</option>
-                  ))}
+                  {Object.values(VehicleType).map(type => (<option key={type} value={type}>{type}</option>))}
                 </select>
               </div>
 
               <div>
                 <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Modelo</label>
-                <input
-                  type="text"
-                  name="model"
-                  value={currentVehicle.model || ''}
-                  onChange={handleInputChange}
-                  placeholder="Ex: Hilux, Strada..."
-                  className={inputClass}
-                />
+                <input type="text" name="model" value={currentVehicle.model || ''} onChange={handleInputChange} placeholder="Ex: Hilux..." className={inputClass} />
               </div>
 
               <div>
                 <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Ano</label>
-                <input
-                  type="text"
-                  name="year"
-                  value={currentVehicle.year || ''}
-                  onChange={handleInputChange}
-                  placeholder="Ex: 2023/2024"
-                  className={inputClass}
-                />
+                <input type="text" name="year" value={currentVehicle.year || ''} onChange={handleInputChange} placeholder="Ex: 2023/2024" className={inputClass} />
               </div>
 
               <div>
                 <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Contrato</label>
-                <select
-                  name="contract"
-                  value={currentVehicle.contract || ''}
-                  onChange={handleInputChange}
-                  required
-                  className={inputClass}
-                >
+                <select name="contract" value={currentVehicle.contract || ''} onChange={handleInputChange} required className={inputClass}>
                   <option value="">Selecione...</option>
-                  {Object.values(ContractType).map(type => (
-                    <option key={type} value={type}>{type}</option>
-                  ))}
+                  {Object.values(ContractType).map(type => (<option key={type} value={type}>{type}</option>))}
                 </select>
               </div>
 
               <div>
                 <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Nome do Motorista</label>
-                <input
-                  type="text"
-                  name="driverName"
-                  value={currentVehicle.driverName || ''}
-                  onChange={handleInputChange}
-                  required
-                  className={inputClass}
-                />
+                <input type="text" name="driverName" value={currentVehicle.driverName || ''} onChange={handleInputChange} required className={inputClass} />
               </div>
 
               <div>
                 <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Município</label>
-                <input
-                  type="text"
-                  name="municipality"
-                  value={currentVehicle.municipality || ''}
-                  onChange={handleInputChange}
-                  required
-                  className={inputClass}
-                />
+                <input type="text" name="municipality" value={currentVehicle.municipality || ''} onChange={handleInputChange} required className={inputClass} />
               </div>
 
               <div>
                 <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Equipe</label>
-                {/* Changed to Input with Datalist for free text or selection */}
-                <input
-                    list="foremen-list"
-                    type="text"
-                    name="foreman"
-                    value={currentVehicle.foreman || ''}
-                    onChange={handleInputChange}
-                    required
-                    placeholder="Digite ou selecione a equipe..."
-                    className={inputClass}
-                />
+                <input list="foremen-list" type="text" name="foreman" value={currentVehicle.foreman || ''} onChange={handleInputChange} required placeholder="Digite ou selecione..." className={inputClass} />
                 <datalist id="foremen-list">
-                    {foremenList.map(f => (
-                        <option key={f} value={f} />
-                    ))}
+                    {foremenList.map(f => (<option key={f} value={f} />))}
                 </datalist>
               </div>
               
               <div className="md:col-span-2 lg:col-span-3 flex gap-3 mt-4 pt-4 border-t border-slate-100">
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="flex items-center justify-center gap-2 bg-green-600 text-white px-6 py-2.5 rounded-lg hover:bg-green-700 transition-colors font-bold shadow-sm shadow-green-600/20 disabled:opacity-50"
-                >
+                <button type="submit" disabled={loading} className="flex items-center justify-center gap-2 bg-green-600 text-white px-6 py-2.5 rounded-lg hover:bg-green-700 transition-colors font-bold shadow-sm disabled:opacity-50">
                   {loading ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
                   {isEditing ? 'Salvar Alterações' : 'Cadastrar Veículo'}
                 </button>
-                
-                <button
-                  type="button"
-                  onClick={resetForm}
-                  className="flex items-center justify-center gap-2 bg-slate-200 text-slate-700 px-6 py-2.5 rounded-lg hover:bg-slate-300 transition-colors font-medium"
-                >
+                <button type="button" onClick={resetForm} className="flex items-center justify-center gap-2 bg-slate-200 text-slate-700 px-6 py-2.5 rounded-lg hover:bg-slate-300 transition-colors font-medium">
                   <X size={18} /> Cancelar
                 </button>
               </div>
@@ -741,7 +581,7 @@ const Vehicles: React.FC = () => {
       </div>
 
       {/* List Section */}
-      <div className="bg-white rounded-t-xl shadow-sm border border-slate-200 overflow-hidden print:overflow-visible">
+      <div className="bg-white rounded-t-xl shadow-sm border border-slate-200 overflow-hidden print:overflow-visible print:border-none print:shadow-none">
         <div className="bg-slate-800 p-4 flex justify-between items-center print:hidden">
           <h3 className="font-bold text-white flex items-center gap-2">
              <Truck size={20} /> 
@@ -751,55 +591,40 @@ const Vehicles: React.FC = () => {
         
         <div className="overflow-x-auto print:overflow-visible">
           <table className="w-full text-sm text-left">
-            <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200 print:bg-white print:text-black">
+            <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200 print:bg-slate-200 print:text-slate-900 print:border-slate-300">
               <tr>
                 <th className="px-6 py-4 print:px-2 print:py-2">Placa</th>
-                <th className="px-6 py-4 print:px-2 print:py-2">Status Atual</th>
+                <th className="px-6 py-4 print:px-2 print:py-2">Status</th>
                 <th className="px-6 py-4 print:px-2 print:py-2">Modelo/Ano</th>
                 <th className="px-6 py-4 print:px-2 print:py-2">Contrato</th>
                 <th className="px-6 py-4 print:px-2 print:py-2">Tipo</th>
                 <th className="px-6 py-4 print:px-2 print:py-2">Motorista</th>
                 <th className="px-6 py-4 print:px-2 print:py-2">Município</th>
                 <th className="px-6 py-4 print:px-2 print:py-2">Equipe</th>
-                <th className="px-6 py-4 text-center print:hidden">
-                   {isReadOnly ? 'Histórico' : 'Ações'}
-                </th>
+                <th className="px-6 py-4 text-center print:hidden">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? (
-                 <tr>
-                   <td colSpan={9} className="px-6 py-12 text-center">
-                     <Loader2 className="animate-spin mx-auto text-blue-500" size={24} />
-                     <p className="text-slate-400 mt-2">Carregando...</p>
-                   </td>
-                 </tr>
+                 <tr><td colSpan={9} className="px-6 py-12 text-center"><Loader2 className="animate-spin mx-auto text-blue-500" size={24} /><p className="text-slate-400 mt-2">Carregando...</p></td></tr>
               ) : filteredVehicles.length === 0 ? (
-                <tr>
-                  <td colSpan={9} className="px-6 py-12 text-center text-slate-400">
-                    Nenhum veículo encontrado com os filtros selecionados.
-                  </td>
-                </tr>
+                <tr><td colSpan={9} className="px-6 py-12 text-center text-slate-400">Nenhum veículo encontrado.</td></tr>
               ) : (
                 filteredVehicles.map(vehicle => {
                   const statusDisplay = getVehicleStatusDisplay(vehicle);
                   return (
-                    <tr key={vehicle.id} className="hover:bg-blue-50/30 transition-colors group print:hover:bg-transparent">
+                    <tr key={vehicle.id} className="hover:bg-blue-50/30 transition-colors group">
                       <td className="px-6 py-4 font-bold text-slate-900 font-mono print:px-2 print:py-2">{vehicle.plate}</td>
                       <td className="px-6 py-4 print:px-2 print:py-2">
-                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold border ${statusDisplay.className} print:border-none print:p-0`}>
-                          <div className={`w-1.5 h-1.5 rounded-full ${statusDisplay.dotColor} print:hidden`}></div>
+                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold border ${statusDisplay.className} print:border-none print:p-0 print:bg-transparent print:text-black`}>
                           {statusDisplay.label}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-slate-600 print:px-2 print:py-2">
-                         <div className="flex flex-col text-xs">
-                           <span className="font-bold">{vehicle.model || '-'}</span>
-                           <span className="text-slate-400 print:text-slate-600">{vehicle.year || '-'}</span>
-                         </div>
+                         {vehicle.model || '-'} {vehicle.year ? `(${vehicle.year})` : ''}
                       </td>
                       <td className="px-6 py-4 print:px-2 print:py-2">
-                        <span className={`inline-block px-2 py-1 rounded text-xs font-bold border ${getContractColor(vehicle.contract)} print:border-none print:bg-transparent print:text-black print:p-0`}>
+                        <span className={`inline-block px-2 py-1 rounded text-xs font-bold border ${getContractColor(vehicle.contract)} print:border-none print:p-0 print:bg-transparent print:text-black`}>
                           {vehicle.contract}
                         </span>
                       </td>
@@ -807,42 +632,25 @@ const Vehicles: React.FC = () => {
                         {vehicle.type}
                       </td>
                       <td className="px-6 py-4 flex items-center gap-2 text-slate-700 print:px-2 print:py-2">
-                        <User size={16} className="text-slate-400 print:hidden" />
                         {vehicle.driverName}
                       </td>
                       <td className="px-6 py-4 text-slate-600 print:px-2 print:py-2">
-                        <div className="flex items-center gap-1">
-                          <MapPin size={14} className="text-slate-400 print:hidden" />
                           {vehicle.municipality}
-                        </div>
                       </td>
                       <td className="px-6 py-4 text-slate-600 text-xs print:px-2 print:py-2">
                         {vehicle.foreman}
                       </td>
                       <td className="px-6 py-4 print:hidden">
                         <div className="flex justify-center gap-2 opacity-70 group-hover:opacity-100 transition-opacity">
-                          <button
-                            onClick={() => showHistory(vehicle)}
-                            className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
-                            title="Histórico de Movimentação"
-                          >
+                          <button onClick={() => showHistory(vehicle)} className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors" title="Histórico">
                             <History size={18} />
                           </button>
-                          
                           {!isReadOnly && (
                             <>
-                                <button
-                                    onClick={() => handleEdit(vehicle)}
-                                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                    title="Editar"
-                                >
+                                <button onClick={() => handleEdit(vehicle)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
                                     <Edit2 size={18} />
                                 </button>
-                                <button
-                                    onClick={() => confirmDelete(vehicle.id)}
-                                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                    title="Excluir"
-                                >
+                                <button onClick={() => confirmDelete(vehicle.id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Excluir">
                                     <Trash2 size={18} />
                                 </button>
                             </>

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>CRV-PARIS | Paris Engenharia</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">
     <style>
       body { font-family: 'Roboto', sans-serif; }
       /* Ensure form elements use the same font */
@@ -26,37 +26,101 @@
           scrollbar-width: none;  /* Firefox */
       }
 
-      /* Print Specific Styles */
+      /* Print Specific Styles - Executive Layout */
       @media print {
         @page {
-          margin: 0.5cm;
+          margin: 1cm;
           size: landscape;
         }
+        
         body {
           background-color: white !important;
+          color: black !important;
           -webkit-print-color-adjust: exact !important;
           print-color-adjust: exact !important;
+          font-size: 10px;
         }
-        /* Remove shadows and rounded corners for sharper print */
+
+        /* Hide UI Elements */
+        .no-print, button, input, select, nav, header, aside {
+          display: none !important;
+        }
+
+        /* Reset Layout containers */
+        #root, main, div {
+          height: auto !important;
+          width: 100% !important;
+          overflow: visible !important;
+          position: static !important;
+          display: block !important;
+        }
+
+        /* Typography Enhancements */
+        h1, h2, h3, h4 {
+          color: #0f172a !important; /* slate-900 */
+        }
+
+        /* Executive Table Styling */
+        table {
+          width: 100% !important;
+          border-collapse: collapse !important;
+          border: 1px solid #cbd5e1 !important; /* slate-300 */
+          margin-top: 10px;
+          page-break-inside: auto;
+        }
+        
+        thead {
+          display: table-header-group;
+        }
+        
+        tfoot {
+          display: table-footer-group;
+        }
+
+        tr {
+          page-break-inside: avoid;
+          page-break-after: auto;
+        }
+
+        /* Zebra Striping for readability */
+        tbody tr:nth-child(even) {
+          background-color: #f1f5f9 !important; /* slate-100 */
+        }
+        
+        th {
+          background-color: #e2e8f0 !important; /* slate-200 */
+          color: #1e293b !important; /* slate-800 */
+          font-weight: 800 !important;
+          text-transform: uppercase;
+          font-size: 9px !important;
+          border: 1px solid #94a3b8 !important; /* slate-400 */
+          padding: 6px 4px !important;
+          text-align: left;
+        }
+
+        td {
+          border: 1px solid #cbd5e1 !important; /* slate-300 */
+          padding: 5px 4px !important;
+          font-size: 10px !important;
+          color: #334155 !important; /* slate-700 */
+          vertical-align: top;
+        }
+
+        /* Utility to force visibility of headers */
+        .print\:block {
+          display: block !important;
+        }
+        .print\:hidden {
+          display: none !important;
+        }
+        
+        /* Remove Shadows and Radius for sharp print */
         .shadow-sm, .shadow-md, .shadow-lg, .shadow-xl {
           box-shadow: none !important;
         }
         .rounded-lg, .rounded-xl, .rounded-2xl {
           border-radius: 0 !important;
-        }
-        /* Ensure tables print well */
-        table {
-          width: 100% !important;
-          border-collapse: collapse !important;
-        }
-        th, td {
-          border: 1px solid #e2e8f0 !important; /* slate-200 */
-          padding: 8px !important;
-          font-size: 10px !important;
-        }
-        /* Hide elements specifically marked */
-        .no-print {
-          display: none !important;
+          border: none !important;
         }
       }
     </style>

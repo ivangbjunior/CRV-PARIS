@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { DailyLog, DailyLogReport, Vehicle, ContractType, VehicleType, UserRole } from '../types';
 import { storageService } from '../services/storage';
@@ -7,6 +6,7 @@ import PasswordModal from './PasswordModal';
 import MultiSelect, { MultiSelectOption } from './MultiSelect';
 import { useAuth } from '../contexts/AuthContext';
 import { Filter, FileText, Trash2, Edit3, Calendar, X, Save, Clock, AlertTriangle, Search, User, MapPin, Key, Ban, Settings, HardHat, Printer, Fuel, Droplet, MessageSquareText, Loader2 } from 'lucide-react';
+import { PrintHeader } from './PrintHeader';
 
 const Reports: React.FC = () => {
   const { user } = useAuth();
@@ -17,12 +17,10 @@ const Reports: React.FC = () => {
   const [filteredLogs, setFilteredLogs] = useState<DailyLogReport[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   
-  // Unique data for dropdowns
   const [uniqueDrivers, setUniqueDrivers] = useState<string[]>([]);
   const [uniqueMunicipalities, setUniqueMunicipalities] = useState<string[]>([]);
   const [uniqueForemen, setUniqueForemen] = useState<string[]>([]);
 
-  // Filter States (Arrays for MultiSelect)
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [filterForeman, setFilterForeman] = useState<string[]>([]); 
   const [filterContract, setFilterContract] = useState<string[]>([]);
@@ -30,18 +28,14 @@ const Reports: React.FC = () => {
   const [filterDriver, setFilterDriver] = useState<string[]>([]);
   const [filterMunicipality, setFilterMunicipality] = useState<string[]>([]);
 
-  // Delete handling
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [logToDelete, setLogToDelete] = useState<string | null>(null);
 
-  // Edit handling
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingLog, setEditingLog] = useState<DailyLog | null>(null);
 
-  // Observation Modal State
   const [obsModalData, setObsModalData] = useState<{content: string, date: string, plate: string} | null>(null);
 
-  // Date Input Refs for Calendar Click Fix
   const startDateRef = useRef<HTMLInputElement>(null);
   const endDateRef = useRef<HTMLInputElement>(null);
 
@@ -67,7 +61,6 @@ const Reports: React.FC = () => {
         const processed: DailyLogReport[] = rawLogs.map(log => {
         let vehicle = vehiclesData.find(v => v.id === log.vehicleId);
         
-        // Se o veículo foi excluído, criar um objeto placeholder com os dados históricos
         if (!vehicle) {
             vehicle = {
                 id: log.vehicleId,
@@ -77,14 +70,12 @@ const Reports: React.FC = () => {
                 contract: (log.historicalContract as ContractType) || ContractType.ADM_MANAUS,
                 driverName: log.historicalDriver || 'N/A',
                 municipality: log.historicalMunicipality || 'N/A',
-                foreman: '-', // Placeholder foreman
-                type: VehicleType.PICK_UP, // Fallback
+                foreman: '-', 
+                type: VehicleType.PICK_UP, 
                 status: 'INATIVO'
             };
         }
 
-        // --- Lógica do Último Abastecimento (Atualizada) ---
-        // 1. Encontrar abastecimentos deste veículo anteriores ou iguais à data do log
         const relevantRefuelings = refuelingsData
             .filter(r => r.vehicleId === log.vehicleId && r.date <= log.date)
             .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -94,8 +85,6 @@ const Reports: React.FC = () => {
         if (relevantRefuelings.length > 0) {
             const lastRef = relevantRefuelings[0];
             
-            // 2. Somar KMs rodados nos logs entre a data do abastecimento e a data do log atual
-            // Modificado: Se for o dia do abastecimento, usa o KM Before Refueling se existir para calcular o KM rodado APÓS
             const kmSince = rawLogs
                 .filter(l => 
                     l.vehicleId === log.vehicleId && 
@@ -104,13 +93,9 @@ const Reports: React.FC = () => {
                 )
                 .reduce((sum, l) => {
                     let dailyContribution = l.kmDriven || 0;
-                    
-                    // Se for o dia do abastecimento E tivermos informação de KM Antes do Abastecimento
                     if (l.date === lastRef.date && l.kmBeforeRefueling !== undefined) {
-                        // O que foi rodado "desde o abastecimento" neste dia é o Total - Antes
                         dailyContribution = Math.max(0, dailyContribution - l.kmBeforeRefueling);
                     }
-                    
                     return sum + dailyContribution;
                 }, 0);
 
@@ -136,15 +121,12 @@ const Reports: React.FC = () => {
         };
         });
 
-        // Sort by date descending
         processed.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-        // Extract unique values for filters
         const uDrivers = new Set<string>();
         const uMunicipalities = new Set<string>();
         const uForemen = new Set<string>();
 
-        // 1. Add from existing logs (history)
         processed.forEach(log => {
         const driver = log.historicalDriver || log.vehicle.driverName;
         if (driver) uDrivers.add(driver);
@@ -155,7 +137,6 @@ const Reports: React.FC = () => {
         if (log.vehicle.foreman) uForemen.add(log.vehicle.foreman);
         });
 
-        // 2. Add from currently registered vehicles
         vehiclesData.forEach(v => {
         if (v.driverName) uDrivers.add(v.driverName);
         if (v.municipality) uMunicipalities.add(v.municipality);
@@ -182,26 +163,15 @@ const Reports: React.FC = () => {
     const end = dateRange.end ? new Date(dateRange.end).getTime() : null;
 
     const filtered = logs.filter(log => {
-      // Date Filter
       const logDate = new Date(log.date).getTime();
       const matchesDate = (!start || logDate >= start) && (!end || logDate <= end);
-      
-      // Contract Filter
       const logContract = log.historicalContract || log.vehicle.contract;
       const matchesContract = filterContract.length === 0 || filterContract.includes(logContract);
-
-      // Vehicle ID Filter
       const matchesVehicleId = filterVehicleId.length === 0 || filterVehicleId.includes(log.vehicle.id);
-
-      // Foreman Filter
       const logForeman = log.vehicle.foreman || '';
       const matchesForeman = filterForeman.length === 0 || filterForeman.includes(logForeman);
-
-      // Driver Filter
       const logDriver = log.historicalDriver || log.vehicle.driverName || '';
       const matchesDriver = filterDriver.length === 0 || filterDriver.includes(logDriver);
-
-      // Municipality Filter
       const logCity = log.historicalMunicipality || log.vehicle.municipality || '';
       const matchesMunicipality = filterMunicipality.length === 0 || filterMunicipality.includes(logCity);
 
@@ -236,7 +206,6 @@ const Reports: React.FC = () => {
     }
   };
 
-  // Edit Functions
   const handleEditClick = (logReport: DailyLogReport) => {
     const logToEdit: DailyLog = {
         id: logReport.id,
@@ -259,7 +228,7 @@ const Reports: React.FC = () => {
         historicalPlate: logReport.historicalPlate,
         historicalModel: logReport.historicalModel,
         nonOperatingReason: logReport.nonOperatingReason,
-        kmBeforeRefueling: logReport.kmBeforeRefueling // Added
+        kmBeforeRefueling: logReport.kmBeforeRefueling 
     };
     setEditingLog(logToEdit);
     setShowEditModal(true);
@@ -268,16 +237,11 @@ const Reports: React.FC = () => {
   const handleEditChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     if (!editingLog) return;
     const { name, value, type } = e.target;
-    
     let val: string | number = value;
     if (type === 'number') {
       val = value === '' ? 0 : Number(value);
     }
-
-    setEditingLog({
-      ...editingLog,
-      [name]: val
-    });
+    setEditingLog({ ...editingLog, [name]: val });
   };
 
   const saveEdit = async (e: React.FormEvent) => {
@@ -299,7 +263,6 @@ const Reports: React.FC = () => {
       });
   };
 
-  // Safe date formatting
   const formatDateDisplay = (dateString: string) => {
     if (!dateString) return '-';
     const [year, month, day] = dateString.split('-');
@@ -312,7 +275,6 @@ const Reports: React.FC = () => {
     return `${day}/${month}`;
   };
   
-  // Helpers for colors
   const getContractColor = (contract: string) => {
     switch (contract) {
       case ContractType.MANUTENCAO: return 'bg-blue-100 text-blue-800 border-blue-200';
@@ -338,7 +300,6 @@ const Reports: React.FC = () => {
      }
   };
 
-  // --- Summary Calculation ---
   const calculateSummary = () => {
     let totalMinutes = 0;
     let totalKm = 0;
@@ -368,7 +329,6 @@ const Reports: React.FC = () => {
   const inputClass = "rounded-lg border border-slate-300 bg-white p-2 text-sm text-slate-800 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none transition-all w-full";
   const editInputClass = "w-full rounded-lg border border-slate-300 bg-slate-50 p-2.5 text-slate-800 focus:border-blue-600 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition-all";
 
-  // Options for MultiSelect
   const contractOptions: MultiSelectOption[] = Object.values(ContractType).map(t => ({ value: t, label: t }));
   const vehicleOptions: MultiSelectOption[] = vehicles.map(v => ({ value: v.id, label: `${v.plate} - ${v.type}` }));
   const foremanOptions: MultiSelectOption[] = uniqueForemen.map(f => ({ value: f, label: f }));
@@ -381,19 +341,19 @@ const Reports: React.FC = () => {
 
   return (
     <div className="space-y-6">
-       {/* Print Header */}
-      <div className="hidden print:block mb-6 text-center">
-        <h1 className="text-2xl font-bold text-black">Relatório Geral de Frota</h1>
-        <p className="text-sm text-gray-600">
-          CRV-PARIS | Gerado em: {new Date().toLocaleDateString()} às {new Date().toLocaleTimeString()}
-        </p>
-         <div className="flex justify-center gap-4 text-xs mt-2 border-t border-b border-slate-200 py-2">
-            <span><strong>Período:</strong> {dateRange.start ? formatDateDisplay(dateRange.start) : 'Início'} até {dateRange.end ? formatDateDisplay(dateRange.end) : 'Hoje'}</span>
-            <span><strong>Registros:</strong> {filteredLogs.length}</span>
-            <span><strong>KM Total:</strong> {summary.totalKm} km</span>
-            <span><strong>Tempo Ligado:</strong> {summary.formattedTime}</span>
-         </div>
-      </div>
+       
+       <PrintHeader 
+        title="Relatório Geral de Frota"
+        subtitle="Diário de Bordo e Métricas"
+        details={
+            <>
+                <span>Período: {dateRange.start ? formatDateDisplay(dateRange.start) : 'Início'} até {dateRange.end ? formatDateDisplay(dateRange.end) : 'Hoje'}</span>
+                <span>Registros: {filteredLogs.length}</span>
+                <span>KM Total: {summary.totalKm}</span>
+                <span>Horas Totais: {summary.formattedTime}</span>
+            </>
+        }
+      />
 
       <div className="print:hidden">
         <PasswordModal
@@ -404,7 +364,6 @@ const Reports: React.FC = () => {
         />
       </div>
 
-      {/* Observation Modal */}
       {obsModalData && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4 print:hidden animate-in fade-in duration-200">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full overflow-hidden">
@@ -432,19 +391,13 @@ const Reports: React.FC = () => {
                    {obsModalData.content}
                 </div>
                 <div className="mt-5 flex justify-end">
-                   <button 
-                      onClick={() => setObsModalData(null)}
-                      className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg font-medium text-sm"
-                   >
-                      Fechar
-                   </button>
+                   <button onClick={() => setObsModalData(null)} className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg font-medium text-sm">Fechar</button>
                 </div>
              </div>
           </div>
         </div>
       )}
 
-      {/* Edit Modal */}
       {showEditModal && editingLog && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 overflow-y-auto print:hidden">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl my-8 flex flex-col max-h-[90vh]">
@@ -460,93 +413,46 @@ const Reports: React.FC = () => {
             
             <form onSubmit={saveEdit} className="p-6 overflow-y-auto">
                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {/* Edit Form Fields (Sem alterações) */}
                   <div className="col-span-full border-b pb-2 mb-2">
                       <h4 className="text-xs font-bold uppercase text-slate-500">Dados do Veículo e Data</h4>
                   </div>
                   
                   <div>
                     <label className="block text-xs font-bold text-slate-500 mb-1">Data</label>
-                    <input
-                      type="date"
-                      name="date"
-                      value={editingLog.date}
-                      onChange={handleEditChange}
-                      required
-                      className={editInputClass}
-                    />
+                    <input type="date" name="date" value={editingLog.date} onChange={handleEditChange} required className={editInputClass} />
                   </div>
                   
                   <div className="lg:col-span-2">
                     <label className="block text-xs font-bold text-slate-500 mb-1">Veículo (Cadastro Original)</label>
-                    <select
-                      name="vehicleId"
-                      value={editingLog.vehicleId}
-                      onChange={handleEditChange}
-                      required
-                      className={editInputClass}
-                    >
-                      {vehicles.map(v => (
-                        <option key={v.id} value={v.id}>{v.plate} - {v.driverName}</option>
-                      ))}
-                      {!vehicles.find(v => v.id === editingLog?.vehicleId) && editingLog?.vehicleId && (
-                         <option value={editingLog.vehicleId}>VEÍCULO EXCLUÍDO / ID: {editingLog.vehicleId}</option>
-                      )}
+                    <select name="vehicleId" value={editingLog.vehicleId} onChange={handleEditChange} required className={editInputClass}>
+                      {vehicles.map(v => (<option key={v.id} value={v.id}>{v.plate} - {v.driverName}</option>))}
+                      {!vehicles.find(v => v.id === editingLog?.vehicleId) && editingLog?.vehicleId && (<option value={editingLog.vehicleId}>VEÍCULO EXCLUÍDO / ID: {editingLog.vehicleId}</option>)}
                     </select>
                   </div>
 
-                  {/* Historical Data Inputs */}
                   <div className="lg:col-span-1">
                     <label className="block text-xs font-bold text-slate-500 mb-1">Motorista (No Dia)</label>
-                    <input
-                      type="text"
-                      name="historicalDriver"
-                      value={editingLog.historicalDriver || ''}
-                      onChange={handleEditChange}
-                      className={editInputClass}
-                    />
+                    <input type="text" name="historicalDriver" value={editingLog.historicalDriver || ''} onChange={handleEditChange} className={editInputClass} />
                   </div>
 
                   <div className="lg:col-span-1">
                     <label className="block text-xs font-bold text-slate-500 mb-1">Município (No Dia)</label>
-                     <input
-                      type="text"
-                      name="historicalMunicipality"
-                      value={editingLog.historicalMunicipality || ''}
-                      onChange={handleEditChange}
-                      className={editInputClass}
-                    />
+                     <input type="text" name="historicalMunicipality" value={editingLog.historicalMunicipality || ''} onChange={handleEditChange} className={editInputClass} />
                   </div>
                   
                   <div className="lg:col-span-1">
                     <label className="block text-xs font-bold text-slate-500 mb-1">Contrato (No Dia)</label>
-                     <select
-                      name="historicalContract"
-                      value={editingLog.historicalContract || ''}
-                      onChange={handleEditChange}
-                      className={editInputClass}
-                    >
+                     <select name="historicalContract" value={editingLog.historicalContract || ''} onChange={handleEditChange} className={editInputClass}>
                       <option value="">Selecione...</option>
-                      {Object.values(ContractType).map(type => (
-                        <option key={type} value={type}>{type}</option>
-                      ))}
+                      {Object.values(ContractType).map(type => (<option key={type} value={type}>{type}</option>))}
                     </select>
                   </div>
 
                   <div className="lg:col-span-1">
                      <label className="block text-xs font-bold text-slate-500 mb-1">Status Operacional</label>
-                     <select
-                        name="nonOperatingReason"
-                        value={editingLog.nonOperatingReason || ''}
-                        onChange={handleEditChange}
-                        className={editInputClass}
-                     >
+                     <select name="nonOperatingReason" value={editingLog.nonOperatingReason || ''} onChange={handleEditChange} className={editInputClass}>
                         <option value="">EM OPERAÇÃO (NORMAL)</option>
-                        <option value="OFICINA">OFICINA</option>
-                        <option value="GARAGEM">GARAGEM</option>
-                        <option value="SEM SINAL">SEM SINAL</option>
-                        <option value="EM MANUTENÇÃO">EM MANUTENÇÃO</option>
-                        <option value="NÃO LIGOU">NÃO LIGOU</option>
+                        {['OFICINA','GARAGEM','SEM SINAL','EM MANUTENÇÃO','NÃO LIGOU'].map(o => <option key={o} value={o}>{o}</option>)}
                      </select>
                   </div>
 
@@ -555,7 +461,6 @@ const Reports: React.FC = () => {
                       <div className="col-span-full border-b pb-2 mb-2 mt-2">
                           <h4 className="text-xs font-bold uppercase text-slate-500">Horários</h4>
                       </div>
-                      {/* ... Time fields ... */}
                       <div>
                         <label className="block text-xs font-bold text-slate-500 mb-1">1ª Ignição</label>
                         <input type="time" name="firstIgnition" value={editingLog.firstIgnition} onChange={handleEditChange} className={editInputClass} />
@@ -624,7 +529,6 @@ const Reports: React.FC = () => {
         </div>
       )}
 
-      {/* Filter Bar */}
       <div className="bg-slate-100 p-5 rounded-xl shadow-sm border border-slate-200 print:hidden">
         <div className="flex items-center gap-2 text-slate-800 font-bold mb-4">
            <Filter size={20} />
@@ -632,44 +536,23 @@ const Reports: React.FC = () => {
         </div>
 
         <form onSubmit={handleFilter} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-           
-           {/* Date Range */}
            <div className="flex gap-2 col-span-1 md:col-span-2">
              <div className="w-1/2">
                 <label className="block text-xs font-medium text-slate-500 mb-1">Data Início</label>
                 <div className="relative w-full">
-                  <input
-                    type="date"
-                    ref={startDateRef}
-                    value={dateRange.start}
-                    onClick={(e) => e.currentTarget.showPicker()} // Força abertura em qualquer navegador
-                    onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
-                    className={`${inputClass} pr-10 cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0`}
-                  />
-                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-slate-500">
-                    <Calendar size={18} />
-                  </div>
+                  <input type="date" ref={startDateRef} value={dateRange.start} onClick={(e) => e.currentTarget.showPicker()} onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })} className={`${inputClass} pr-10 cursor-pointer`} />
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-slate-500"><Calendar size={18} /></div>
                 </div>
              </div>
              <div className="w-1/2">
                 <label className="block text-xs font-medium text-slate-500 mb-1">Data Final</label>
                 <div className="relative w-full">
-                  <input
-                    type="date"
-                    ref={endDateRef}
-                    value={dateRange.end}
-                    onClick={(e) => e.currentTarget.showPicker()} // Força abertura em qualquer navegador
-                    onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
-                    className={`${inputClass} pr-10 cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0`}
-                  />
-                   <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-slate-500">
-                    <Calendar size={18} />
-                  </div>
+                  <input type="date" ref={endDateRef} value={dateRange.end} onClick={(e) => e.currentTarget.showPicker()} onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })} className={`${inputClass} pr-10 cursor-pointer`} />
+                   <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-slate-500"><Calendar size={18} /></div>
                 </div>
              </div>
            </div>
 
-           {/* Other Filters */}
            <div><MultiSelect label="Contratos" options={contractOptions} selected={filterContract} onChange={setFilterContract} placeholder="Todos os contratos" /></div>
            <div><MultiSelect label="Placas" options={vehicleOptions} selected={filterVehicleId} onChange={setFilterVehicleId} placeholder="Todas as placas" /></div>
            <div><MultiSelect label="Equipes" options={foremanOptions} selected={filterForeman} onChange={setFilterForeman} placeholder="Todas as equipes" /></div>
@@ -684,7 +567,6 @@ const Reports: React.FC = () => {
         </form>
       </div>
 
-      {/* Summary Card */}
       <div className="bg-white rounded-xl shadow-md border border-slate-200 p-6 print:border-none print:shadow-none print:p-0 print:mb-4">
         <div className="flex items-center gap-2 text-slate-800 font-bold mb-4 border-b pb-2 print:hidden">
            <FileText size={20} className="text-blue-600" />
@@ -710,7 +592,6 @@ const Reports: React.FC = () => {
         </div>
       </div>
 
-      {/* Results Table */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden print:shadow-none print:border-none print:overflow-visible">
          <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center print:hidden">
             <h3 className="font-bold text-slate-700 flex items-center gap-2">
@@ -721,7 +602,7 @@ const Reports: React.FC = () => {
 
          <div className="overflow-x-auto print:overflow-visible">
            <table className="w-full text-base text-left whitespace-nowrap">
-             <thead className="bg-slate-100 text-slate-600 font-semibold uppercase tracking-wider text-sm print:bg-white print:text-black">
+             <thead className="bg-slate-100 text-slate-600 font-semibold uppercase tracking-wider text-sm print:bg-slate-200 print:text-slate-900">
                <tr>
                  <th className="px-4 py-3 border-b print:px-1 print:py-1">Data</th>
                  <th className="px-4 py-3 border-b min-w-[200px] print:px-1 print:py-1">Veículo / Motorista / Local</th>
@@ -731,15 +612,12 @@ const Reports: React.FC = () => {
                  <th className="px-4 py-3 border-b print:px-1 print:py-1">KM Rodado</th>
                  <th className="px-4 py-3 border-b print:px-1 print:py-1">Vel. Máx</th>
                  <th className="px-4 py-3 border-b min-w-[160px] print:px-1 print:py-1">Últ. Abast.</th>
-                 {/* Removed Obs Column */}
                  {!isReadOnly && <th className="px-4 py-3 border-b text-center print:hidden">Ações</th>}
                </tr>
              </thead>
              <tbody className="divide-y divide-slate-100">
                {filteredLogs.length === 0 ? (
-                 <tr>
-                   <td colSpan={isReadOnly ? 8 : 9} className="px-6 py-12 text-center text-slate-400">Nenhum registro encontrado.</td>
-                 </tr>
+                 <tr><td colSpan={isReadOnly ? 8 : 9} className="px-6 py-12 text-center text-slate-400">Nenhum registro encontrado.</td></tr>
                ) : (
                  filteredLogs.map(log => {
                    const displayContract = log.historicalContract || log.vehicle.contract;
@@ -754,11 +632,7 @@ const Reports: React.FC = () => {
                            </div>
                         )}
                         {log.observations && (
-                          <button 
-                              onClick={(e) => { e.stopPropagation(); openObsModal(log); }}
-                              className="mt-1 text-yellow-600 hover:text-yellow-800 hover:bg-yellow-100 rounded-full p-1 transition-colors print:hidden" 
-                              title="Ver Observação"
-                          >
+                          <button onClick={(e) => { e.stopPropagation(); openObsModal(log); }} className="mt-1 text-yellow-600 hover:text-yellow-800 hover:bg-yellow-100 rounded-full p-1 transition-colors print:hidden">
                               <MessageSquareText size={16} className="fill-yellow-100" />
                           </button>
                         )}
@@ -822,7 +696,6 @@ const Reports: React.FC = () => {
                        </>
                      )}
                      
-                     {/* Último Abastecimento */}
                      <td className="px-4 py-3 align-top print:px-1 print:py-1">
                         {log.lastRefuelingInfo ? (
                             <div className="flex flex-col gap-1 text-sm">
@@ -844,11 +717,9 @@ const Reports: React.FC = () => {
                                 )}
                             </div>
                         ) : (
-                            <span className="text-xs text-slate-400 italic">Sem registro anterior</span>
+                            <span className="text-xs text-slate-400 italic">Sem registro</span>
                         )}
                      </td>
-
-                     {/* Removed Obs Column */}
 
                      {!isReadOnly && (
                       <td className="px-4 py-3 align-middle text-center print:hidden">

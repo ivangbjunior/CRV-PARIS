@@ -400,7 +400,7 @@ const Requisitions: React.FC = () => {
 
      const qtdText = req.isFullTank ? "COMPLETAR TANQUE" : `${req.liters} L`;
 
-     const text = `*REQUISIÇÃO INTERNA Nº: ${req.internalId}*
+     const text = `*SOLICITAÇÃO DE ABASTECIMENTO Nº: ${req.internalId}*
 Encarregado: ${req.requesterName}
 Veículo: ${vehicleInfo}
 Município: ${req.municipality}

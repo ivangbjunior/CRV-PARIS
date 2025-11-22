@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import Vehicles from './components/Vehicles';
 import DailyLogs from './components/DailyLogs';
@@ -11,6 +10,7 @@ import { LayoutDashboard, Truck, FileSpreadsheet, Menu, X, Home, ChevronRight, F
 import { UserRole, DailyLog, Vehicle } from './types';
 import { storageService } from './services/storage';
 import { calculateDuration, formatMinutesToTime } from './utils/timeUtils';
+import { ParisLogo } from './components/ParisLogo';
 
 enum Tab {
   HOME = 'home',
@@ -20,65 +20,6 @@ enum Tab {
   FUEL = 'fuel',
   REQUISITIONS = 'requisitions'
 }
-
-// --- Logo Component ---
-const ParisLogo = ({ variant = 'dark', size = 'normal' }: { variant?: 'dark' | 'light', size?: 'normal' | 'large' }) => {
-  const isLarge = size === 'large';
-  const textColor = variant === 'dark' ? 'text-slate-900' : 'text-white';
-  const subColor = variant === 'dark' ? 'text-blue-700' : 'text-blue-200';
-  const circleBorder = variant === 'dark' ? 'border-blue-900' : 'border-white/30';
-  const towerColor = variant === 'dark' ? 'text-blue-900' : 'text-white';
-
-  // Dimensions
-  const circleSize = isLarge ? 'w-28 h-28' : 'w-10 h-10';
-  const titleSize = isLarge ? 'text-6xl' : 'text-2xl';
-  const subSize = isLarge ? 'text-sm' : 'text-[10px]';
-  // Adjust icon size to fit well within the circle without touching borders
-  const iconSize = isLarge ? 'h-20 w-auto' : 'h-7 w-auto'; 
-  const strokeWidth = isLarge ? 8 : 10; // Relative to viewBox 0 0 100 200
-
-  return (
-    <div className="flex items-center gap-4 select-none">
-      {/* Symbol */}
-      <div className={`${circleSize} rounded-full border-2 ${circleBorder} flex items-center justify-center bg-transparent flex-shrink-0`}>
-        <svg 
-          viewBox="0 0 100 200" 
-          className={`${towerColor} ${iconSize}`}
-          fill="none" 
-          stroke="currentColor" 
-          strokeLinecap="round" 
-          strokeLinejoin="round"
-        >
-          {/* Top Spire */}
-          <path d="M50 10 L50 40" strokeWidth={strokeWidth} />
-          
-          {/* Main Body Legs - using quadratic curves for the iconic slope */}
-          <path d="M50 40 Q 45 100 20 190" strokeWidth={strokeWidth} />
-          <path d="M50 40 Q 55 100 80 190" strokeWidth={strokeWidth} />
-          
-          {/* Top Platform */}
-          <path d="M38 85 L62 85" strokeWidth={strokeWidth} />
-          
-          {/* Middle Platform */}
-          <path d="M30 135 L70 135" strokeWidth={strokeWidth} />
-          
-          {/* Base Arch */}
-          <path d="M25 185 Q 50 160 75 185" strokeWidth={strokeWidth * 0.8} />
-        </svg>
-      </div>
-      
-      {/* Text */}
-      <div className="flex flex-col justify-center">
-        <span className={`font-black ${titleSize} leading-none tracking-tighter ${textColor} font-sans`} style={{ fontFamily: "'Roboto', sans-serif" }}>
-          CRV-PARIS
-        </span>
-        <span className={`${subSize} font-bold tracking-[0.15em] ${subColor} uppercase ml-1`}>
-          Controle de Frota
-        </span>
-      </div>
-    </div>
-  );
-};
 
 // --- Home Menu Component ---
 interface HomeMenuProps {
@@ -101,11 +42,8 @@ const HomeMenu: React.FC<HomeMenuProps> = ({ onNavigate, role, userName }) => {
   const [loadingAlerts, setLoadingAlerts] = useState(true);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   
-  // State to track how many alerts were seen. 
-  // Badge only shows if alerts.length > viewedAlertsCount
   const [viewedAlertsCount, setViewedAlertsCount] = useState(0);
 
-  // Define access logic based on Roles
   const showLogs = (role === UserRole.ADMIN || role === UserRole.GESTOR || role === UserRole.OPERADOR) && role !== UserRole.GERENCIA;
   const showVehicles = role !== UserRole.ENCARREGADO;
   const showFuel = role === UserRole.ADMIN || role === UserRole.GESTOR || role === UserRole.FINANCEIRO || role === UserRole.GERENCIA;
@@ -260,7 +198,6 @@ const HomeMenu: React.FC<HomeMenuProps> = ({ onNavigate, role, userName }) => {
 
   const handleOpenNotifications = () => {
     setIsNotificationsOpen(true);
-    // Mark all current alerts as viewed
     setViewedAlertsCount(alerts.length);
   };
 
@@ -290,21 +227,19 @@ const HomeMenu: React.FC<HomeMenuProps> = ({ onNavigate, role, userName }) => {
   const hasNewNotifications = alerts.length > viewedAlertsCount;
 
   return (
-    <div className="relative min-h-full w-full p-6 lg:p-8 font-sans flex flex-col">
+    <div className="relative min-h-full w-full p-6 lg:p-8 font-sans flex flex-col print:p-0 print:block">
       
       {/* Modernized Background */}
-      <div className="fixed inset-0 pointer-events-none z-0 h-screen w-screen overflow-hidden bg-slate-50">
-          {/* Soft Gradient Blobs */}
+      <div className="fixed inset-0 pointer-events-none z-0 h-screen w-screen overflow-hidden bg-slate-50 print:hidden">
           <div className="absolute top-0 left-0 w-[800px] h-[800px] bg-blue-200/20 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob"></div>
           <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-indigo-200/20 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob animation-delay-2000"></div>
           <div className="absolute -bottom-32 left-20 w-[800px] h-[800px] bg-slate-200/30 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob animation-delay-4000"></div>
           
-          {/* Noise Texture Overlay for modern feel */}
           <div className="absolute inset-0 opacity-[0.4]" style={{backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.1'/%3E%3C/svg%3E")`}}></div>
       </div>
 
-      {/* Status Badge */}
-      <div className="flex justify-center w-full relative z-20 -mt-2 mb-4">
+      {/* Status Badge - Hide on Print */}
+      <div className="flex justify-center w-full relative z-20 -mt-2 mb-4 print:hidden">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-b-xl bg-white border-b border-x border-slate-200 shadow-sm transform -translate-y-2">
               <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
               <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">Sistema Online</span>
@@ -313,14 +248,11 @@ const HomeMenu: React.FC<HomeMenuProps> = ({ onNavigate, role, userName }) => {
 
       {/* Notifications Drawer (Slide-over) */}
       {isNotificationsOpen && (
-          <div className="fixed inset-0 z-50 flex justify-end">
-              {/* Backdrop */}
+          <div className="fixed inset-0 z-50 flex justify-end print:hidden">
               <div 
                   className="absolute inset-0 bg-black/20 backdrop-blur-sm transition-opacity" 
                   onClick={() => setIsNotificationsOpen(false)}
               ></div>
-              
-              {/* Panel */}
               <div className="relative w-full max-w-sm h-full bg-white shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
                   <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/80">
                       <div className="flex items-center gap-3">
@@ -356,7 +288,6 @@ const HomeMenu: React.FC<HomeMenuProps> = ({ onNavigate, role, userName }) => {
                         ) : (
                             alerts.map(alert => (
                                 <div key={alert.id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow relative overflow-hidden group">
-                                    {/* Color Bar Indicator */}
                                     <div className={`absolute left-0 top-0 bottom-0 w-1 ${
                                         alert.type === 'SPEEDING' ? 'bg-red-500' : 
                                         alert.type === 'NO_SIGNAL' ? 'bg-orange-500' : 'bg-blue-500'
@@ -372,7 +303,6 @@ const HomeMenu: React.FC<HomeMenuProps> = ({ onNavigate, role, userName }) => {
                                                 {formatDate(alert.date)}
                                             </span>
                                         </div>
-                                        
                                         <div className="text-sm">
                                             {alert.details}
                                         </div>
@@ -385,12 +315,11 @@ const HomeMenu: React.FC<HomeMenuProps> = ({ onNavigate, role, userName }) => {
           </div>
       )}
 
-      <div className="relative z-10 max-w-7xl mx-auto w-full flex-1">
+      <div className="relative z-10 max-w-7xl mx-auto w-full flex-1 print:max-w-none print:w-full">
         
         {/* --- Header Section --- */}
-        <div className="flex items-center justify-between mb-10 animate-in slide-in-from-top-4 duration-700">
+        <div className="flex items-center justify-between mb-10 animate-in slide-in-from-top-4 duration-700 print:hidden">
             <div className="flex items-start gap-6">
-                {/* Bell Icon on Left Side - Improved Style */}
                 {canSeeNotifications && (
                     <button 
                         onClick={handleOpenNotifications}
@@ -402,7 +331,6 @@ const HomeMenu: React.FC<HomeMenuProps> = ({ onNavigate, role, userName }) => {
                     >
                         <Bell size={24} className={hasNewNotifications ? "animate-[swing_1s_ease-in-out_infinite]" : ""} />
                         
-                        {/* Badge only shows if there are NEW notifications */}
                         {hasNewNotifications && (
                             <span className="absolute top-2.5 right-3 flex h-3 w-3">
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
@@ -432,9 +360,9 @@ const HomeMenu: React.FC<HomeMenuProps> = ({ onNavigate, role, userName }) => {
         </div>
 
         {/* --- Main Content (Full Width Cards) --- */}
-        <div className="w-full animate-in slide-in-from-bottom-8 fade-in duration-1000 delay-200">
+        <div className="w-full animate-in slide-in-from-bottom-8 fade-in duration-1000 delay-200 print:animate-none">
             
-            <div className="mb-6 flex items-center gap-3">
+            <div className="mb-6 flex items-center gap-3 print:hidden">
                 <div className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-300 to-transparent"></div>
                 <div className="flex items-center gap-2 text-slate-400 bg-white/50 px-3 py-1 rounded-full backdrop-blur-sm border border-white/20 shadow-sm">
                     <Zap size={14} className="text-yellow-500" fill="currentColor" />
@@ -443,11 +371,8 @@ const HomeMenu: React.FC<HomeMenuProps> = ({ onNavigate, role, userName }) => {
                 <div className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-300 to-transparent"></div>
             </div>
 
-            {/* Grid Layout for Cards - 3 Columns for large screens */}
-            {/* Reordered based on user request: Logs -> Vehicles -> Reports -> Fuel -> Requisitions */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-10">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-10 print:hidden">
                 
-                {/* 1. Daily Logs */}
                 {showLogs && (
                     <HomeCard 
                     icon={LayoutDashboard} 
@@ -458,7 +383,6 @@ const HomeMenu: React.FC<HomeMenuProps> = ({ onNavigate, role, userName }) => {
                     />
                 )}
 
-                {/* 2. Fleet (Vehicles) */}
                 {showVehicles && (
                 <HomeCard 
                     icon={Truck} 
@@ -469,7 +393,6 @@ const HomeMenu: React.FC<HomeMenuProps> = ({ onNavigate, role, userName }) => {
                 />
                 )}
 
-                {/* 3. Reports */}
                 {showReports && (
                     <HomeCard 
                     icon={FileSpreadsheet} 
@@ -480,7 +403,6 @@ const HomeMenu: React.FC<HomeMenuProps> = ({ onNavigate, role, userName }) => {
                     />
                 )}
 
-                {/* 4. Fuel */}
                 {showFuel && (
                     <HomeCard 
                     icon={Fuel} 
@@ -491,7 +413,6 @@ const HomeMenu: React.FC<HomeMenuProps> = ({ onNavigate, role, userName }) => {
                     />
                 )}
 
-                {/* 5. Requisitions */}
                 {showRequisitions && (
                     <HomeCard 
                     icon={FileText} 
@@ -571,10 +492,8 @@ const HomeCard: React.FC<HomeCardProps> = ({ icon: Icon, title, subtitle, theme,
       onClick={onClick}
       className={`group relative bg-white overflow-hidden rounded-2xl border transition-all duration-500 text-left h-[220px] hover:-translate-y-2 hover:shadow-xl ${t.border} ${t.shadow}`}
     >
-      {/* Decorative Background Gradient Blob */}
       <div className={`absolute -right-10 -top-10 w-40 h-40 bg-gradient-to-br ${t.gradient} opacity-10 rounded-full blur-3xl group-hover:opacity-20 transition-opacity duration-500`}></div>
       
-      {/* Watermark Icon */}
       <Icon 
         className={`absolute -right-6 -bottom-6 text-slate-100 transform -rotate-12 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-0 opacity-50`} 
         size={140} 
@@ -582,12 +501,10 @@ const HomeCard: React.FC<HomeCardProps> = ({ icon: Icon, title, subtitle, theme,
       />
 
       <div className="absolute inset-0 p-6 flex flex-col justify-between h-full z-10">
-          {/* Top Section: Icon */}
           <div className={`w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg bg-gradient-to-br ${t.gradient} text-white transform group-hover:scale-110 transition-transform duration-300`}>
             <Icon size={32} strokeWidth={1.5} />
           </div>
           
-          {/* Bottom Section: Text and Arrow */}
           <div className="w-full relative">
              <div className="flex justify-between items-end">
                 <div>
@@ -610,20 +527,18 @@ const App: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showReset, setShowReset] = useState(false);
 
-  // Always force HOME when user changes (login)
   useEffect(() => {
     if (user) {
       setActiveTab(Tab.HOME);
     }
   }, [user]);
 
-  // Timer para mostrar botão de reset se o loading demorar muito
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
     if (loading) {
       timer = setTimeout(() => {
         setShowReset(true);
-      }, 5000); // 5 segundos
+      }, 5000);
     } else {
       setShowReset(false);
     }
@@ -662,7 +577,6 @@ const App: React.FC = () => {
     return <Login />;
   }
 
-  // ACCESS CONTROL FLAGS
   const isFinanceiro = user.role === UserRole.FINANCEIRO;
   const isOperador = user.role === UserRole.OPERADOR;
   const isRH = user.role === UserRole.RH;
@@ -670,18 +584,14 @@ const App: React.FC = () => {
   const isEncarregado = user.role === UserRole.ENCARREGADO;
   const isGestorOrAdmin = user.role === UserRole.ADMIN || user.role === UserRole.GESTOR;
 
-  // Access Logic Maps
-  // HIDE LOGS FOR GERENCIA
   const canAccessLogs = (isGestorOrAdmin || isOperador) && !isGerencia;
-  const canAccessVehicles = !isEncarregado; // Encarregado has very limited vehicle view only inside Requisitions
+  const canAccessVehicles = !isEncarregado; 
   const canAccessFuel = isGestorOrAdmin || isFinanceiro || isGerencia;
   const canAccessReports = isGestorOrAdmin || isRH || isOperador || isGerencia;
   const canAccessRequisitions = isGestorOrAdmin || isFinanceiro || isGerencia || isEncarregado;
 
-  // Ajustado para pegar apenas o primeiro nome, removendo pontos e sobrenomes
   const getUserName = () => {
       const rawName = user.name || user.email.split('@')[0];
-      // Substitui pontos por espaços e pega o primeiro elemento
       return rawName.replace(/\./g, ' ').split(' ')[0].toUpperCase();
   };
 
@@ -755,7 +665,6 @@ const App: React.FC = () => {
           <div className="my-4 border-t border-slate-800/50 mx-2"></div>
           <p className="px-4 text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">Módulos</p>
           
-          {/* REORDERED MENU ITEMS */}
           {canAccessLogs && <NavItem tab={Tab.LOGS} label="Lançamento Diário" icon={LayoutDashboard} />}
           {canAccessVehicles && <NavItem tab={Tab.VEHICLES} label="Gestão de Frota" icon={Truck} />}
           {canAccessReports && <NavItem tab={Tab.REPORTS} label="Relatórios" icon={FileSpreadsheet} />}
@@ -804,7 +713,6 @@ const App: React.FC = () => {
            <nav className="space-y-2">
              <NavItem tab={Tab.HOME} label="Menu Inicial" icon={Home} />
              <div className="my-4 border-t border-slate-800"></div>
-             {/* REORDERED MOBILE MENU */}
              {canAccessLogs && <NavItem tab={Tab.LOGS} label="Lançamento Diário" icon={LayoutDashboard} />}
              {canAccessVehicles && <NavItem tab={Tab.VEHICLES} label="Gestão de Frota" icon={Truck} />}
              {canAccessReports && <NavItem tab={Tab.REPORTS} label="Relatórios" icon={FileSpreadsheet} />}
@@ -831,7 +739,6 @@ const App: React.FC = () => {
 
       {/* Main Content */}
       <main className="flex-1 p-0 md:p-0 overflow-y-auto h-full relative print:p-0 print:overflow-visible print:h-auto">
-        {/* Subtle background pattern */}
         <div className="absolute inset-0 opacity-[0.015] pointer-events-none z-0 print:hidden" 
              style={{ backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '24px 24px' }}>
         </div>
