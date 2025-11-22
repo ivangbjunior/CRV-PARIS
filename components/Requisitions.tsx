@@ -415,7 +415,7 @@ Observação: ${req.observation || '-'}
   
   // --- HELPERS ---
   const getAvailableVehicles = () => {
-      if (isFinanceiro || isGerencia) return vehicles; // Financeiro vê todos
+      if (isFinanceiro || isGerencia || isAdmin) return vehicles; // Financeiro e Admin vêem todos
       if (isEncarregado && user) {
           const myVehicleIds = userVehicles.filter(uv => uv.userId === user.id).map(uv => uv.vehicleId);
           return vehicles.filter(v => myVehicleIds.includes(v.id));
@@ -453,8 +453,8 @@ Observação: ${req.observation || '-'}
                 </h1>
                 <p className="text-slate-500">Solicitação e aprovação de combustível.</p>
             </div>
-            {/* New Request Button for Encarregado/Financeiro */}
-            {(isEncarregado || isFinanceiro) && (
+            {/* New Request Button for Encarregado/Financeiro/Admin */}
+            {(isEncarregado || isFinanceiro || isAdmin) && (
                  <button 
                     onClick={() => setShowForm(true)}
                     className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 shadow-lg transition-all"

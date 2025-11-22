@@ -625,25 +625,37 @@ const App: React.FC = () => {
         setActiveTab(tab);
         setIsMobileMenuOpen(false);
       }}
-      className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all w-full mb-1 ${
+      className={`group flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all w-full mb-1 relative overflow-hidden ${
         activeTab === tab
-          ? 'bg-blue-800 text-white shadow-md ring-1 ring-blue-700'
-          : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+          ? 'bg-blue-600/10 text-white shadow-lg shadow-blue-900/20'
+          : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
       }`}
     >
-      <Icon size={20} className={activeTab === tab ? 'text-blue-200' : ''} />
-      <span className="font-medium">{label}</span>
+      {activeTab === tab && (
+        <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500 rounded-r-full"></div>
+      )}
+      <Icon 
+        size={20} 
+        className={`transition-colors relative z-10 ${
+            activeTab === tab ? 'text-blue-400' : 'text-slate-500 group-hover:text-blue-400'
+        }`} 
+      />
+      <span className={`font-medium relative z-10 tracking-wide ${activeTab === tab ? 'font-bold' : ''}`}>{label}</span>
+      
+      {activeTab === tab && (
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 to-transparent pointer-events-none"></div>
+      )}
     </button>
   );
 
   const getRoleBadge = (role: UserRole) => {
     switch(role) {
-      case UserRole.ADMIN: return 'bg-red-500 text-white';
-      case UserRole.GESTOR: return 'bg-blue-500 text-white';
-      case UserRole.FINANCEIRO: return 'bg-emerald-600 text-white';
-      case UserRole.RH: return 'bg-purple-600 text-white';
-      case UserRole.GERENCIA: return 'bg-orange-600 text-white';
-      case UserRole.ENCARREGADO: return 'bg-cyan-600 text-white';
+      case UserRole.ADMIN: return 'bg-red-500/20 text-red-400 border border-red-500/30';
+      case UserRole.GESTOR: return 'bg-blue-500/20 text-blue-400 border border-blue-500/30';
+      case UserRole.FINANCEIRO: return 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
+      case UserRole.RH: return 'bg-purple-500/20 text-purple-400 border border-purple-500/30';
+      case UserRole.GERENCIA: return 'bg-orange-500/20 text-orange-400 border border-orange-500/30';
+      case UserRole.ENCARREGADO: return 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30';
       default: return 'bg-slate-600 text-slate-300';
     }
   };
@@ -651,56 +663,65 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans print:block print:h-auto print:overflow-visible">
       
-      {/* Sidebar (Desktop) */}
-      <aside className="hidden md:flex print:hidden flex-col w-72 bg-slate-900 text-slate-300 h-screen sticky top-0 shadow-xl z-50">
+      {/* Sidebar (Desktop) - Modernized */}
+      <aside className="hidden md:flex print:hidden flex-col w-72 h-screen sticky top-0 shadow-2xl z-50 bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 border-r border-slate-800/50">
         <div 
-          className="p-8 border-b border-slate-800 flex justify-center cursor-pointer hover:bg-slate-800/50 transition-colors"
+          className="p-6 flex justify-center cursor-pointer hover:bg-white/5 transition-colors border-b border-slate-800/50 relative overflow-hidden"
           onClick={() => setActiveTab(Tab.HOME)}
         >
-           <ParisLogo variant="light" />
+           {/* Logo Glow Effect */}
+           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl pointer-events-none"></div>
+           <div className="relative z-10">
+               <ParisLogo variant="light" size="medium" />
+           </div>
         </div>
         
-        <nav className="flex-1 p-4 mt-6">
-          <NavItem tab={Tab.HOME} label="Início" icon={Home} />
-          <div className="my-4 border-t border-slate-800/50 mx-2"></div>
-          <p className="px-4 text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">Módulos</p>
+        <nav className="flex-1 px-4 py-6 overflow-y-auto custom-scrollbar">
+          <NavItem tab={Tab.HOME} label="Visão Geral" icon={Home} />
           
-          {canAccessLogs && <NavItem tab={Tab.LOGS} label="Lançamento Diário" icon={LayoutDashboard} />}
-          {canAccessVehicles && <NavItem tab={Tab.VEHICLES} label="Gestão de Frota" icon={Truck} />}
-          {canAccessReports && <NavItem tab={Tab.REPORTS} label="Relatórios" icon={FileSpreadsheet} />}
-          {canAccessFuel && <NavItem tab={Tab.FUEL} label="Abastecimento" icon={Fuel} />}
-          {canAccessRequisitions && <NavItem tab={Tab.REQUISITIONS} label="Requisições" icon={FileText} />}
-        
+          <div className="my-6 flex items-center gap-3 px-2">
+            <div className="h-px flex-1 bg-slate-800"></div>
+            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Módulos</span>
+            <div className="h-px flex-1 bg-slate-800"></div>
+          </div>
+          
+          <div className="space-y-1">
+            {canAccessLogs && <NavItem tab={Tab.LOGS} label="Diário de Bordo" icon={LayoutDashboard} />}
+            {canAccessVehicles && <NavItem tab={Tab.VEHICLES} label="Gestão de Frota" icon={Truck} />}
+            {canAccessReports && <NavItem tab={Tab.REPORTS} label="Relatórios" icon={FileSpreadsheet} />}
+            {canAccessFuel && <NavItem tab={Tab.FUEL} label="Abastecimento" icon={Fuel} />}
+            {canAccessRequisitions && <NavItem tab={Tab.REQUISITIONS} label="Requisições" icon={FileText} />}
+          </div>
         </nav>
 
-        <div className="p-4 border-t border-slate-800 bg-slate-950/30">
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-slate-800 flex items-center justify-center border border-slate-700">
-                <UserCircle size={20} className="text-slate-400" />
+        {/* Modernized User Profile Section */}
+        <div className="p-4 bg-slate-950/50 border-t border-slate-800 backdrop-blur-sm">
+          <div className="bg-slate-900/50 rounded-xl p-3 border border-slate-800 shadow-inner">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center border border-slate-600 shadow-sm">
+                <UserCircle size={22} className="text-slate-300" />
               </div>
               <div className="flex-1 min-w-0">
                  <p className="text-sm font-bold text-white truncate" title={user.email}>{user.email.split('@')[0]}</p>
-                 <div className="flex items-center gap-1 mt-0.5">
-                    <ShieldCheck size={10} className={user.role === UserRole.ADMIN ? 'text-red-400' : (user.role === UserRole.FINANCEIRO ? 'text-emerald-400' : 'text-blue-400')} />
-                    <span className={`text-[10px] uppercase font-bold tracking-wider rounded px-1 ${getRoleBadge(user.role)}`}>{user.role}</span>
+                 <div className="flex items-center gap-1.5 mt-1">
+                    <span className={`text-[9px] uppercase font-bold tracking-wider rounded px-1.5 py-0.5 ${getRoleBadge(user.role)}`}>{user.role}</span>
                  </div>
               </div>
             </div>
             <button 
               onClick={signOut}
-              className="flex items-center justify-center gap-2 w-full bg-slate-800 hover:bg-red-900/30 hover:text-red-400 text-slate-400 py-2 rounded-lg text-xs font-bold transition-all border border-transparent hover:border-red-900/50"
+              className="flex items-center justify-center gap-2 w-full bg-slate-800 hover:bg-red-900/20 hover:text-red-400 text-slate-400 py-2 rounded-lg text-xs font-bold transition-all border border-slate-700 hover:border-red-900/30 group"
             >
-              <LogOut size={14} /> SAIR DO SISTEMA
+              <LogOut size={14} className="group-hover:-translate-x-1 transition-transform" /> FINALIZAR SESSÃO
             </button>
           </div>
         </div>
       </aside>
 
       {/* Mobile Header */}
-      <header className="md:hidden print:hidden bg-slate-900 text-white p-4 flex justify-between items-center sticky top-0 z-40 shadow-md">
+      <header className="md:hidden print:hidden bg-slate-900 text-white p-4 flex justify-between items-center sticky top-0 z-40 shadow-md border-b border-slate-800">
         <div onClick={() => setActiveTab(Tab.HOME)} className="cursor-pointer">
-          <ParisLogo variant="light" />
+          <ParisLogo variant="light" size="normal" />
         </div>
         <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 hover:bg-slate-800 rounded-lg">
           {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
@@ -722,15 +743,15 @@ const App: React.FC = () => {
            
            <div className="mt-auto pt-8 border-t border-slate-800">
               <div className="flex items-center gap-3 mb-4">
-                 <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center">
+                 <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center border border-slate-700">
                     <UserCircle size={24} className="text-slate-400" />
                  </div>
                  <div>
                     <p className="text-white font-bold text-sm">{user.email}</p>
-                    <p className="text-xs px-1 rounded w-fit mt-1 font-bold uppercase" style={{backgroundColor: user.role === UserRole.FINANCEIRO ? '#059669' : '#475569'}}>{user.role}</p>
+                    <p className="text-xs px-2 py-0.5 rounded w-fit mt-1 font-bold uppercase bg-slate-800 text-slate-300 border border-slate-700">{user.role}</p>
                  </div>
               </div>
-              <button onClick={signOut} className="w-full bg-red-900/20 text-red-400 py-3 rounded-lg font-bold flex items-center justify-center gap-2">
+              <button onClick={signOut} className="w-full bg-red-900/20 text-red-400 py-3 rounded-lg font-bold flex items-center justify-center gap-2 border border-red-900/30">
                 <LogOut size={18} /> Sair
               </button>
            </div>

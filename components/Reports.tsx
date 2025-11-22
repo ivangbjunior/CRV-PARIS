@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { DailyLog, DailyLogReport, Vehicle, ContractType, VehicleType, UserRole } from '../types';
 import { storageService } from '../services/storage';
@@ -5,7 +6,7 @@ import { calculateWorkHours } from '../utils/timeUtils';
 import PasswordModal from './PasswordModal';
 import MultiSelect, { MultiSelectOption } from './MultiSelect';
 import { useAuth } from '../contexts/AuthContext';
-import { Filter, FileText, Trash2, Edit3, Calendar, X, Save, Clock, AlertTriangle, Search, User, MapPin, Key, Ban, Settings, HardHat, Printer, Fuel, Droplet, MessageSquareText, Loader2 } from 'lucide-react';
+import { Filter, FileText, Trash2, Edit3, Calendar, X, Save, Clock, AlertTriangle, Search, User, MapPin, Key, Ban, Settings, HardHat, Printer, Fuel, Droplet, MessageSquareText, Loader2, WifiOff } from 'lucide-react';
 import { PrintHeader } from './PrintHeader';
 
 const Reports: React.FC = () => {
@@ -567,30 +568,52 @@ const Reports: React.FC = () => {
         </form>
       </div>
 
-      <div className="bg-white rounded-xl shadow-md border border-slate-200 p-6 print:border-none print:shadow-none print:p-0 print:mb-4">
-        <div className="flex items-center gap-2 text-slate-800 font-bold mb-4 border-b pb-2 print:hidden">
-           <FileText size={20} className="text-blue-600" />
-           <span>Resumo Geral dos Resultados</span>
+      {/* Resumo Compacto */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-2 print:grid-cols-4">
+            {/* Time */}
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 hover:border-blue-300 transition-all group">
+                <div className="p-3 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors print:hidden">
+                    <Clock size={20} strokeWidth={2} />
+                </div>
+                <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tempo em Operação</p>
+                    <p className="text-xl font-black text-slate-800 leading-none mt-1">{summary.formattedTime}</p>
+                </div>
+            </div>
+
+            {/* KM */}
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 hover:border-green-300 transition-all group">
+                <div className="p-3 bg-green-50 text-green-600 rounded-lg group-hover:bg-green-600 group-hover:text-white transition-colors print:hidden">
+                    <MapPin size={20} strokeWidth={2} />
+                </div>
+                <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">KM Total</p>
+                    <p className="text-xl font-black text-slate-800 leading-none mt-1">{summary.totalKm} <span className="text-xs font-bold text-slate-400">km</span></p>
+                </div>
+            </div>
+
+            {/* No Signal */}
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 hover:border-orange-300 transition-all group">
+                <div className="p-3 bg-orange-50 text-orange-600 rounded-lg group-hover:bg-orange-600 group-hover:text-white transition-colors print:hidden">
+                    <WifiOff size={20} strokeWidth={2} />
+                </div>
+                <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Sem Sinal</p>
+                    <p className="text-xl font-black text-slate-800 leading-none mt-1">{summary.daysNoSignal} <span className="text-xs font-bold text-slate-400">dias</span></p>
+                </div>
+            </div>
+
+            {/* Stopped */}
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 hover:border-red-300 transition-all group">
+                <div className="p-3 bg-red-50 text-red-600 rounded-lg group-hover:bg-red-600 group-hover:text-white transition-colors print:hidden">
+                    <Ban size={20} strokeWidth={2} />
+                </div>
+                <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Parado / Oficina</p>
+                    <p className="text-xl font-black text-slate-800 leading-none mt-1">{summary.daysStopped} <span className="text-xs font-bold text-slate-400">dias</span></p>
+                </div>
+            </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 print:grid-cols-4">
-           <div className="bg-green-50 p-4 rounded-lg border border-green-100 flex flex-col items-center text-center print:bg-white print:border-slate-300">
-              <span className="text-green-600 font-bold text-xs uppercase mb-1 print:text-black">Tempo Ligado (Total)</span>
-              <span className="text-2xl font-black text-green-800 print:text-black">{summary.formattedTime}</span>
-           </div>
-           <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 flex flex-col items-center text-center print:bg-white print:border-slate-300">
-              <span className="text-blue-600 font-bold text-xs uppercase mb-1 print:text-black">KM Rodado (Total)</span>
-              <span className="text-2xl font-black text-blue-800 print:text-black">{summary.totalKm} km</span>
-           </div>
-           <div className="bg-orange-50 p-4 rounded-lg border border-orange-100 flex flex-col items-center text-center print:bg-white print:border-slate-300">
-              <span className="text-orange-600 font-bold text-xs uppercase mb-1 print:text-black">Dias Sem Sinal</span>
-              <span className="text-2xl font-black text-orange-800 print:text-black">{summary.daysNoSignal}</span>
-           </div>
-           <div className="bg-red-50 p-4 rounded-lg border border-red-100 flex flex-col items-center text-center print:bg-white print:border-slate-300">
-              <span className="text-red-600 font-bold text-xs uppercase mb-1 print:text-black">Dias Parado</span>
-              <span className="text-2xl font-black text-red-800 print:text-black">{summary.daysStopped}</span>
-           </div>
-        </div>
-      </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden print:shadow-none print:border-none print:overflow-visible">
          <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center print:hidden">
