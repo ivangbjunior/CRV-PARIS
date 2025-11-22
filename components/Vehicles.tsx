@@ -741,7 +741,7 @@ const Vehicles: React.FC = () => {
       </div>
 
       {/* List Section */}
-      <div className="bg-white rounded-t-xl shadow-sm border border-slate-200 overflow-hidden">
+      <div className="bg-white rounded-t-xl shadow-sm border border-slate-200 overflow-hidden print:overflow-visible">
         <div className="bg-slate-800 p-4 flex justify-between items-center print:hidden">
           <h3 className="font-bold text-white flex items-center gap-2">
              <Truck size={20} /> 
@@ -749,7 +749,7 @@ const Vehicles: React.FC = () => {
           </h3>
         </div>
         
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto print:overflow-visible">
           <table className="w-full text-sm text-left">
             <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200 print:bg-white print:text-black">
               <tr>

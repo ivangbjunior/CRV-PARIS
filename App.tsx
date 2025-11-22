@@ -739,7 +739,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans">
+    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans print:block print:h-auto print:overflow-visible">
       
       {/* Sidebar (Desktop) */}
       <aside className="hidden md:flex print:hidden flex-col w-72 bg-slate-900 text-slate-300 h-screen sticky top-0 shadow-xl z-50">
@@ -830,13 +830,13 @@ const App: React.FC = () => {
       )}
 
       {/* Main Content */}
-      <main className="flex-1 p-0 md:p-0 overflow-y-auto h-full relative print:p-0 print:overflow-visible">
+      <main className="flex-1 p-0 md:p-0 overflow-y-auto h-full relative print:p-0 print:overflow-visible print:h-auto">
         {/* Subtle background pattern */}
         <div className="absolute inset-0 opacity-[0.015] pointer-events-none z-0 print:hidden" 
              style={{ backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '24px 24px' }}>
         </div>
         
-        <div className="relative z-10 h-full flex flex-col">
+        <div className="relative z-10 h-full flex flex-col print:h-auto print:block">
            {renderContent()}
         </div>
       </main>

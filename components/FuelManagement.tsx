@@ -959,8 +959,8 @@ const FuelManagement: React.FC = () => {
              </div>
 
             {/* List */}
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden print:border-none print:shadow-none">
-                <div className="overflow-x-auto">
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden print:border-none print:shadow-none print:overflow-visible">
+                <div className="overflow-x-auto print:overflow-visible">
                     <table className="w-full text-sm text-left">
                         <thead className="bg-slate-100 text-slate-600 font-bold uppercase text-xs print:bg-white print:text-black border-b border-slate-200">
                             <tr>
@@ -1216,8 +1216,8 @@ const FuelManagement: React.FC = () => {
              )}
 
              {/* Stations List */}
-             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                 <div className="overflow-x-auto">
+             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden print:overflow-visible">
+                 <div className="overflow-x-auto print:overflow-visible">
                     <table className="w-full text-sm text-left">
                         <thead className="bg-slate-100 text-slate-600 font-bold uppercase text-xs border-b border-slate-200">
                             <tr>

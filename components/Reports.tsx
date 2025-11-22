@@ -711,7 +711,7 @@ const Reports: React.FC = () => {
       </div>
 
       {/* Results Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden print:shadow-none print:border-none">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden print:shadow-none print:border-none print:overflow-visible">
          <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center print:hidden">
             <h3 className="font-bold text-slate-700 flex items-center gap-2">
               <FileText size={18} /> Listagem Detalhada
@@ -719,7 +719,7 @@ const Reports: React.FC = () => {
             </h3>
          </div>
 
-         <div className="overflow-x-auto">
+         <div className="overflow-x-auto print:overflow-visible">
            <table className="w-full text-base text-left whitespace-nowrap">
              <thead className="bg-slate-100 text-slate-600 font-semibold uppercase tracking-wider text-sm print:bg-white print:text-black">
                <tr>
