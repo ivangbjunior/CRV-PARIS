@@ -26,13 +26,15 @@ export enum UserRole {
   OPERADOR = 'OPERADOR', // Apenas lança dados
   FINANCEIRO = 'FINANCEIRO', // Apenas Abastecimento (Total) e Veículos (Leitura)
   RH = 'RH',              // Apenas Relatórios e Veículos (Leitura)
-  GERENCIA = 'GERENCIA'   // Acesso total a menus, mas SOMENTE LEITURA (sem cadastro/edição/exclusão)
+  GERENCIA = 'GERENCIA',   // Acesso total a menus, mas SOMENTE LEITURA (sem cadastro/edição/exclusão)
+  ENCARREGADO = 'ENCARREGADO' // Acesso restrito a Requisições de seus veículos
 }
 
 export interface UserProfile {
   id: string;
   email: string;
   role: UserRole;
+  name?: string; // Nome opcional para exibição
 }
 // ---------------------------
 
@@ -130,4 +132,49 @@ export interface RefuelingLog {
   municipalitySnapshot: string;
   observation?: string; // Novo campo: Observação/Descrição
   time?: string; // Hora do abastecimento
+}
+
+// --- NOVAS ENTIDADES DE REQUISIÇÃO ---
+
+export enum RequisitionStatus {
+  PENDING = 'PENDENTE',
+  APPROVED = 'APROVADA',
+  REJECTED = 'RECUSADA'
+}
+
+export interface UserVehicle {
+  id: string;
+  userId: string;
+  vehicleId: string;
+}
+
+export interface Requisition {
+  id: string;
+  internalId: number; // Sequencial Global
+  externalId?: string; // Número do Posto (Apenas na aprovação)
+  
+  date: string; // YYYY-MM-DD
+  requestTime: string; // HH:MM
+  
+  requesterId: string;
+  requesterName?: string; // Snapshot do nome do usuário
+  
+  vehicleId: string; // Pode ser ID de veiculo ou 'EXTERNAL'
+  
+  // Se for veículo não cadastrado ou externo
+  externalType?: string; // Carro, Moto, Barco...
+  externalPlate?: string;
+  
+  fuelType: FuelType;
+  liters: number;
+  isFullTank?: boolean; // Novo campo: Completar Tanque
+  observation?: string;
+  municipality: string; // Snapshot ou input manual
+
+  status: RequisitionStatus;
+  
+  // Campos preenchidos na aprovação
+  approvedBy?: string; // ID do Financeiro
+  approvalDate?: string;
+  gasStationId?: string;
 }

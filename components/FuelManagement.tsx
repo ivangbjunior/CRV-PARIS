@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { GasStation, RefuelingLog, Vehicle, FuelType, ContractType, UserRole } from '../types';
+import { GasStation, RefuelingLog, Vehicle, FuelType, ContractType, UserRole, UserProfile } from '../types';
 import { storageService } from '../services/storage';
 import PasswordModal from './PasswordModal';
 import { useAuth } from '../contexts/AuthContext';
@@ -56,7 +56,7 @@ const FuelManagement: React.FC = () => {
   const [uniquePlates, setUniquePlates] = useState<string[]>([]);
   const [uniqueContracts, setUniqueContracts] = useState<string[]>([]);
   const [uniqueMunicipalities, setUniqueMunicipalities] = useState<string[]>([]);
-  const [uniqueForemen, setUniqueForemen] = useState<string[]>([]); // Lista de equipes
+  const [uniqueForemen, setUniqueForemen] = useState<string[]>([]); // Lista de Encarregados (Users)
 
   // Form States
   const [showForm, setShowForm] = useState(false);
@@ -116,10 +116,11 @@ const FuelManagement: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [sData, rData, vData] = await Promise.all([
+      const [sData, rData, vData, uData] = await Promise.all([
           storageService.getGasStations(),
           storageService.getRefuelings(),
-          storageService.getVehicles()
+          storageService.getVehicles(),
+          storageService.getAllUsers()
       ]);
 
       setStations(sData);
@@ -131,15 +132,16 @@ const FuelManagement: React.FC = () => {
       const contracts = Array.from(new Set(rData.map(r => r.contractSnapshot))).sort();
       const cities = Array.from(new Set(rData.map(r => r.municipalitySnapshot))).sort();
       
-      // Foremen: Get from history AND from currently registered vehicles
-      const historyForemen = rData.map(r => r.foremanSnapshot).filter(Boolean);
-      const vehicleForemen = vData.map(v => v.foreman).filter(Boolean);
-      const allForemen = Array.from(new Set([...historyForemen, ...vehicleForemen])).sort();
+      // Filtro de Equipe agora usa Encarregados autenticados no sistema
+      const encarregados = uData
+        .filter(u => u.role === UserRole.ENCARREGADO)
+        .map(u => u.name || u.email.split('@')[0])
+        .sort();
 
       setUniquePlates(plates);
       setUniqueContracts(contracts);
       setUniqueMunicipalities(cities);
-      setUniqueForemen(allForemen);
+      setUniqueForemen(encarregados);
     } catch (e) {
         console.error(e);
     } finally {
@@ -151,6 +153,18 @@ const FuelManagement: React.FC = () => {
     window.print();
   };
 
+  // Helper for fuel colors
+  const getFuelColor = (fuelType: string) => {
+    switch (fuelType) {
+      // Changed from red to orange/amber
+      case FuelType.GASOLINA: return 'bg-orange-100 text-orange-800 border-orange-200'; 
+      case FuelType.ETANOL: return 'bg-green-100 text-green-800 border-green-200';
+      case FuelType.DIESEL: return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case FuelType.DIESEL_S10: return 'bg-slate-100 text-slate-800 border-slate-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
   // --- STATION HANDLERS ---
   const handleSaveStation = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -159,11 +173,11 @@ const FuelManagement: React.FC = () => {
 
     const newStation: GasStation = {
       id: currentStation.id || crypto.randomUUID(),
-      name: currentStation.name,
-      cnpj: currentStation.cnpj || '',
-      municipality: currentStation.municipality,
+      name: currentStation.name.toUpperCase(),
+      cnpj: currentStation.cnpj ? currentStation.cnpj.toUpperCase() : '',
+      municipality: currentStation.municipality.toUpperCase(),
       phone: currentStation.phone || '',
-      address: currentStation.address || ''
+      address: currentStation.address ? currentStation.address.toUpperCase() : ''
     };
 
     setLoading(true);
@@ -202,6 +216,8 @@ const FuelManagement: React.FC = () => {
     
     if (!currentRefueling.gasStationId || !currentRefueling.liters || !currentRefueling.fuelType) return;
 
+    // VALIDATION REMOVED: Allowed duplicate invoices per request
+    
     let snapshotData = {
         plate: '',
         model: '',
@@ -221,7 +237,7 @@ const FuelManagement: React.FC = () => {
         snapshotData.plate = externalData.identifier.toUpperCase();
         snapshotData.model = externalData.model ? externalData.model.toUpperCase() : '';
         snapshotData.contract = externalData.contract;
-        snapshotData.municipality = externalData.municipality;
+        snapshotData.municipality = externalData.municipality.toUpperCase();
         vehicleIdToSave = 'EXTERNAL';
     } else {
         // Validate Registered Vehicle
@@ -248,8 +264,8 @@ const FuelManagement: React.FC = () => {
       fuelType: currentRefueling.fuelType as FuelType,
       liters: Number(currentRefueling.liters),
       totalCost: Number(currentRefueling.totalCost || 0),
-      invoiceNumber: currentRefueling.invoiceNumber || '',
-      requisitionNumber: currentRefueling.requisitionNumber || '',
+      invoiceNumber: currentRefueling.invoiceNumber ? currentRefueling.invoiceNumber.toUpperCase() : '',
+      requisitionNumber: currentRefueling.requisitionNumber ? currentRefueling.requisitionNumber.toUpperCase() : '',
       time: currentRefueling.time || '', // Save Time
       
       // Snapshots
@@ -258,7 +274,7 @@ const FuelManagement: React.FC = () => {
       foremanSnapshot: snapshotData.foreman, 
       contractSnapshot: snapshotData.contract,
       municipalitySnapshot: snapshotData.municipality,
-      observation: isExternal ? externalData.description : '' // Salva descrição para externos
+      observation: isExternal && externalData.description ? externalData.description.toUpperCase() : ''
     };
 
     setLoading(true);
@@ -600,13 +616,13 @@ const FuelManagement: React.FC = () => {
 
                             {/* 4. Foreman/Team Filter */}
                             <div>
-                                <label className="block text-xs font-bold text-slate-500 mb-1">Equipe</label>
+                                <label className="block text-xs font-bold text-slate-500 mb-1">Encarregado</label>
                                 <select 
                                     className={selectClass}
                                     value={filterForeman}
                                     onChange={(e) => setFilterForeman(e.target.value)}
                                 >
-                                    <option value="">Todas</option>
+                                    <option value="">Todos</option>
                                     {uniqueForemen.map(f => <option key={f} value={f}>{f}</option>)}
                                 </select>
                             </div>
@@ -760,10 +776,10 @@ const FuelManagement: React.FC = () => {
                                 <div>
                                     <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Município</label>
                                     <input 
-                                        type="text"
+                                        type="text" 
                                         required
                                         value={externalData.municipality}
-                                        onChange={e => setExternalData({...externalData, municipality: e.target.value})}
+                                        onChange={e => setExternalData({...externalData, municipality: e.target.value.toUpperCase()})}
                                         className={inputClass}
                                     />
                                 </div>
@@ -773,7 +789,7 @@ const FuelManagement: React.FC = () => {
                                         type="text"
                                         placeholder="Detalhes (Opcional)"
                                         value={externalData.description}
-                                        onChange={e => setExternalData({...externalData, description: e.target.value})}
+                                        onChange={e => setExternalData({...externalData, description: e.target.value.toUpperCase()})}
                                         className={inputClass}
                                     />
                                 </div>
@@ -808,14 +824,14 @@ const FuelManagement: React.FC = () => {
 
                         {/* Field: Equipe - Always Visible and Editable, Populated from Existing Data */}
                         <div>
-                            <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Equipe Responsável</label>
+                            <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Encarregado / Equipe</label>
                              <div className="relative">
                                 <select 
                                     value={currentRefueling.foremanSnapshot || ''}
                                     onChange={e => setCurrentRefueling({...currentRefueling, foremanSnapshot: e.target.value})}
                                     className={inputClass}
                                 >
-                                    <option value="">Selecione a Equipe...</option>
+                                    <option value="">Selecione...</option>
                                     {uniqueForemen.map(f => (
                                         <option key={f} value={f}>{f}</option>
                                     ))}
@@ -890,7 +906,7 @@ const FuelManagement: React.FC = () => {
                                 type="text" 
                                 placeholder="Nº da Nota"
                                 value={currentRefueling.invoiceNumber || ''}
-                                onChange={e => setCurrentRefueling({...currentRefueling, invoiceNumber: e.target.value})}
+                                onChange={e => setCurrentRefueling({...currentRefueling, invoiceNumber: e.target.value.toUpperCase()})}
                                 className={inputClass}
                             />
                         </div>
@@ -900,7 +916,7 @@ const FuelManagement: React.FC = () => {
                                 type="text" 
                                 placeholder="Nº da Requisição"
                                 value={currentRefueling.requisitionNumber || ''}
-                                onChange={e => setCurrentRefueling({...currentRefueling, requisitionNumber: e.target.value})}
+                                onChange={e => setCurrentRefueling({...currentRefueling, requisitionNumber: e.target.value.toUpperCase()})}
                                 className={inputClass}
                             />
                         </div>
@@ -949,7 +965,7 @@ const FuelManagement: React.FC = () => {
                         <thead className="bg-slate-100 text-slate-600 font-bold uppercase text-xs print:bg-white print:text-black border-b border-slate-200">
                             <tr>
                                 <th className="px-6 py-3 print:px-2">Data / Hora</th>
-                                <th className="px-6 py-3 print:px-2">Veículo / Equipe</th>
+                                <th className="px-6 py-3 print:px-2">Veículo / Encarregado</th>
                                 <th className="px-6 py-3 print:px-2">Posto</th>
                                 <th className="px-6 py-3 print:px-2">Documentos</th>
                                 <th className="px-6 py-3 print:px-2">Combustível</th>
@@ -1013,12 +1029,20 @@ const FuelManagement: React.FC = () => {
                                                 </div>
                                             </td>
                                             <td className="px-6 py-3 print:px-2">
-                                                <span className={`text-xs font-bold px-2 py-1 rounded border ${item.fuelType === 'DIESEL' ? 'bg-blue-50 text-blue-800 border-blue-200' : 'bg-orange-50 text-orange-800 border-orange-200'}`}>
+                                                <span className={`text-xs font-bold px-2 py-1 rounded border ${getFuelColor(item.fuelType)}`}>
                                                     {item.fuelType}
                                                 </span>
                                             </td>
                                             <td className="px-6 py-3 font-mono print:px-2">{item.liters.toFixed(2)} L</td>
-                                            <td className="px-6 py-3 font-mono font-bold text-slate-700 print:px-2">{formatCurrency(item.totalCost)}</td>
+                                            <td className="px-6 py-3 font-mono font-bold text-slate-700 print:px-2">
+                                                {item.totalCost > 0 ? (
+                                                    formatCurrency(item.totalCost)
+                                                ) : (
+                                                    <span className="inline-flex items-center gap-1 bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-bold border border-red-200 animate-pulse">
+                                                       <AlertCircle size={12} /> PENDÊNCIA
+                                                    </span>
+                                                )}
+                                            </td>
                                             <td className="px-6 py-3 print:hidden text-center">
                                                 {!isReadOnly && (
                                                     <div className="flex justify-center gap-2">
@@ -1127,7 +1151,7 @@ const FuelManagement: React.FC = () => {
                                 required
                                 placeholder="Ex: Posto Ipiranga Centro"
                                 value={currentStation.name || ''}
-                                onChange={e => setCurrentStation({...currentStation, name: e.target.value})}
+                                onChange={e => setCurrentStation({...currentStation, name: e.target.value.toUpperCase()})}
                                 className={inputClass}
                             />
                         </div>
@@ -1137,7 +1161,7 @@ const FuelManagement: React.FC = () => {
                                 type="text"
                                 placeholder="00.000.000/0000-00"
                                 value={currentStation.cnpj || ''}
-                                onChange={e => setCurrentStation({...currentStation, cnpj: e.target.value})}
+                                onChange={e => setCurrentStation({...currentStation, cnpj: e.target.value.toUpperCase()})}
                                 className={inputClass}
                             />
                         </div>
@@ -1147,7 +1171,7 @@ const FuelManagement: React.FC = () => {
                                 type="text"
                                 required
                                 value={currentStation.municipality || ''}
-                                onChange={e => setCurrentStation({...currentStation, municipality: e.target.value})}
+                                onChange={e => setCurrentStation({...currentStation, municipality: e.target.value.toUpperCase()})}
                                 className={inputClass}
                             />
                         </div>
@@ -1157,7 +1181,7 @@ const FuelManagement: React.FC = () => {
                                 type="text"
                                 placeholder="Rua, Número, Bairro..."
                                 value={currentStation.address || ''}
-                                onChange={e => setCurrentStation({...currentStation, address: e.target.value})}
+                                onChange={e => setCurrentStation({...currentStation, address: e.target.value.toUpperCase()})}
                                 className={inputClass}
                             />
                         </div>

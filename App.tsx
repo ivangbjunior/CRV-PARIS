@@ -1,20 +1,24 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Vehicles from './components/Vehicles';
 import DailyLogs from './components/DailyLogs';
 import Reports from './components/Reports';
 import FuelManagement from './components/FuelManagement';
+import Requisitions from './components/Requisitions';
 import Login from './components/Login';
 import { useAuth } from './contexts/AuthContext';
-import { LayoutDashboard, Truck, FileSpreadsheet, Menu, X, Home, ChevronRight, Fuel, LogOut, UserCircle, ShieldCheck, AlertTriangle, DollarSign } from 'lucide-react';
-import { UserRole } from './types';
+import { LayoutDashboard, Truck, FileSpreadsheet, Menu, X, Home, ChevronRight, Fuel, LogOut, UserCircle, ShieldCheck, AlertTriangle, DollarSign, FileText, Bell, Gauge, Clock, WifiOff, CheckCircle2, Loader2, Activity, CalendarDays, MapPin, Zap } from 'lucide-react';
+import { UserRole, DailyLog, Vehicle } from './types';
+import { storageService } from './services/storage';
+import { calculateDuration, formatMinutesToTime } from './utils/timeUtils';
 
 enum Tab {
   HOME = 'home',
   LOGS = 'logs',
   VEHICLES = 'vehicles',
   REPORTS = 'reports',
-  FUEL = 'fuel'
+  FUEL = 'fuel',
+  REQUISITIONS = 'requisitions'
 }
 
 // --- Logo Component ---
@@ -80,92 +84,427 @@ const ParisLogo = ({ variant = 'dark', size = 'normal' }: { variant?: 'dark' | '
 interface HomeMenuProps {
   onNavigate: (tab: Tab) => void;
   role: UserRole;
+  userName: string;
 }
 
-const HomeMenu: React.FC<HomeMenuProps> = ({ onNavigate, role }) => {
+interface AlertItem {
+  id: string;
+  type: 'SPEEDING' | 'EXTRA_TIME' | 'NO_SIGNAL';
+  date: string;
+  title: string;
+  details: React.ReactNode;
+  severity: 'high' | 'medium' | 'low';
+}
+
+const HomeMenu: React.FC<HomeMenuProps> = ({ onNavigate, role, userName }) => {
+  const [alerts, setAlerts] = useState<AlertItem[]>([]);
+  const [loadingAlerts, setLoadingAlerts] = useState(true);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  
+  // State to track how many alerts were seen. 
+  // Badge only shows if alerts.length > viewedAlertsCount
+  const [viewedAlertsCount, setViewedAlertsCount] = useState(0);
+
   // Define access logic based on Roles
-  const showLogs = role === UserRole.ADMIN || role === UserRole.GESTOR || role === UserRole.OPERADOR || role === UserRole.GERENCIA;
-  const showVehicles = true; // Todos veem veículos (RH e GERENCIA read-only)
+  const showLogs = (role === UserRole.ADMIN || role === UserRole.GESTOR || role === UserRole.OPERADOR) && role !== UserRole.GERENCIA;
+  const showVehicles = role !== UserRole.ENCARREGADO;
   const showFuel = role === UserRole.ADMIN || role === UserRole.GESTOR || role === UserRole.FINANCEIRO || role === UserRole.GERENCIA;
   const showReports = role === UserRole.ADMIN || role === UserRole.GESTOR || role === UserRole.RH || role === UserRole.OPERADOR || role === UserRole.GERENCIA;
+  const showRequisitions = role === UserRole.ADMIN || role === UserRole.GESTOR || role === UserRole.FINANCEIRO || role === UserRole.GERENCIA || role === UserRole.ENCARREGADO;
+
+  const canSeeNotifications = role === UserRole.ADMIN || role === UserRole.GERENCIA;
+
+  useEffect(() => {
+    if (canSeeNotifications) {
+      fetchAlerts();
+    }
+  }, [canSeeNotifications]);
+
+  const fetchAlerts = async () => {
+    setLoadingAlerts(true);
+    try {
+      const [logs, vehicles] = await Promise.all([
+        storageService.getLogs(),
+        storageService.getVehicles()
+      ]);
+
+      const generatedAlerts: AlertItem[] = [];
+      
+      const getVehicleInfo = (log: DailyLog) => {
+        const v = vehicles.find(v => v.id === log.vehicleId);
+        return {
+           plate: log.historicalPlate || v?.plate || 'Desconhecido',
+           driver: log.historicalDriver || v?.driverName || 'Desconhecido',
+           contract: log.historicalContract || v?.contract || '-'
+        };
+      };
+
+      const sortedLogs = [...logs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      const cutOffDate = new Date();
+      cutOffDate.setDate(cutOffDate.getDate() - 5); // Últimos 5 dias
+      const cutOffStr = cutOffDate.toISOString().split('T')[0];
+      const recentLogs = sortedLogs.filter(l => l.date >= cutOffStr);
+
+      recentLogs.forEach(log => {
+        const info = getVehicleInfo(log);
+        if (log.maxSpeed > 90) {
+          generatedAlerts.push({
+            id: `speed-${log.id}`,
+            type: 'SPEEDING',
+            date: log.date,
+            severity: 'high',
+            title: `Excesso: ${log.maxSpeed} km/h`,
+            details: (
+              <div className="text-xs text-slate-600 mt-1">
+                <span className="font-bold text-slate-800">{info.plate}</span> - {info.driver}
+                <div className="mt-0.5 bg-red-50 text-red-700 px-2 py-0.5 rounded w-fit border border-red-100 font-medium">
+                    Ocorrências &gt; 90km/h: {log.speedingCount}x
+                </div>
+              </div>
+            )
+          });
+        }
+
+        if (log.extraTimeStart && log.extraTimeEnd) {
+          const minutes = calculateDuration(log.extraTimeStart, log.extraTimeEnd);
+          if (minutes > 0) {
+            generatedAlerts.push({
+              id: `extra-${log.id}`,
+              type: 'EXTRA_TIME',
+              date: log.date,
+              severity: 'medium',
+              title: `Atividade Extra`,
+              details: (
+                <div className="text-xs flex flex-col gap-1 mt-1">
+                   <div className="flex items-center gap-1">
+                     <span className="font-bold text-slate-800">{info.plate}</span>
+                     <span className="text-slate-400">•</span>
+                     <span className="font-medium text-slate-600 truncate max-w-[120px]">{info.driver}</span>
+                   </div>
+                   <div className="flex items-center gap-2">
+                      <span className="text-[9px] font-bold uppercase bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200">
+                        {info.contract}
+                      </span>
+                      <span className="bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded font-mono text-[10px] font-bold">
+                        {log.extraTimeStart} - {log.extraTimeEnd}
+                      </span>
+                   </div>
+                </div>
+              )
+            });
+          }
+        }
+      });
+
+      const vehicleLogs: Record<string, DailyLog[]> = {};
+      logs.forEach(log => {
+        if (!vehicleLogs[log.vehicleId]) vehicleLogs[log.vehicleId] = [];
+        vehicleLogs[log.vehicleId].push(log);
+      });
+
+      Object.keys(vehicleLogs).forEach(vId => {
+         const vLogs = vehicleLogs[vId].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+         let consecutiveNoSignal = 0;
+         let lastDate = '';
+
+         for (const log of vLogs) {
+           if (log.nonOperatingReason === 'SEM SINAL') {
+             consecutiveNoSignal++;
+             if (!lastDate) lastDate = log.date;
+           } else {
+             break;
+           }
+         }
+
+         if (consecutiveNoSignal > 2) {
+            const currentV = vehicles.find(v => v.id === vId);
+            if (currentV) {
+              generatedAlerts.push({
+                id: `nosignal-${vId}`,
+                type: 'NO_SIGNAL',
+                date: lastDate,
+                severity: 'high',
+                title: `Sem Sinal (${consecutiveNoSignal} dias)`,
+                details: (
+                  <div className="text-xs text-slate-600 mt-1 flex flex-col gap-1.5">
+                     <div className="flex items-center justify-between">
+                        <span className="font-bold text-slate-800 text-sm">{currentV.plate}</span>
+                        <span className="text-[9px] bg-slate-100 border border-slate-200 px-1 rounded uppercase text-slate-500">{currentV.type}</span>
+                     </div>
+                     
+                     <div className="flex items-center gap-2 text-slate-600">
+                        <UserCircle size={12} className="text-slate-400" />
+                        <span className="font-medium truncate">{currentV.driverName}</span>
+                     </div>
+
+                     <div className="flex items-center gap-2 text-slate-600">
+                        <MapPin size={12} className="text-slate-400" />
+                        <span className="uppercase font-bold text-xs">{currentV.municipality}</span>
+                     </div>
+                  </div>
+                )
+              });
+            }
+         }
+      });
+
+      generatedAlerts.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      setAlerts(generatedAlerts);
+
+    } catch (error) {
+      console.error("Error fetching alerts", error);
+    } finally {
+      setLoadingAlerts(false);
+    }
+  };
+
+  const handleOpenNotifications = () => {
+    setIsNotificationsOpen(true);
+    // Mark all current alerts as viewed
+    setViewedAlertsCount(alerts.length);
+  };
+
+  const formatDate = (dateStr: string) => {
+    const [y, m, d] = dateStr.split('-');
+    return `${d}/${m}`;
+  };
+
+  const getAlertIcon = (type: string) => {
+      switch(type) {
+          case 'SPEEDING': return <Gauge size={18} />;
+          case 'NO_SIGNAL': return <WifiOff size={18} />;
+          case 'EXTRA_TIME': return <Clock size={18} />;
+          default: return <AlertTriangle size={18} />;
+      }
+  };
+
+  const getAlertColor = (type: string) => {
+      switch(type) {
+          case 'SPEEDING': return 'bg-red-100 text-red-700 border-red-200';
+          case 'NO_SIGNAL': return 'bg-orange-100 text-orange-700 border-orange-200';
+          case 'EXTRA_TIME': return 'bg-blue-100 text-blue-700 border-blue-200';
+          default: return 'bg-slate-100 text-slate-700 border-slate-200';
+      }
+  };
+
+  const hasNewNotifications = alerts.length > viewedAlertsCount;
 
   return (
-    <div className="relative min-h-[calc(100vh-4rem)] flex flex-col items-center justify-center overflow-hidden font-sans">
+    <div className="relative min-h-full w-full p-6 lg:p-8 font-sans flex flex-col">
       
-      {/* Sophisticated Background */}
-      <div className="absolute inset-0 bg-slate-50 pointer-events-none">
-         {/* Grid Pattern */}
-         <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
-         {/* Ambient Glows */}
-         <div className="absolute left-0 top-0 -z-10 m-auto h-[400px] w-[400px] rounded-full bg-blue-400 opacity-10 blur-[100px]"></div>
-         <div className="absolute right-0 bottom-0 -z-10 h-[400px] w-[400px] rounded-full bg-indigo-400 opacity-10 blur-[100px]"></div>
+      {/* Modernized Background */}
+      <div className="fixed inset-0 pointer-events-none z-0 h-screen w-screen overflow-hidden bg-slate-50">
+          {/* Soft Gradient Blobs */}
+          <div className="absolute top-0 left-0 w-[800px] h-[800px] bg-blue-200/20 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob"></div>
+          <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-indigo-200/20 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob animation-delay-2000"></div>
+          <div className="absolute -bottom-32 left-20 w-[800px] h-[800px] bg-slate-200/30 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob animation-delay-4000"></div>
+          
+          {/* Noise Texture Overlay for modern feel */}
+          <div className="absolute inset-0 opacity-[0.4]" style={{backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.1'/%3E%3C/svg%3E")`}}></div>
       </div>
 
-      {/* Main Content Container */}
-      <div className="relative z-10 w-full max-w-6xl px-6">
-        
-        {/* Hero Section */}
-        <div className="text-center mb-20">
-           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white border border-slate-200 shadow-sm mb-8 animate-in fade-in zoom-in duration-700">
-              <span className="flex h-2 w-2 relative">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
-              <span className="text-xs font-bold text-slate-600 uppercase tracking-widest">Paris Engenharia</span>
-           </div>
+      {/* Status Badge */}
+      <div className="flex justify-center w-full relative z-20 -mt-2 mb-4">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-b-xl bg-white border-b border-x border-slate-200 shadow-sm transform -translate-y-2">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+              <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">Sistema Online</span>
+          </div>
+      </div>
 
-           <h1 className="text-6xl md:text-7xl font-black text-slate-900 tracking-tight mb-6 drop-shadow-sm animate-in slide-in-from-bottom-4 fade-in duration-1000">
-             CRV<span className="text-blue-600">PARIS</span>
-           </h1>
-           
-           <p className="text-xl text-slate-500 font-medium max-w-2xl mx-auto animate-in slide-in-from-bottom-4 fade-in duration-1000 delay-100 leading-relaxed">
-             Plataforma integrada de <span className="text-slate-900 font-bold">Controle de Frota</span> e Gestão Operacional.
-           </p>
-        </div>
+      {/* Notifications Drawer (Slide-over) */}
+      {isNotificationsOpen && (
+          <div className="fixed inset-0 z-50 flex justify-end">
+              {/* Backdrop */}
+              <div 
+                  className="absolute inset-0 bg-black/20 backdrop-blur-sm transition-opacity" 
+                  onClick={() => setIsNotificationsOpen(false)}
+              ></div>
+              
+              {/* Panel */}
+              <div className="relative w-full max-w-sm h-full bg-white shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
+                  <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/80">
+                      <div className="flex items-center gap-3">
+                          <div className="relative">
+                              <Bell size={20} className="text-indigo-600" />
+                          </div>
+                          <div>
+                              <h3 className="font-bold text-slate-800">Central de Alertas</h3>
+                              <p className="text-xs text-slate-500">Últimos 5 dias</p>
+                          </div>
+                      </div>
+                      <button onClick={() => setIsNotificationsOpen(false)} className="p-2 hover:bg-slate-200 rounded-full text-slate-500">
+                          <X size={20} />
+                      </button>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/30">
+                        {loadingAlerts ? (
+                           <div className="py-12 text-center flex flex-col items-center gap-3">
+                              <Loader2 className="animate-spin text-blue-500" size={24} />
+                              <span className="text-xs font-medium text-slate-400">Atualizando...</span>
+                           </div>
+                        ) : alerts.length === 0 ? (
+                           <div className="py-20 px-4 text-center flex flex-col items-center gap-4">
+                              <div className="w-16 h-16 rounded-full bg-emerald-50 flex items-center justify-center border border-emerald-100 shadow-sm">
+                                 <ShieldCheck size={32} className="text-emerald-500" />
+                              </div>
+                              <div>
+                                <p className="text-slate-800 font-bold">Tudo Tranquilo!</p>
+                                <p className="text-slate-500 text-sm mt-1">Nenhuma ocorrência registrada recentemente.</p>
+                              </div>
+                           </div>
+                        ) : (
+                            alerts.map(alert => (
+                                <div key={alert.id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow relative overflow-hidden group">
+                                    {/* Color Bar Indicator */}
+                                    <div className={`absolute left-0 top-0 bottom-0 w-1 ${
+                                        alert.type === 'SPEEDING' ? 'bg-red-500' : 
+                                        alert.type === 'NO_SIGNAL' ? 'bg-orange-500' : 'bg-blue-500'
+                                    }`}></div>
+
+                                    <div className="pl-3">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <div className={`flex items-center gap-2 px-2 py-1 rounded-md text-xs font-bold border ${getAlertColor(alert.type)}`}>
+                                                {getAlertIcon(alert.type)}
+                                                <span>{alert.title}</span>
+                                            </div>
+                                            <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">
+                                                {formatDate(alert.date)}
+                                            </span>
+                                        </div>
+                                        
+                                        <div className="text-sm">
+                                            {alert.details}
+                                        </div>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                  </div>
+              </div>
+          </div>
+      )}
+
+      <div className="relative z-10 max-w-7xl mx-auto w-full flex-1">
         
-        {/* Modern Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-in slide-in-from-bottom-8 fade-in duration-1000 delay-200 justify-center">
-           {showLogs && (
-             <HomeCard 
-               icon={LayoutDashboard} 
-               title="Diário de Bordo" 
-               subtitle="Registros operacionais diários" 
-               theme="blue"
-               onClick={() => onNavigate(Tab.LOGS)} 
-             />
-           )}
-           {showVehicles && (
-            <HomeCard 
-              icon={Truck} 
-              title="Minha Frota" 
-              subtitle={(role === UserRole.FINANCEIRO || role === UserRole.RH || role === UserRole.GERENCIA) ? "Visualização e Histórico" : "Gestão de veículos e condutores"} 
-              theme="indigo"
-              onClick={() => onNavigate(Tab.VEHICLES)} 
-            />
-           )}
-           {showFuel && (
-             <HomeCard 
-               icon={Fuel} 
-               title="Abastecimento" 
-               subtitle="Controle de combustível" 
-               theme="orange"
-               onClick={() => onNavigate(Tab.FUEL)} 
-             />
-           )}
-           {showReports && (
-             <HomeCard 
-               icon={FileSpreadsheet} 
-               title="Relatórios" 
-               subtitle="Análise de dados e métricas" 
-               theme="emerald"
-               onClick={() => onNavigate(Tab.REPORTS)} 
-             />
-           )}
+        {/* --- Header Section --- */}
+        <div className="flex items-center justify-between mb-10 animate-in slide-in-from-top-4 duration-700">
+            <div className="flex items-start gap-6">
+                {/* Bell Icon on Left Side - Improved Style */}
+                {canSeeNotifications && (
+                    <button 
+                        onClick={handleOpenNotifications}
+                        className={`relative p-3.5 rounded-2xl transition-all group mt-1 border ${
+                           hasNewNotifications 
+                             ? 'bg-indigo-50 border-indigo-200 text-indigo-600 shadow-lg shadow-indigo-100' 
+                             : 'bg-white border-slate-100 text-slate-500 hover:text-indigo-600 hover:border-indigo-100 shadow-lg shadow-indigo-500/5'
+                        } hover:scale-105`}
+                    >
+                        <Bell size={24} className={hasNewNotifications ? "animate-[swing_1s_ease-in-out_infinite]" : ""} />
+                        
+                        {/* Badge only shows if there are NEW notifications */}
+                        {hasNewNotifications && (
+                            <span className="absolute top-2.5 right-3 flex h-3 w-3">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500 border-2 border-white"></span>
+                            </span>
+                        )}
+                        
+                        <div className="absolute left-0 top-full mt-2 bg-slate-800 text-white text-xs font-bold px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-20 shadow-xl">
+                            {alerts.length > 0 ? `${alerts.length} Alertas` : 'Sem Alertas'}
+                        </div>
+                    </button>
+                )}
+
+                <div>
+                    <div className="flex items-center gap-2 text-slate-500 mb-1">
+                    <CalendarDays size={14} />
+                    <span className="text-xs font-bold uppercase tracking-wide">
+                        {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                    </span>
+                    </div>
+                    <h1 className="text-3xl md:text-4xl font-bold text-slate-900 tracking-tight">
+                    Olá, <span className="text-indigo-600">{userName}</span>
+                    </h1>
+                    <p className="text-slate-500 text-sm mt-1">Bem-vindo ao seu painel de controle.</p>
+                </div>
+            </div>
         </div>
-        
-        <div className="mt-24 text-center animate-in fade-in duration-1000 delay-500">
-           <p className="text-slate-400 text-xs font-bold uppercase tracking-widest opacity-60">Sistema de Gestão v2.0</p>
+
+        {/* --- Main Content (Full Width Cards) --- */}
+        <div className="w-full animate-in slide-in-from-bottom-8 fade-in duration-1000 delay-200">
+            
+            <div className="mb-6 flex items-center gap-3">
+                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-300 to-transparent"></div>
+                <div className="flex items-center gap-2 text-slate-400 bg-white/50 px-3 py-1 rounded-full backdrop-blur-sm border border-white/20 shadow-sm">
+                    <Zap size={14} className="text-yellow-500" fill="currentColor" />
+                    <h2 className="text-xs font-bold uppercase tracking-widest">Acesso Rápido</h2>
+                </div>
+                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-300 to-transparent"></div>
+            </div>
+
+            {/* Grid Layout for Cards - 3 Columns for large screens */}
+            {/* Reordered based on user request: Logs -> Vehicles -> Reports -> Fuel -> Requisitions */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-10">
+                
+                {/* 1. Daily Logs */}
+                {showLogs && (
+                    <HomeCard 
+                    icon={LayoutDashboard} 
+                    title="Diário de Bordo" 
+                    subtitle="Lançar atividades" 
+                    theme="blue"
+                    onClick={() => onNavigate(Tab.LOGS)} 
+                    />
+                )}
+
+                {/* 2. Fleet (Vehicles) */}
+                {showVehicles && (
+                <HomeCard 
+                    icon={Truck} 
+                    title="Minha Frota" 
+                    subtitle="Veículos e condutores" 
+                    theme="indigo"
+                    onClick={() => onNavigate(Tab.VEHICLES)} 
+                />
+                )}
+
+                {/* 3. Reports */}
+                {showReports && (
+                    <HomeCard 
+                    icon={FileSpreadsheet} 
+                    title="Relatórios" 
+                    subtitle="Métricas e resultados" 
+                    theme="emerald"
+                    onClick={() => onNavigate(Tab.REPORTS)} 
+                    />
+                )}
+
+                {/* 4. Fuel */}
+                {showFuel && (
+                    <HomeCard 
+                    icon={Fuel} 
+                    title="Abastecimento" 
+                    subtitle="Controle de postos" 
+                    theme="rose" 
+                    onClick={() => onNavigate(Tab.FUEL)} 
+                    />
+                )}
+
+                {/* 5. Requisitions */}
+                {showRequisitions && (
+                    <HomeCard 
+                    icon={FileText} 
+                    title="Requisições" 
+                    subtitle="Solicitar combustível" 
+                    theme="orange"
+                    onClick={() => onNavigate(Tab.REQUISITIONS)} 
+                    highlight
+                    />
+                )}
+            </div>
         </div>
+
       </div>
     </div>
   );
@@ -176,16 +515,53 @@ interface HomeCardProps {
   icon: React.ElementType;
   title: string;
   subtitle: string;
-  theme: 'blue' | 'indigo' | 'orange' | 'emerald';
+  theme: 'blue' | 'indigo' | 'orange' | 'emerald' | 'rose';
   onClick: () => void;
+  highlight?: boolean;
 }
 
-const HomeCard: React.FC<HomeCardProps> = ({ icon: Icon, title, subtitle, theme, onClick }) => {
+const HomeCard: React.FC<HomeCardProps> = ({ icon: Icon, title, subtitle, theme, onClick, highlight }) => {
   const themes = {
-    blue: { bg: "bg-blue-50", text: "text-blue-600", hoverBorder: "hover:border-blue-300", hoverShadow: "hover:shadow-blue-100" },
-    indigo: { bg: "bg-indigo-50", text: "text-indigo-600", hoverBorder: "hover:border-indigo-300", hoverShadow: "hover:shadow-indigo-100" },
-    orange: { bg: "bg-orange-50", text: "text-orange-600", hoverBorder: "hover:border-orange-300", hoverShadow: "hover:shadow-orange-100" },
-    emerald: { bg: "bg-emerald-50", text: "text-emerald-600", hoverBorder: "hover:border-emerald-300", hoverShadow: "hover:shadow-emerald-100" },
+    blue: { 
+        gradient: "from-blue-500 to-blue-600", 
+        bgLight: "bg-blue-50", 
+        text: "text-blue-900", 
+        border: "border-blue-100 hover:border-blue-300",
+        shadow: "shadow-blue-500/20",
+        iconText: "text-blue-600"
+    },
+    indigo: { 
+        gradient: "from-indigo-500 to-indigo-600", 
+        bgLight: "bg-indigo-50", 
+        text: "text-indigo-900", 
+        border: "border-indigo-100 hover:border-indigo-300",
+        shadow: "shadow-indigo-500/20",
+        iconText: "text-indigo-600"
+    },
+    orange: { 
+        gradient: "from-orange-500 to-orange-600", 
+        bgLight: "bg-orange-50", 
+        text: "text-orange-900", 
+        border: "border-orange-100 hover:border-orange-300",
+        shadow: "shadow-orange-500/20",
+        iconText: "text-orange-600"
+    },
+    emerald: { 
+        gradient: "from-emerald-500 to-emerald-600", 
+        bgLight: "bg-emerald-50", 
+        text: "text-emerald-900", 
+        border: "border-emerald-100 hover:border-emerald-300",
+        shadow: "shadow-emerald-500/20",
+        iconText: "text-emerald-600"
+    },
+    rose: { 
+        gradient: "from-rose-500 to-rose-600", 
+        bgLight: "bg-rose-50", 
+        text: "text-rose-900", 
+        border: "border-rose-100 hover:border-rose-300",
+        shadow: "shadow-rose-500/20",
+        iconText: "text-rose-600"
+    },
   };
   
   const t = themes[theme];
@@ -193,19 +569,36 @@ const HomeCard: React.FC<HomeCardProps> = ({ icon: Icon, title, subtitle, theme,
   return (
     <button 
       onClick={onClick}
-      className={`group bg-white/80 backdrop-blur-sm p-6 rounded-2xl border border-slate-200 shadow-sm transition-all duration-300 text-left flex flex-col h-auto min-h-[220px] hover:-translate-y-1 hover:shadow-xl ${t.hoverBorder} ${t.hoverShadow}`}
+      className={`group relative bg-white overflow-hidden rounded-2xl border transition-all duration-500 text-left h-[220px] hover:-translate-y-2 hover:shadow-xl ${t.border} ${t.shadow}`}
     >
-      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 transition-transform duration-300 group-hover:scale-110 ${t.bg} ${t.text}`}>
-        <Icon size={28} strokeWidth={1.5} />
-      </div>
+      {/* Decorative Background Gradient Blob */}
+      <div className={`absolute -right-10 -top-10 w-40 h-40 bg-gradient-to-br ${t.gradient} opacity-10 rounded-full blur-3xl group-hover:opacity-20 transition-opacity duration-500`}></div>
       
-      <div className="mb-4">
-        <h3 className="text-lg font-bold text-slate-800 mb-2 group-hover:text-slate-900 transition-colors">{title}</h3>
-        <p className="text-sm text-slate-500 font-medium leading-relaxed">{subtitle}</p>
-      </div>
+      {/* Watermark Icon */}
+      <Icon 
+        className={`absolute -right-6 -bottom-6 text-slate-100 transform -rotate-12 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-0 opacity-50`} 
+        size={140} 
+        strokeWidth={1} 
+      />
 
-      <div className="mt-auto flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-400 group-hover:text-slate-800 transition-colors">
-        Acessar <ChevronRight size={14} className="transition-transform group-hover:translate-x-1" />
+      <div className="absolute inset-0 p-6 flex flex-col justify-between h-full z-10">
+          {/* Top Section: Icon */}
+          <div className={`w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg bg-gradient-to-br ${t.gradient} text-white transform group-hover:scale-110 transition-transform duration-300`}>
+            <Icon size={32} strokeWidth={1.5} />
+          </div>
+          
+          {/* Bottom Section: Text and Arrow */}
+          <div className="w-full relative">
+             <div className="flex justify-between items-end">
+                <div>
+                   <h3 className={`text-2xl font-bold ${t.text} mb-1 tracking-tight`}>{title}</h3>
+                   <p className="text-sm text-slate-500 font-medium leading-snug">{subtitle}</p>
+                </div>
+                <div className={`p-2.5 rounded-full bg-white text-slate-300 border border-slate-100 shadow-sm group-hover:text-white group-hover:bg-gradient-to-r ${t.gradient} transition-all duration-300`}>
+                   <ChevronRight size={20} />
+                </div>
+             </div>
+          </div>
       </div>
     </button>
   );
@@ -216,6 +609,13 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>(Tab.HOME);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showReset, setShowReset] = useState(false);
+
+  // Always force HOME when user changes (login)
+  useEffect(() => {
+    if (user) {
+      setActiveTab(Tab.HOME);
+    }
+  }, [user]);
 
   // Timer para mostrar botão de reset se o loading demorar muito
   useEffect(() => {
@@ -267,32 +667,45 @@ const App: React.FC = () => {
   const isOperador = user.role === UserRole.OPERADOR;
   const isRH = user.role === UserRole.RH;
   const isGerencia = user.role === UserRole.GERENCIA;
+  const isEncarregado = user.role === UserRole.ENCARREGADO;
   const isGestorOrAdmin = user.role === UserRole.ADMIN || user.role === UserRole.GESTOR;
 
   // Access Logic Maps
-  const canAccessLogs = isGestorOrAdmin || isOperador || isGerencia;
-  const canAccessVehicles = true; // Everyone has access (some read-only)
+  // HIDE LOGS FOR GERENCIA
+  const canAccessLogs = (isGestorOrAdmin || isOperador) && !isGerencia;
+  const canAccessVehicles = !isEncarregado; // Encarregado has very limited vehicle view only inside Requisitions
   const canAccessFuel = isGestorOrAdmin || isFinanceiro || isGerencia;
   const canAccessReports = isGestorOrAdmin || isRH || isOperador || isGerencia;
+  const canAccessRequisitions = isGestorOrAdmin || isFinanceiro || isGerencia || isEncarregado;
+
+  // Ajustado para pegar apenas o primeiro nome, removendo pontos e sobrenomes
+  const getUserName = () => {
+      const rawName = user.name || user.email.split('@')[0];
+      // Substitui pontos por espaços e pega o primeiro elemento
+      return rawName.replace(/\./g, ' ').split(' ')[0].toUpperCase();
+  };
 
   const renderContent = () => {
     switch (activeTab) {
       case Tab.HOME:
-        return <HomeMenu onNavigate={(tab) => setActiveTab(tab)} role={user.role} />;
+        return <HomeMenu onNavigate={(tab) => setActiveTab(tab)} role={user.role} userName={getUserName()} />;
       case Tab.VEHICLES:
-        if (!canAccessVehicles) return <HomeMenu onNavigate={(tab) => setActiveTab(tab)} role={user.role} />;
+        if (!canAccessVehicles) return <HomeMenu onNavigate={(tab) => setActiveTab(tab)} role={user.role} userName={getUserName()} />;
         return <Vehicles />;
       case Tab.LOGS:
-        if (!canAccessLogs) return <HomeMenu onNavigate={(tab) => setActiveTab(tab)} role={user.role} />;
+        if (!canAccessLogs) return <HomeMenu onNavigate={(tab) => setActiveTab(tab)} role={user.role} userName={getUserName()} />;
         return <DailyLogs />;
       case Tab.REPORTS:
-        if (!canAccessReports) return <HomeMenu onNavigate={(tab) => setActiveTab(tab)} role={user.role} />;
+        if (!canAccessReports) return <HomeMenu onNavigate={(tab) => setActiveTab(tab)} role={user.role} userName={getUserName()} />;
         return <Reports />;
       case Tab.FUEL:
-        if (!canAccessFuel) return <HomeMenu onNavigate={(tab) => setActiveTab(tab)} role={user.role} />;
+        if (!canAccessFuel) return <HomeMenu onNavigate={(tab) => setActiveTab(tab)} role={user.role} userName={getUserName()} />;
         return <FuelManagement />;
+      case Tab.REQUISITIONS:
+        if (!canAccessRequisitions) return <HomeMenu onNavigate={(tab) => setActiveTab(tab)} role={user.role} userName={getUserName()} />;
+        return <Requisitions />;
       default:
-        return <HomeMenu onNavigate={(tab) => setActiveTab(tab)} role={user.role} />;
+        return <HomeMenu onNavigate={(tab) => setActiveTab(tab)} role={user.role} userName={getUserName()} />;
     }
   };
 
@@ -320,6 +733,7 @@ const App: React.FC = () => {
       case UserRole.FINANCEIRO: return 'bg-emerald-600 text-white';
       case UserRole.RH: return 'bg-purple-600 text-white';
       case UserRole.GERENCIA: return 'bg-orange-600 text-white';
+      case UserRole.ENCARREGADO: return 'bg-cyan-600 text-white';
       default: return 'bg-slate-600 text-slate-300';
     }
   };
@@ -341,11 +755,12 @@ const App: React.FC = () => {
           <div className="my-4 border-t border-slate-800/50 mx-2"></div>
           <p className="px-4 text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">Módulos</p>
           
-          {/* Conditional Menu Items based on Role */}
+          {/* REORDERED MENU ITEMS */}
           {canAccessLogs && <NavItem tab={Tab.LOGS} label="Lançamento Diário" icon={LayoutDashboard} />}
           {canAccessVehicles && <NavItem tab={Tab.VEHICLES} label="Gestão de Frota" icon={Truck} />}
-          {canAccessFuel && <NavItem tab={Tab.FUEL} label="Abastecimento" icon={Fuel} />}
           {canAccessReports && <NavItem tab={Tab.REPORTS} label="Relatórios" icon={FileSpreadsheet} />}
+          {canAccessFuel && <NavItem tab={Tab.FUEL} label="Abastecimento" icon={Fuel} />}
+          {canAccessRequisitions && <NavItem tab={Tab.REQUISITIONS} label="Requisições" icon={FileText} />}
         
         </nav>
 
@@ -389,10 +804,12 @@ const App: React.FC = () => {
            <nav className="space-y-2">
              <NavItem tab={Tab.HOME} label="Menu Inicial" icon={Home} />
              <div className="my-4 border-t border-slate-800"></div>
+             {/* REORDERED MOBILE MENU */}
              {canAccessLogs && <NavItem tab={Tab.LOGS} label="Lançamento Diário" icon={LayoutDashboard} />}
              {canAccessVehicles && <NavItem tab={Tab.VEHICLES} label="Gestão de Frota" icon={Truck} />}
-             {canAccessFuel && <NavItem tab={Tab.FUEL} label="Abastecimento" icon={Fuel} />}
              {canAccessReports && <NavItem tab={Tab.REPORTS} label="Relatórios" icon={FileSpreadsheet} />}
+             {canAccessFuel && <NavItem tab={Tab.FUEL} label="Abastecimento" icon={Fuel} />}
+             {canAccessRequisitions && <NavItem tab={Tab.REQUISITIONS} label="Requisições" icon={FileText} />}
            </nav>
            
            <div className="mt-auto pt-8 border-t border-slate-800">
@@ -413,13 +830,13 @@ const App: React.FC = () => {
       )}
 
       {/* Main Content */}
-      <main className="flex-1 p-4 md:p-8 overflow-y-auto h-full relative print:p-0 print:overflow-visible">
+      <main className="flex-1 p-0 md:p-0 overflow-y-auto h-full relative print:p-0 print:overflow-visible">
         {/* Subtle background pattern */}
         <div className="absolute inset-0 opacity-[0.015] pointer-events-none z-0 print:hidden" 
              style={{ backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '24px 24px' }}>
         </div>
         
-        <div className="relative z-10 max-w-7xl mx-auto print:max-w-none print:w-full">
+        <div className="relative z-10 h-full flex flex-col">
            {renderContent()}
         </div>
       </main>

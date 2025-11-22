@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Vehicle, ContractType, VehicleType, DailyLog, UserRole } from '../types';
+import { Vehicle, ContractType, VehicleType, DailyLog, UserRole, UserProfile } from '../types';
 import { storageService } from '../services/storage';
 import PasswordModal from './PasswordModal';
 import { useAuth } from '../contexts/AuthContext';
@@ -32,6 +32,7 @@ const Vehicles: React.FC = () => {
   // Edit / Create State
   const [isEditing, setIsEditing] = useState(false);
   const [currentVehicle, setCurrentVehicle] = useState<Partial<Vehicle>>({});
+  const [foremenList, setForemenList] = useState<string[]>([]);
   
   // Delete Modal State
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -98,13 +99,21 @@ const Vehicles: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [vData, lData] = await Promise.all([
+      const [vData, lData, uData] = await Promise.all([
         storageService.getVehicles(),
-        storageService.getLogs()
+        storageService.getLogs(),
+        storageService.getAllUsers()
       ]);
       setVehicles(vData);
       setFilteredVehicles(vData);
       setLogs(lData);
+      
+      const foremen = uData
+        .filter((u: UserProfile) => u.role === UserRole.ENCARREGADO)
+        .map((u: UserProfile) => u.name || u.email.split('@')[0])
+        .sort();
+      setForemenList(foremen);
+
     } catch (error) {
       console.error("Failed to load data", error);
     } finally {
@@ -114,7 +123,8 @@ const Vehicles: React.FC = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setCurrentVehicle(prev => ({ ...prev, [name]: value }));
+    // Force Uppercase
+    setCurrentVehicle(prev => ({ ...prev, [name]: value.toUpperCase() }));
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -126,11 +136,11 @@ const Vehicles: React.FC = () => {
       id: currentVehicle.id || crypto.randomUUID(),
       contract: currentVehicle.contract as ContractType,
       plate: currentVehicle.plate.toUpperCase(),
-      model: currentVehicle.model || '',
+      model: currentVehicle.model ? currentVehicle.model.toUpperCase() : '',
       year: currentVehicle.year || '',
-      driverName: currentVehicle.driverName || '',
-      municipality: currentVehicle.municipality || '',
-      foreman: currentVehicle.foreman || '',
+      driverName: currentVehicle.driverName ? currentVehicle.driverName.toUpperCase() : '',
+      municipality: currentVehicle.municipality ? currentVehicle.municipality.toUpperCase() : '',
+      foreman: currentVehicle.foreman ? currentVehicle.foreman.toUpperCase() : '',
       type: currentVehicle.type as VehicleType || VehicleType.PICK_UP,
       status: 'ATIVO' // Default, as option was removed
     };
@@ -689,14 +699,22 @@ const Vehicles: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Equipe</label>
+                {/* Changed to Input with Datalist for free text or selection */}
                 <input
-                  type="text"
-                  name="foreman"
-                  value={currentVehicle.foreman || ''}
-                  onChange={handleInputChange}
-                  required
-                  className={inputClass}
+                    list="foremen-list"
+                    type="text"
+                    name="foreman"
+                    value={currentVehicle.foreman || ''}
+                    onChange={handleInputChange}
+                    required
+                    placeholder="Digite ou selecione a equipe..."
+                    className={inputClass}
                 />
+                <datalist id="foremen-list">
+                    {foremenList.map(f => (
+                        <option key={f} value={f} />
+                    ))}
+                </datalist>
               </div>
               
               <div className="md:col-span-2 lg:col-span-3 flex gap-3 mt-4 pt-4 border-t border-slate-100">

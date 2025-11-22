@@ -1,4 +1,5 @@
-import { Vehicle, DailyLog, GasStation, RefuelingLog } from '../types';
+
+import { Vehicle, DailyLog, GasStation, RefuelingLog, Requisition, UserVehicle, UserProfile } from '../types';
 import { supabase } from './supabaseClient';
 
 // Mapeamento de tabelas
@@ -6,7 +7,10 @@ const TABLES = {
   VEHICLES: 'vehicles',
   LOGS: 'daily_logs',
   STATIONS: 'gas_stations',
-  REFUELING: 'refueling_logs'
+  REFUELING: 'refueling_logs',
+  REQUISITIONS: 'requisitions',
+  USER_VEHICLES: 'user_vehicles',
+  USER_ROLES: 'user_roles'
 };
 
 export const storageService = {
@@ -130,5 +134,107 @@ export const storageService = {
       .eq('id', id);
 
     if (error) console.error('Error deleting refueling:', error);
+  },
+
+  // --- Requisition Operations ---
+  getRequisitions: async (): Promise<Requisition[]> => {
+    const { data, error } = await supabase
+      .from(TABLES.REQUISITIONS)
+      .select('*')
+      .order('internalId', { ascending: false }); // Order by most recent ID
+
+    if (error) {
+      console.error('Error fetching requisitions:', error);
+      return [];
+    }
+    return data || [];
+  },
+
+  getNextInternalId: async (): Promise<number> => {
+    // Simula auto-increment global buscando o maior ID atual
+    const { data, error } = await supabase
+      .from(TABLES.REQUISITIONS)
+      .select('internalId')
+      .order('internalId', { ascending: false })
+      .limit(1);
+
+    if (error) {
+       console.error("Error getting next ID", error);
+       return 1;
+    }
+
+    if (data && data.length > 0) {
+        return (data[0].internalId || 0) + 1;
+    }
+    return 1;
+  },
+
+  saveRequisition: async (requisition: Requisition): Promise<void> => {
+    const { error } = await supabase
+      .from(TABLES.REQUISITIONS)
+      .upsert(requisition);
+
+    if (error) console.error('Error saving requisition:', error);
+  },
+
+  deleteRequisition: async (id: string): Promise<void> => {
+    const { error } = await supabase
+        .from(TABLES.REQUISITIONS)
+        .delete()
+        .eq('id', id);
+    
+    if (error) console.error('Error deleting requisition:', error);
+  },
+
+  // --- User Vehicles Association ---
+  getUserVehicles: async (): Promise<UserVehicle[]> => {
+    const { data, error } = await supabase
+      .from(TABLES.USER_VEHICLES)
+      .select('*');
+
+    if (error) {
+        console.error('Error fetching user vehicles:', error);
+        return [];
+    }
+    return data || [];
+  },
+
+  saveUserVehicle: async (link: UserVehicle): Promise<void> => {
+    const { error } = await supabase
+      .from(TABLES.USER_VEHICLES)
+      .upsert(link);
+      
+    if (error) console.error('Error saving user vehicle:', error);
+  },
+
+  deleteUserVehicle: async (id: string): Promise<void> => {
+    const { error } = await supabase
+      .from(TABLES.USER_VEHICLES)
+      .delete()
+      .eq('id', id);
+      
+    if (error) console.error('Error deleting user vehicle:', error);
+  },
+  
+  // --- User Profiles Helper (For Gerencia) ---
+  getAllUsers: async (): Promise<UserProfile[]> => {
+      // Note: This depends on RLS policies allowing read access to user_roles
+      const { data, error } = await supabase
+          .from(TABLES.USER_ROLES)
+          .select('*');
+          
+      if (error) {
+          console.error('Error fetching users:', error);
+          return [];
+      }
+      // Map raw data to UserProfile, assuming email might be separate or included depending on backend view
+      // For this implementation we assume user_roles contains email or we fetch it
+      // If email is not in user_roles, this might be tricky client-side without Admin API.
+      // We assume the table has 'email' column for simplicity based on AuthContext logic.
+      return data?.map((u: any) => ({
+          id: u.id,
+          email: u.email || 'No Email',
+          role: u.role
+      })) || [];
   }
 };

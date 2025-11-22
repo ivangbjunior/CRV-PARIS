@@ -11,6 +11,11 @@
       /* Ensure form elements use the same font */
       input, select, textarea, button { font-family: 'Roboto', sans-serif; }
       
+      /* Force visual uppercase for all inputs */
+      input[type="text"], textarea {
+        text-transform: uppercase;
+      }
+
       /* Hide scrollbar for Chrome, Safari and Opera */
       .no-scrollbar::-webkit-scrollbar {
           display: none;

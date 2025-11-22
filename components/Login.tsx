@@ -8,6 +8,7 @@ const Login: React.FC = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [capsLockOn, setCapsLockOn] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,6 +44,12 @@ const Login: React.FC = () => {
     }
   };
 
+  const checkCapsLock = (e: React.KeyboardEvent | React.MouseEvent) => {
+    if (e.getModifierState) {
+        setCapsLockOn(e.getModifierState('CapsLock'));
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 font-sans">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -68,7 +75,7 @@ const Login: React.FC = () => {
 
         <form onSubmit={handleLogin} className="space-y-5">
           <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-1 ml-1">Usuário / Nome</label>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1 ml-1">Usuário</label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <User className="h-5 w-5 text-slate-400" />
@@ -76,11 +83,11 @@ const Login: React.FC = () => {
               <input
                 type="text"
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="block w-full pl-10 pr-3 py-3 border border-slate-200 rounded-xl bg-slate-50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                placeholder="Digite seu primeiro nome (ex: admin)"
+                onChange={(e) => setUsername(e.target.value.toUpperCase())}
+                className="block w-full pl-10 pr-3 py-3 border border-slate-200 rounded-xl bg-slate-50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all uppercase"
+                placeholder="NOME DE USUÁRIO"
                 required
-                autoCapitalize="none"
+                autoCapitalize="characters"
                 autoCorrect="off"
               />
             </div>
@@ -96,11 +103,20 @@ const Login: React.FC = () => {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={checkCapsLock}
+                onClick={checkCapsLock}
+                onBlur={() => setCapsLockOn(false)}
                 className="block w-full pl-10 pr-3 py-3 border border-slate-200 rounded-xl bg-slate-50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 placeholder="••••••••"
                 required
               />
             </div>
+            {capsLockOn && (
+                <div className="text-xs text-orange-600 font-bold mt-1.5 flex items-center gap-1 animate-in fade-in slide-in-from-top-1">
+                    <AlertTriangle size={12} />
+                    CAPS LOCK ATIVADO
+                </div>
+            )}
           </div>
 
           {error && (
@@ -118,13 +134,6 @@ const Login: React.FC = () => {
             {loading ? <Loader2 className="animate-spin" size={20} /> : 'ACESSAR SISTEMA'}
           </button>
         </form>
-        
-        <div className="mt-8 text-center">
-          <p className="text-xs text-slate-400">
-            Acesse usando apenas seu <strong>Primeiro Nome</strong>.
-            <br/>O sistema completará automaticamente.
-          </p>
-        </div>
       </div>
       
       <div className="mt-8 text-slate-400 text-xs font-medium">
