@@ -472,7 +472,7 @@ const Requisitions: React.FC = () => {
     ) => {
      
      // Find last refueling info
-     let lastRefuelingText = "Último Abastecimento: Não encontrado";
+     let lastRefuelingText = "Não encontrado";
      
      if (!isExternal) {
          const vRefuelings = refuelings
@@ -482,7 +482,7 @@ const Requisitions: React.FC = () => {
          if (vRefuelings.length > 0) {
              const last = vRefuelings[0];
              const [y,m,d] = last.date.split('-');
-             lastRefuelingText = `Último Abastecimento: ${d}/${m}/${y} (${last.liters} L)`;
+             lastRefuelingText = `${d}/${m}/${y} (${last.liters} L)`;
          }
      }
 
@@ -496,15 +496,45 @@ const Requisitions: React.FC = () => {
 
      const idsString = internalIds.length > 0 ? internalIds.join(', ') : 'N/A (Insumos)';
 
-     const rawText = `*SOLICITAÇÃO DE ABASTECIMENTO Nº: ${idsString}*
-Encarregado: ${requesterName}
+     let messageBody = '';
+
+     // Lógica para formatar a mensagem baseada na quantidade de itens
+     if (items.length === 1) {
+        // TEXTO 01 - Item Único
+        const item = items[0];
+        const qtyText = item.isFullTank ? "TANQUE CHEIO" : `${item.liters} Litros`;
+        const obsText = item.observation ? item.observation : '-';
+
+        messageBody = `*SOLICITAÇÃO DE ABASTECIMENTO Nº: ${idsString}*
+Solicitante: ${requesterName}
+Veículo: ${vehicleInfo}
+Município: ${municipality}
+Combustível: ${item.fuelType}
+Quantidade: ${qtyText}
+Observação: ${obsText}
+
+ℹ️ Último Abastecimento: ${lastRefuelingText}`;
+
+     } else {
+        // TEXTO 02 - Múltiplos Itens
+        const itemsList = items.map((item, i) => {
+            const qtyText = item.isFullTank ? "TANQUE CHEIO" : `${item.liters} Litros`;
+            const obsText = item.observation ? ` (${item.observation})` : '';
+            return `${i + 1}. ${item.fuelType} - ${qtyText}${obsText}`;
+        }).join('\n');
+
+        messageBody = `*SOLICITAÇÃO DE ABASTECIMENTO Nº: ${idsString}*
+Solicitante: ${requesterName}
 Veículo: ${vehicleInfo}
 Município: ${municipality}
 
 *Itens Solicitados:*
-${items.map((item, i) => `${i + 1}. ${item.fuelType} - ${item.isFullTank ? "TANQUE CHEIO" : item.liters + " L"} ${item.observation ? `(${item.observation})` : ''}`).join('\n')}
+${itemsList}
 
-ℹ️ ${lastRefuelingText}
+ℹ️ Último Abastecimento: ${lastRefuelingText}`;
+     }
+
+     const finalMessage = `${messageBody}
 
 👇 *ENQUETE DE APROVAÇÃO:*
 Responda com uma das opções:
@@ -512,7 +542,7 @@ Responda com uma das opções:
 2️⃣ Recusado
 3️⃣ Liberado`;
 
-     return `https://wa.me/?text=${encodeURIComponent(rawText)}`;
+     return `https://wa.me/?text=${encodeURIComponent(finalMessage)}`;
   };
   
   // --- HELPERS ---
