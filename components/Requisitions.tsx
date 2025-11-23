@@ -516,7 +516,8 @@ const Requisitions: React.FC = () => {
         const qtyText = item.isFullTank ? "TANQUE CHEIO" : `${item.liters} Litros`;
         const obsText = item.observation ? item.observation : '-';
 
-        messageBody = `*SOLICITAÇÃO DE ABASTECIMENTO Nº: ${idsString}*
+        messageBody = `*SOLICITAÇÃO DE ABASTECIMENTO*
+Nº: ${idsString}
 Solicitante: ${requesterName}
 Veículo: ${vehicleInfo}
 Município: ${municipality}
@@ -534,7 +535,8 @@ Observação: ${obsText}
             return `${i + 1}. ${item.fuelType} - ${qtyText}${obsText}`;
         }).join('\n');
 
-        messageBody = `*SOLICITAÇÃO DE ABASTECIMENTO Nº: ${idsString}*
+        messageBody = `*SOLICITAÇÃO DE ABASTECIMENTO*
+Nº: ${idsString}
 Solicitante: ${requesterName}
 Veículo: ${vehicleInfo}
 Município: ${municipality}
