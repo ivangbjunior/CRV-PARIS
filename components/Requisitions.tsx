@@ -1,16 +1,21 @@
+
 import React, { useState, useEffect } from 'react';
 import { Requisition, RequisitionStatus, Vehicle, FuelType, ContractType, UserRole, UserVehicle, UserProfile, GasStation, RefuelingLog } from '../types';
 import { storageService } from '../services/storage';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   FileText, Plus, Check, X, Search, Filter, Clock, User, Truck, Fuel, MapPin, AlertCircle, 
-  Calendar, Loader2, Send, ThumbsUp, ThumbsDown, Eye, Users, Settings, Link as LinkIcon, Save, AlertTriangle, ArrowLeft, Gauge, Receipt, Trash2, RotateCcw, ShoppingCart, List
+  Calendar, Loader2, Send, ThumbsUp, ThumbsDown, Eye, Users, Settings, Link as LinkIcon, Save, AlertTriangle, ArrowLeft, Gauge, Receipt, Trash2, RotateCcw, ShoppingCart, List, Droplet, Box
 } from 'lucide-react';
 import MultiSelect from './MultiSelect';
 
 const EXTERNAL_EQUIPMENT_TYPES = [
   'CARRO', 'MOTO', 'BARCO', 'BALSA', 'LANCHA', 'MOTOR DE POPA', 'GALÃO', 'GERADOR', 'TAMBOR'
 ];
+
+// Definição dos grupos para o select
+const FUEL_OPTIONS = [FuelType.DIESEL, FuelType.DIESEL_S10, FuelType.GASOLINA, FuelType.ETANOL];
+const SUPPLY_OPTIONS = Object.values(FuelType).filter(t => !FUEL_OPTIONS.includes(t));
 
 interface CartItem {
     id: string;
@@ -171,6 +176,12 @@ const Requisitions: React.FC = () => {
       if (!currentItem.fuelType) {
           alert("Selecione o tipo de item/combustível.");
           return;
+      }
+      
+      // Se não for tanque cheio e litros for 0 ou inválido
+      if (!currentItem.isFullTank && (!currentItem.liters || currentItem.liters <= 0)) {
+           alert("Informe a quantidade de litros ou marque 'Completar Tanque'.");
+           return;
       }
 
       setCartItems(prev => [...prev, {
@@ -534,13 +545,8 @@ ${itemsList}
 ℹ️ Último Abastecimento: ${lastRefuelingText}`;
      }
 
-     const finalMessage = `${messageBody}
-
-👇 *ENQUETE DE APROVAÇÃO:*
-Responda com uma das opções:
-1️⃣ Autorizado
-2️⃣ Recusado
-3️⃣ Liberado`;
+     // REMOVIDA A ENQUETE CONFORME SOLICITADO
+     const finalMessage = `${messageBody}`;
 
      return `https://wa.me/?text=${encodeURIComponent(finalMessage)}`;
   };
@@ -567,7 +573,7 @@ Responda com uma das opções:
     setHistoryRequester('');
   };
 
-  const inputClass = "w-full rounded-lg border border-slate-300 bg-slate-50 p-2.5 text-slate-800 focus:border-blue-600 outline-none";
+  const inputClass = "w-full rounded-lg border border-slate-300 bg-slate-50 p-3 text-slate-800 focus:border-blue-600 outline-none transition-all";
   const selectClass = "w-full rounded-lg border border-slate-300 bg-white p-2 text-slate-700 focus:border-blue-600 outline-none h-[42px] shadow-sm";
 
   // --- RENDERS ---
@@ -1129,18 +1135,18 @@ Responda com uma das opções:
 
         {/* --- MODAL: NEW REQUISITION (CART SYSTEM) --- */}
         {showForm && (
-            <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-                <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh]">
-                    <div className="bg-orange-600 p-4 flex justify-between items-center text-white flex-shrink-0">
+            <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-[9999] p-4 sm:p-6">
+                <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full flex flex-col max-h-[90dvh] overflow-hidden">
+                    <div className="bg-orange-600 p-4 flex justify-between items-center text-white flex-shrink-0 sticky top-0 z-20 shadow-md">
                         <h3 className="font-bold flex items-center gap-2"><FileText /> Nova Requisição (Carrinho)</h3>
-                        <button onClick={() => setShowForm(false)}><X /></button>
+                        <button onClick={() => setShowForm(false)} className="p-1 hover:bg-orange-700 rounded transition-colors"><X /></button>
                     </div>
                     
                     <div className="p-6 overflow-y-auto flex-1">
                         
                         {/* Vehicle Selection - GLOBAL for Cart */}
                         <div className="mb-6 p-4 bg-slate-50 border border-slate-200 rounded-lg">
-                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Veículo (Para todos os itens)</label>
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Veículo (Para todos os itens)</label>
                             <select 
                                 required
                                 value={selectedVehicleForCart}
@@ -1148,7 +1154,7 @@ Responda com uma das opções:
                                     setSelectedVehicleForCart(e.target.value);
                                     // Reset items if vehicle changes? No, keep items, user might correct vehicle.
                                 }}
-                                className={inputClass}
+                                className={`${inputClass} font-bold text-lg h-14`}
                             >
                                 <option value="">Selecione...</option>
                                 {getAvailableVehicles().map(v => (
@@ -1198,49 +1204,39 @@ Responda com uma das opções:
 
                         {/* Add Item Form */}
                         <div className="mb-6 pb-6 border-b border-slate-200">
-                             <h4 className="font-bold text-slate-700 mb-3 flex items-center gap-2"><Plus size={16} /> Adicionar Item</h4>
-                             <div className="grid grid-cols-2 gap-4 mb-4">
+                             <h4 className="font-bold text-slate-700 mb-4 flex items-center gap-2 text-lg border-b pb-2"><Plus size={20} /> Adicionar Item</h4>
+                             
+                             <div className="flex flex-col gap-5">
+                                {/* 1. Produto / Insumo */}
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Produto / Insumo</label>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Produto / Insumo</label>
                                     <select 
                                         value={currentItem.fuelType || ''}
                                         onChange={(e) => setCurrentItem({...currentItem, fuelType: e.target.value as FuelType})}
-                                        className={inputClass}
+                                        className={`${inputClass} font-medium h-14 text-base`}
                                     >
-                                        <option value="">Selecione...</option>
-                                        {Object.values(FuelType).map(f => <option key={f} value={f}>{f}</option>)}
+                                        <option value="">Selecione o item...</option>
+                                        <optgroup label="COMBUSTÍVEL">
+                                            {FUEL_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
+                                        </optgroup>
+                                        <optgroup label="INSUMOS">
+                                            {SUPPLY_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
+                                        </optgroup>
                                     </select>
                                 </div>
                                 
-                                {/* Logic for Liters vs Full Tank */}
+                                {/* 2. Quantity Logic */}
                                 <div>
-                                    <div className="flex justify-between items-center mb-1">
-                                        <label className="block text-xs font-bold text-slate-500 uppercase">Quantidade (L)</label>
-                                        <label className="flex items-center gap-1.5 text-xs font-bold text-blue-600 cursor-pointer select-none">
-                                            <input 
-                                                type="checkbox" 
-                                                className="accent-blue-600 w-4 h-4"
-                                                checked={currentItem.isFullTank || false}
-                                                onChange={(e) => {
-                                                    setCurrentItem({
-                                                        ...currentItem, 
-                                                        isFullTank: e.target.checked,
-                                                        liters: e.target.checked ? 0 : currentItem.liters
-                                                    });
-                                                }}
-                                            />
-                                            Completar
-                                        </label>
-                                    </div>
-                                    
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Quantidade (Litros)</label>
                                     <div className="relative">
                                         <input 
                                             type="number" 
                                             step="0.1"
                                             disabled={currentItem.isFullTank}
-                                            value={currentItem.isFullTank ? '' : currentItem.liters}
+                                            // Ensure it shows empty placeholder if 0
+                                            value={currentItem.isFullTank ? '' : (currentItem.liters === 0 ? '' : currentItem.liters)}
                                             onChange={(e) => setCurrentItem({...currentItem, liters: Number(e.target.value)})}
-                                            className={`${inputClass} ${currentItem.isFullTank ? 'bg-slate-100 text-transparent' : ''}`}
+                                            className={`${inputClass} h-14 text-lg font-bold ${currentItem.isFullTank ? 'bg-slate-100 text-transparent' : 'bg-white'}`}
                                             placeholder={currentItem.isFullTank ? '' : "0.0"}
                                         />
                                         {currentItem.isFullTank && (
@@ -1250,25 +1246,49 @@ Responda com uma das opções:
                                         )}
                                     </div>
                                 </div>
-                            </div>
+
+                                {/* 3. Full Tank Option - Explicitly below quantity */}
+                                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                                    <label className="flex items-center gap-3 cursor-pointer w-full">
+                                        <input 
+                                            type="checkbox" 
+                                            className="accent-blue-600 w-6 h-6"
+                                            checked={currentItem.isFullTank || false}
+                                            onChange={(e) => {
+                                                setCurrentItem({
+                                                    ...currentItem, 
+                                                    isFullTank: e.target.checked,
+                                                    liters: e.target.checked ? 0 : currentItem.liters
+                                                });
+                                            }}
+                                        />
+                                        <div>
+                                            <span className="text-sm font-bold text-slate-800 block">Quero completar o tanque</span>
+                                            <span className="text-xs text-slate-500 block">Marque apenas se for encher até a capacidade máxima.</span>
+                                        </div>
+                                    </label>
+                                </div>
+
+                                {/* 4. Include Button - MOVED ABOVE OBSERVATION */}
+                                <button 
+                                    type="button" 
+                                    onClick={handleAddItemToCart}
+                                    className="bg-slate-800 hover:bg-slate-900 text-white py-3.5 rounded-lg font-bold flex items-center justify-center gap-2 h-14 w-full shadow-md mt-2 transition-transform active:scale-[0.98]"
+                                >
+                                    <Plus size={22} /> INCLUIR ITEM NA LISTA
+                                </button>
                             
-                            <div className="flex gap-2 items-end">
-                                <div className="flex-1">
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Observação (Op.)</label>
+                                {/* 5. Observation - MOVED BELOW BUTTON */}
+                                <div className="mt-2">
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Observação (Opcional)</label>
                                     <input 
                                         type="text" 
-                                        className={inputClass}
+                                        className={`${inputClass} h-12`}
+                                        placeholder="Ex: Óleo 15w40, Filtro..."
                                         value={currentItem.observation}
                                         onChange={(e) => setCurrentItem({...currentItem, observation: e.target.value.toUpperCase()})}
                                     />
                                 </div>
-                                <button 
-                                    type="button" 
-                                    onClick={handleAddItemToCart}
-                                    className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2.5 rounded-lg font-bold flex items-center gap-2 h-[42px]"
-                                >
-                                    <Plus size={18} /> Incluir
-                                </button>
                             </div>
                         </div>
 
@@ -1276,30 +1296,33 @@ Responda com uma das opções:
                         <div>
                             <h4 className="font-bold text-slate-700 mb-3 flex items-center gap-2"><ShoppingCart size={16} /> Itens na Requisição</h4>
                             {cartItems.length === 0 ? (
-                                <div className="text-center p-6 border-2 border-dashed border-slate-200 rounded-lg text-slate-400 text-sm">
-                                    Nenhum item adicionado à lista.
+                                <div className="text-center p-8 border-2 border-dashed border-slate-200 rounded-lg text-slate-400 text-sm bg-slate-50">
+                                    <div className="flex justify-center mb-2 opacity-50"><ShoppingCart size={32} /></div>
+                                    <p>Nenhum item adicionado à lista.</p>
+                                    <p className="text-xs mt-1">Preencha acima e clique em "INCLUIR ITEM"</p>
                                 </div>
                             ) : (
                                 <div className="space-y-2">
                                     {cartItems.map((item, index) => (
-                                        <div key={item.id} className="flex justify-between items-center p-3 bg-white border border-slate-200 rounded-lg shadow-sm">
-                                            <div className="flex items-center gap-3">
-                                                <div className="bg-slate-100 text-slate-500 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold">
+                                        <div key={item.id} className="flex justify-between items-center p-4 bg-white border border-slate-200 rounded-lg shadow-sm hover:border-orange-200 transition-colors">
+                                            <div className="flex items-center gap-4">
+                                                <div className="bg-orange-100 text-orange-700 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border border-orange-200">
                                                     {index + 1}
                                                 </div>
                                                 <div>
-                                                    <div className="font-bold text-slate-800">{item.fuelType}</div>
-                                                    <div className="text-xs text-slate-500">
+                                                    <div className="font-black text-slate-800 text-lg">{item.fuelType}</div>
+                                                    <div className="text-sm text-slate-600 font-medium">
                                                         {item.isFullTank ? "TANQUE CHEIO" : `${item.liters} Litros`}
-                                                        {item.observation && <span className="text-orange-600 ml-2">({item.observation})</span>}
+                                                        {item.observation && <span className="text-orange-600 ml-2 font-normal">({item.observation})</span>}
                                                     </div>
                                                 </div>
                                             </div>
                                             <button 
                                                 onClick={() => handleRemoveItemFromCart(item.id)}
-                                                className="text-red-500 hover:bg-red-50 p-2 rounded-full"
+                                                className="text-red-500 hover:bg-red-50 p-2 rounded-full transition-colors"
+                                                title="Remover item"
                                             >
-                                                <Trash2 size={16} />
+                                                <Trash2 size={20} />
                                             </button>
                                         </div>
                                     ))}
@@ -1309,14 +1332,14 @@ Responda com uma das opções:
 
                     </div>
                     
-                    <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-2 flex-shrink-0">
-                        <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-bold">Cancelar</button>
+                    <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-3 flex-shrink-0">
+                        <button type="button" onClick={() => setShowForm(false)} className="px-6 py-3 text-slate-600 hover:bg-slate-200 rounded-lg font-bold text-sm">CANCELAR</button>
                         <button 
                             type="button" 
                             onClick={handleSaveCart}
-                            className="bg-orange-600 hover:bg-orange-700 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2"
+                            className="bg-orange-600 hover:bg-orange-700 text-white px-8 py-3 rounded-lg font-bold flex items-center gap-2 shadow-lg transform active:scale-95 transition-all text-sm"
                         >
-                            <Send size={18} /> Gerar Requisição
+                            <Send size={18} /> GERAR REQUISIÇÃO
                         </button>
                     </div>
 
@@ -1326,7 +1349,7 @@ Responda com uma das opções:
 
         {/* --- MODAL: APPROVAL --- */}
         {showApprovalModal && selectedRequisition && (
-             <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+             <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-[9999] p-4 sm:p-6">
                 <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden">
                     <div className="bg-green-600 p-4 text-white">
                         <h3 className="font-bold">Aprovação de Requisição #{selectedRequisition.internalId}</h3>
