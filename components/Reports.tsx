@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { DailyLog, DailyLogReport, Vehicle, ContractType, VehicleType, UserRole } from '../types';
 import { storageService } from '../services/storage';
@@ -6,7 +5,7 @@ import { calculateWorkHours } from '../utils/timeUtils';
 import PasswordModal from './PasswordModal';
 import MultiSelect, { MultiSelectOption } from './MultiSelect';
 import { useAuth } from '../contexts/AuthContext';
-import { Filter, FileText, Trash2, Edit3, Calendar, X, Save, Clock, AlertTriangle, Search, User, MapPin, Key, Ban, Settings, HardHat, Printer, Fuel, Droplet, MessageSquareText, Loader2, WifiOff } from 'lucide-react';
+import { Filter, FileText, Trash2, Edit3, Calendar, X, Save, Clock, AlertTriangle, Search, User, MapPin, Key, Ban, Settings, HardHat, Printer, Fuel, Droplet, MessageSquareText, Loader2, WifiOff, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
 import { PrintHeader } from './PrintHeader';
 
 const Reports: React.FC = () => {
@@ -29,6 +28,8 @@ const Reports: React.FC = () => {
   const [filterDriver, setFilterDriver] = useState<string[]>([]);
   const [filterMunicipality, setFilterMunicipality] = useState<string[]>([]);
 
+  const [showFilters, setShowFilters] = useState(false);
+
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [logToDelete, setLogToDelete] = useState<string | null>(null);
 
@@ -37,12 +38,21 @@ const Reports: React.FC = () => {
 
   const [obsModalData, setObsModalData] = useState<{content: string, date: string, plate: string} | null>(null);
 
+  // Pagination State
+  const [itemsPerPage, setItemsPerPage] = useState(25);
+  const [currentPage, setCurrentPage] = useState(1);
+
   const startDateRef = useRef<HTMLInputElement>(null);
   const endDateRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadData();
   }, []);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [dateRange, filterForeman, filterContract, filterVehicleId, filterDriver, filterMunicipality]);
 
   const handlePrint = () => {
     window.print();
@@ -122,6 +132,7 @@ const Reports: React.FC = () => {
         };
         });
 
+        // Always sort by date descending (newest first)
         processed.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
         const uDrivers = new Set<string>();
@@ -179,6 +190,8 @@ const Reports: React.FC = () => {
       return matchesDate && matchesContract && matchesVehicleId && matchesForeman && matchesDriver && matchesMunicipality;
     });
 
+    // Ensure sorting is maintained after filtering (Newest First)
+    filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     setFilteredLogs(filtered);
   };
 
@@ -326,6 +339,13 @@ const Reports: React.FC = () => {
   };
 
   const summary = calculateSummary();
+
+  // Pagination Logic
+  const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
+  const paginatedLogs = filteredLogs.slice(
+      (currentPage - 1) * itemsPerPage,
+      currentPage * itemsPerPage
+  );
 
   const inputClass = "rounded-lg border border-slate-300 bg-white p-2 text-sm text-slate-800 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none transition-all w-full";
   const editInputClass = "w-full rounded-lg border border-slate-300 bg-slate-50 p-2.5 text-slate-800 focus:border-blue-600 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition-all";
@@ -530,97 +550,125 @@ const Reports: React.FC = () => {
         </div>
       )}
 
-      <div className="bg-slate-100 p-5 rounded-xl shadow-sm border border-slate-200 print:hidden">
-        <div className="flex items-center gap-2 text-slate-800 font-bold mb-4">
-           <Filter size={20} />
-           <span>Filtros Avançados (Multi-seleção)</span>
+      {/* Modernized Collapsible Filters - REMOVED OVERFLOW HIDDEN */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm print:hidden relative z-20">
+        <div 
+            onClick={() => setShowFilters(!showFilters)} 
+            className="p-4 bg-white flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors rounded-xl"
+        >
+            <div className="flex items-center gap-2 text-slate-800 font-bold">
+                <Filter size={20} className="text-blue-600" />
+                Filtros Avançados (Multi-seleção)
+                <span className="text-xs font-normal text-slate-400 ml-1">(Clique para expandir)</span>
+            </div>
+            <div className="flex items-center gap-2">
+                {showFilters ? <ChevronUp size={20} className="text-slate-400"/> : <ChevronDown size={20} className="text-slate-400"/>}
+            </div>
         </div>
 
-        <form onSubmit={handleFilter} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-           <div className="flex gap-2 col-span-1 md:col-span-2">
-             <div className="w-1/2">
-                <label className="block text-xs font-medium text-slate-500 mb-1">Data Início</label>
-                <div className="relative w-full">
-                  <input type="date" ref={startDateRef} value={dateRange.start} onClick={(e) => e.currentTarget.showPicker()} onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })} className={`${inputClass} pr-10 cursor-pointer`} />
-                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-slate-500"><Calendar size={18} /></div>
-                </div>
-             </div>
-             <div className="w-1/2">
-                <label className="block text-xs font-medium text-slate-500 mb-1">Data Final</label>
-                <div className="relative w-full">
-                  <input type="date" ref={endDateRef} value={dateRange.end} onClick={(e) => e.currentTarget.showPicker()} onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })} className={`${inputClass} pr-10 cursor-pointer`} />
-                   <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-slate-500"><Calendar size={18} /></div>
-                </div>
-             </div>
-           </div>
+        {showFilters && (
+            <div className="p-5 border-t border-slate-100 bg-slate-50/50 animate-in slide-in-from-top-5 duration-200 rounded-b-xl">
+                <form onSubmit={handleFilter} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="flex gap-2 col-span-1 md:col-span-2">
+                        <div className="w-1/2">
+                            <label className="block text-xs font-medium text-slate-500 mb-1">Data Início</label>
+                            <div className="relative w-full">
+                            <input type="date" ref={startDateRef} value={dateRange.start} onClick={(e) => e.currentTarget.showPicker()} onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })} className={`${inputClass} pr-10 cursor-pointer`} />
+                            <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-slate-500"><Calendar size={18} /></div>
+                            </div>
+                        </div>
+                        <div className="w-1/2">
+                            <label className="block text-xs font-medium text-slate-500 mb-1">Data Final</label>
+                            <div className="relative w-full">
+                            <input type="date" ref={endDateRef} value={dateRange.end} onClick={(e) => e.currentTarget.showPicker()} onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })} className={`${inputClass} pr-10 cursor-pointer`} />
+                            <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-slate-500"><Calendar size={18} /></div>
+                            </div>
+                        </div>
+                    </div>
 
-           <div><MultiSelect label="Contratos" options={contractOptions} selected={filterContract} onChange={setFilterContract} placeholder="Todos os contratos" /></div>
-           <div><MultiSelect label="Placas" options={vehicleOptions} selected={filterVehicleId} onChange={setFilterVehicleId} placeholder="Todas as placas" /></div>
-           <div><MultiSelect label="Equipes" options={foremanOptions} selected={filterForeman} onChange={setFilterForeman} placeholder="Todas as equipes" /></div>
-           <div><MultiSelect label="Motoristas" options={driverOptions} selected={filterDriver} onChange={setFilterDriver} placeholder="Todos motoristas" /></div>
-           <div><MultiSelect label="Municípios" options={municipalityOptions} selected={filterMunicipality} onChange={setFilterMunicipality} placeholder="Todos municípios" /></div>
+                    <div><MultiSelect label="Contratos" options={contractOptions} selected={filterContract} onChange={setFilterContract} placeholder="Todos os contratos" /></div>
+                    <div><MultiSelect label="Placas" options={vehicleOptions} selected={filterVehicleId} onChange={setFilterVehicleId} placeholder="Todas as placas" /></div>
+                    <div><MultiSelect label="Equipes" options={foremanOptions} selected={filterForeman} onChange={setFilterForeman} placeholder="Todas as equipes" /></div>
+                    <div><MultiSelect label="Motoristas" options={driverOptions} selected={filterDriver} onChange={setFilterDriver} placeholder="Todos motoristas" /></div>
+                    <div><MultiSelect label="Municípios" options={municipalityOptions} selected={filterMunicipality} onChange={setFilterMunicipality} placeholder="Todos municípios" /></div>
 
-           <div className="col-span-1 flex items-end gap-2">
-             <button type="submit" className="flex-1 bg-blue-800 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-blue-900 transition-colors h-[42px] flex items-center justify-center gap-2"><Search size={18} /> Filtrar</button>
-             <button type="button" onClick={clearFilters} className="bg-slate-200 text-slate-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-300 transition-colors h-[42px]" title="Limpar Filtros"><X size={18} /></button>
-             <button type="button" onClick={handlePrint} className="bg-white border border-slate-300 text-slate-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors h-[42px]" title="Imprimir Relatório"><Printer size={18} /></button>
-           </div>
-        </form>
+                    <div className="col-span-1 flex items-end gap-2">
+                        <button type="submit" className="flex-1 bg-blue-800 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-blue-900 transition-colors h-[42px] flex items-center justify-center gap-2"><Search size={18} /> Filtrar</button>
+                        <button type="button" onClick={clearFilters} className="bg-slate-200 text-slate-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-300 transition-colors h-[42px]" title="Limpar Filtros"><X size={18} /></button>
+                        <button type="button" onClick={handlePrint} className="bg-white border border-slate-300 text-slate-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors h-[42px]" title="Imprimir Relatório"><Printer size={18} /></button>
+                    </div>
+                </form>
+            </div>
+        )}
       </div>
 
       {/* Resumo Compacto */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-2 print:grid-cols-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-2 print:flex print:flex-row print:justify-between print:gap-4 print:border-b print:border-slate-200 print:pb-4 print:mb-6 relative z-0">
             {/* Time */}
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 hover:border-blue-300 transition-all group">
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 hover:border-blue-300 transition-all group print:border-none print:shadow-none print:p-0 print:bg-transparent">
                 <div className="p-3 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors print:hidden">
                     <Clock size={20} strokeWidth={2} />
                 </div>
                 <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tempo em Operação</p>
-                    <p className="text-xl font-black text-slate-800 leading-none mt-1">{summary.formattedTime}</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider print:text-slate-600">Tempo em Operação</p>
+                    <p className="text-xl font-black text-slate-800 leading-none mt-1 print:text-sm">{summary.formattedTime}</p>
                 </div>
             </div>
 
             {/* KM */}
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 hover:border-green-300 transition-all group">
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 hover:border-green-300 transition-all group print:border-none print:shadow-none print:p-0 print:bg-transparent">
                 <div className="p-3 bg-green-50 text-green-600 rounded-lg group-hover:bg-green-600 group-hover:text-white transition-colors print:hidden">
                     <MapPin size={20} strokeWidth={2} />
                 </div>
                 <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">KM Total</p>
-                    <p className="text-xl font-black text-slate-800 leading-none mt-1">{summary.totalKm} <span className="text-xs font-bold text-slate-400">km</span></p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider print:text-slate-600">KM Total</p>
+                    <p className="text-xl font-black text-slate-800 leading-none mt-1 print:text-sm">{summary.totalKm} <span className="text-xs font-bold text-slate-400">km</span></p>
                 </div>
             </div>
 
             {/* No Signal */}
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 hover:border-orange-300 transition-all group">
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 hover:border-orange-300 transition-all group print:border-none print:shadow-none print:p-0 print:bg-transparent">
                 <div className="p-3 bg-orange-50 text-orange-600 rounded-lg group-hover:bg-orange-600 group-hover:text-white transition-colors print:hidden">
                     <WifiOff size={20} strokeWidth={2} />
                 </div>
                 <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Sem Sinal</p>
-                    <p className="text-xl font-black text-slate-800 leading-none mt-1">{summary.daysNoSignal} <span className="text-xs font-bold text-slate-400">dias</span></p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider print:text-slate-600">Sem Sinal</p>
+                    <p className="text-xl font-black text-slate-800 leading-none mt-1 print:text-sm">{summary.daysNoSignal} <span className="text-xs font-bold text-slate-400">dias</span></p>
                 </div>
             </div>
 
             {/* Stopped */}
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 hover:border-red-300 transition-all group">
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 hover:border-red-300 transition-all group print:border-none print:shadow-none print:p-0 print:bg-transparent">
                 <div className="p-3 bg-red-50 text-red-600 rounded-lg group-hover:bg-red-600 group-hover:text-white transition-colors print:hidden">
                     <Ban size={20} strokeWidth={2} />
                 </div>
                 <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Parado / Oficina</p>
-                    <p className="text-xl font-black text-slate-800 leading-none mt-1">{summary.daysStopped} <span className="text-xs font-bold text-slate-400">dias</span></p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider print:text-slate-600">Parado / Oficina</p>
+                    <p className="text-xl font-black text-slate-800 leading-none mt-1 print:text-sm">{summary.daysStopped} <span className="text-xs font-bold text-slate-400">dias</span></p>
                 </div>
             </div>
         </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden print:shadow-none print:border-none print:overflow-visible">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden print:shadow-none print:border-none print:overflow-visible relative z-0">
          <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center print:hidden">
             <h3 className="font-bold text-slate-700 flex items-center gap-2">
               <FileText size={18} /> Listagem Detalhada
               <span className="ml-2 text-sm font-normal text-slate-500 bg-white px-2 py-0.5 border rounded-full shadow-sm">{filteredLogs.length} Registros</span>
             </h3>
+            
+            {/* Items Per Page Selector */}
+            <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-500 font-bold">Exibir:</span>
+                <select 
+                    value={itemsPerPage} 
+                    onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}
+                    className="text-xs border border-slate-300 rounded p-1 bg-white outline-none focus:border-blue-500"
+                >
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                </select>
+            </div>
          </div>
 
          <div className="overflow-x-auto print:overflow-visible">
@@ -639,10 +687,10 @@ const Reports: React.FC = () => {
                </tr>
              </thead>
              <tbody className="divide-y divide-slate-100">
-               {filteredLogs.length === 0 ? (
+               {paginatedLogs.length === 0 ? (
                  <tr><td colSpan={isReadOnly ? 8 : 9} className="px-6 py-12 text-center text-slate-400">Nenhum registro encontrado.</td></tr>
                ) : (
-                 filteredLogs.map(log => {
+                 paginatedLogs.map(log => {
                    const displayContract = log.historicalContract || log.vehicle.contract;
                    return (
                    <tr key={log.id} className="hover:bg-slate-50 transition-colors print:hover:bg-transparent">
@@ -758,6 +806,59 @@ const Reports: React.FC = () => {
              </tbody>
            </table>
          </div>
+
+         {/* Pagination Controls */}
+         {totalPages > 1 && (
+             <div className="flex items-center justify-between border-t border-slate-200 bg-white px-4 py-3 sm:px-6 print:hidden">
+                 <div className="flex flex-1 justify-between sm:hidden">
+                     <button
+                         onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                         disabled={currentPage === 1}
+                         className="relative inline-flex items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                     >
+                         Anterior
+                     </button>
+                     <button
+                         onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                         disabled={currentPage === totalPages}
+                         className="relative ml-3 inline-flex items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                     >
+                         Próximo
+                     </button>
+                 </div>
+                 <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+                     <div>
+                         <p className="text-sm text-slate-700">
+                             Mostrando <span className="font-bold">{(currentPage - 1) * itemsPerPage + 1}</span> até <span className="font-bold">{Math.min(currentPage * itemsPerPage, filteredLogs.length)}</span> de <span className="font-bold">{filteredLogs.length}</span> resultados
+                         </p>
+                     </div>
+                     <div>
+                         <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
+                             <button
+                                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                 disabled={currentPage === 1}
+                                 className="relative inline-flex items-center rounded-l-md px-2 py-2 text-slate-400 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50"
+                             >
+                                 <span className="sr-only">Anterior</span>
+                                 <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+                             </button>
+                             {/* Simplified Pagination Numbers */}
+                             <span className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-slate-700 ring-1 ring-inset ring-slate-300 focus:outline-offset-0">
+                                 Página {currentPage} de {totalPages}
+                             </span>
+                             <button
+                                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                 disabled={currentPage === totalPages}
+                                 className="relative inline-flex items-center rounded-r-md px-2 py-2 text-slate-400 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50"
+                             >
+                                 <span className="sr-only">Próximo</span>
+                                 <ChevronRight className="h-5 w-5" aria-hidden="true" />
+                             </button>
+                         </nav>
+                     </div>
+                 </div>
+             </div>
+         )}
       </div>
     </div>
   );

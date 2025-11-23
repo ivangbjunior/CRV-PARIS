@@ -27,7 +27,6 @@ const Vehicles: React.FC = () => {
   const [showForm, setShowForm] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [currentVehicle, setCurrentVehicle] = useState<Partial<Vehicle>>({});
-  const [foremenList, setForemenList] = useState<string[]>([]);
   
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [vehicleToDelete, setVehicleToDelete] = useState<string | null>(null);
@@ -86,21 +85,13 @@ const Vehicles: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [vData, lData, uData] = await Promise.all([
+      const [vData, lData] = await Promise.all([
         storageService.getVehicles(),
-        storageService.getLogs(),
-        storageService.getAllUsers()
+        storageService.getLogs()
       ]);
       setVehicles(vData);
       setFilteredVehicles(vData);
       setLogs(lData);
-      
-      const foremen = uData
-        .filter((u: UserProfile) => u.role === UserRole.ENCARREGADO)
-        .map((u: UserProfile) => u.name || u.email.split('@')[0])
-        .sort();
-      setForemenList(foremen);
-
     } catch (error) {
       console.error("Failed to load data", error);
     } finally {
@@ -560,10 +551,14 @@ const Vehicles: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Equipe</label>
-                <input list="foremen-list" type="text" name="foreman" value={currentVehicle.foreman || ''} onChange={handleInputChange} required placeholder="Digite ou selecione..." className={inputClass} />
-                <datalist id="foremen-list">
-                    {foremenList.map(f => (<option key={f} value={f} />))}
-                </datalist>
+                <input 
+                  type="text" 
+                  name="foreman" 
+                  value={currentVehicle.foreman || ''} 
+                  onChange={handleInputChange} 
+                  placeholder="Nome do Encarregado..." 
+                  className={inputClass} 
+                />
               </div>
               
               <div className="md:col-span-2 lg:col-span-3 flex gap-3 mt-4 pt-4 border-t border-slate-100">

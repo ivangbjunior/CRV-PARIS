@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { GasStation, RefuelingLog, Vehicle, FuelType, ContractType, UserRole, UserProfile } from '../types';
 import { storageService } from '../services/storage';
@@ -388,6 +389,9 @@ const FuelManagement: React.FC = () => {
   const inputClass = "w-full rounded-lg border border-slate-300 bg-slate-50 p-2.5 text-slate-800 focus:border-blue-600 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition-all";
   const selectClass = "w-full rounded-lg border border-slate-300 bg-white p-2 text-slate-700 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none transition-all h-[42px] shadow-sm";
 
+  // Filter only valid fuels for selection (exclude OIL, GREASE, etc.)
+  const validFuels = [FuelType.DIESEL, FuelType.DIESEL_S10, FuelType.GASOLINA, FuelType.ETANOL];
+
   if (loading && activeTab === 'REFUELING' && refuelings.length === 0) {
       return <div className="flex justify-center items-center h-64"><Loader2 className="animate-spin text-blue-600" size={48} /></div>;
   }
@@ -665,7 +669,7 @@ const FuelManagement: React.FC = () => {
                             <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Combustível</label>
                             <select required value={currentRefueling.fuelType || ''} onChange={e => setCurrentRefueling({...currentRefueling, fuelType: e.target.value as FuelType})} className={inputClass}>
                                 <option value="">Selecione...</option>
-                                {Object.values(FuelType).map(f => (<option key={f} value={f}>{f}</option>))}
+                                {validFuels.map(f => (<option key={f} value={f}>{f}</option>))}
                             </select>
                         </div>
 

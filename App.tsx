@@ -6,8 +6,8 @@ import FuelManagement from './components/FuelManagement';
 import Requisitions from './components/Requisitions';
 import Login from './components/Login';
 import { useAuth } from './contexts/AuthContext';
-import { LayoutDashboard, Truck, FileSpreadsheet, Menu, X, Home, ChevronRight, Fuel, LogOut, UserCircle, ShieldCheck, AlertTriangle, DollarSign, FileText, Bell, Gauge, Clock, WifiOff, CheckCircle2, Loader2, Activity, CalendarDays, MapPin, Zap } from 'lucide-react';
-import { UserRole, DailyLog, Vehicle } from './types';
+import { LayoutDashboard, Truck, FileSpreadsheet, Menu, X, Home, ChevronRight, Fuel, LogOut, UserCircle, ShieldCheck, AlertTriangle, DollarSign, FileText, Bell, Gauge, Clock, WifiOff, CheckCircle2, Loader2, Activity, CalendarDays, MapPin, Zap, TrendingUp, TrendingDown, Trophy, Droplet, Clock3 } from 'lucide-react';
+import { UserRole, DailyLog, Vehicle, RefuelingLog, RequisitionStatus } from './types';
 import { storageService } from './services/storage';
 import { calculateDuration, formatMinutesToTime } from './utils/timeUtils';
 import { ParisLogo } from './components/ParisLogo';
@@ -21,6 +21,242 @@ enum Tab {
   REQUISITIONS = 'requisitions'
 }
 
+// --- Dashboard Rankings Component ---
+const DashboardRankings: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<'KM' | 'FUEL' | 'SPEED'>('KM');
+  const [loading, setLoading] = useState(true);
+  const [rankings, setRankings] = useState({
+    km: [] as { id: string; value: number; contract: string; municipality: string; driver: string }[],
+    fuel: [] as { id: string; value: number; contract: string; municipality: string; driver: string }[],
+    speed: [] as { id: string; value: number; contract: string; municipality: string; driver: string }[]
+  });
+  const [financials, setFinancials] = useState({
+    currentMonthCost: 0,
+    lastMonthCost: 0,
+    diffPercent: 0,
+    isIncrease: false
+  });
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [logs, refuelings, vehicles] = await Promise.all([
+          storageService.getLogs(),
+          storageService.getRefuelings(),
+          storageService.getVehicles()
+        ]);
+
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
+        const currentDay = now.getDate();
+
+        // 1. Process Financials (Month to Date Comparison)
+        let currentCost = 0;
+        let lastCost = 0;
+
+        refuelings.forEach(r => {
+          const rDate = new Date(r.date + 'T12:00:00'); // Fix timezone issue
+          const rMonth = rDate.getMonth();
+          const rYear = rDate.getFullYear();
+          const rDay = rDate.getDate();
+
+          if (rYear === currentYear && rMonth === currentMonth) {
+            currentCost += r.totalCost;
+          }
+
+          // Compare with same period last month
+          const lastMonthDate = new Date();
+          lastMonthDate.setMonth(now.getMonth() - 1);
+          
+          if (rYear === lastMonthDate.getFullYear() && rMonth === lastMonthDate.getMonth() && rDay <= currentDay) {
+            lastCost += r.totalCost;
+          }
+        });
+
+        let diff = 0;
+        if (lastCost > 0) {
+            diff = ((currentCost - lastCost) / lastCost) * 100;
+        } else if (currentCost > 0) {
+            diff = 100;
+        }
+
+        setFinancials({
+          currentMonthCost: currentCost,
+          lastMonthCost: lastCost,
+          diffPercent: Math.abs(diff),
+          isIncrease: diff >= 0
+        });
+
+        // 2. Process Rankings
+        const kmMap: Record<string, number> = {};
+        const fuelMap: Record<string, number> = {};
+        const speedMap: Record<string, number> = {};
+
+        // Helper to get vehicle details
+        const getVDetails = (id: string) => {
+             const v = vehicles.find(v => v.id === id);
+             return v ? { 
+               contract: v.contract, 
+               municipality: v.municipality, 
+               driver: v.driverName 
+             } : { 
+               contract: '?', 
+               municipality: '?', 
+               driver: '?' 
+             };
+        };
+
+        // KM & Speed Logic (Current Month)
+        logs.forEach(log => {
+          const lDate = new Date(log.date + 'T12:00:00');
+          if (lDate.getMonth() === currentMonth && lDate.getFullYear() === currentYear) {
+             // KM
+             kmMap[log.vehicleId] = (kmMap[log.vehicleId] || 0) + (log.kmDriven || 0);
+             // Speed
+             if (log.maxSpeed > 90) {
+                const count = log.speedingCount > 0 ? log.speedingCount : 1;
+                speedMap[log.vehicleId] = (speedMap[log.vehicleId] || 0) + count;
+             }
+          }
+        });
+
+        // Fuel Logic (Current Month - Liters)
+        refuelings.forEach(ref => {
+          const rDate = new Date(ref.date + 'T12:00:00');
+          if (rDate.getMonth() === currentMonth && rDate.getFullYear() === currentYear) {
+             fuelMap[ref.vehicleId] = (fuelMap[ref.vehicleId] || 0) + ref.liters;
+          }
+        });
+
+        const sortAndMap = (map: Record<string, number>) => {
+           return Object.entries(map)
+             .sort(([, a], [, b]) => b - a)
+             .slice(0, 5)
+             .map(([id, val]) => ({ id, ...getVDetails(id), value: val }));
+        };
+
+        setRankings({
+           km: sortAndMap(kmMap),
+           fuel: sortAndMap(fuelMap),
+           speed: sortAndMap(speedMap)
+        });
+
+      } catch (error) {
+        console.error("Error loading dashboard metrics", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  if (loading) return <div className="animate-pulse bg-white/50 h-24 w-64 rounded-xl"></div>;
+
+  const formatCurrency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+
+  return (
+    <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-stretch">
+       {/* Financial Widget - Transparent */}
+       <div className="bg-slate-900/5 backdrop-blur-md border border-slate-900/10 rounded-xl p-4 min-w-[200px] flex flex-col justify-between h-full shadow-sm hover:bg-slate-900/10 transition-colors">
+          <div className="flex items-center gap-2 text-slate-600 mb-1">
+             <div className="p-1.5 bg-white/60 rounded-lg shadow-sm">
+               <DollarSign size={14} className="text-emerald-600" />
+             </div>
+             <span className="text-[10px] font-bold uppercase tracking-wider">Custo Combustível (Mês)</span>
+          </div>
+          
+          <div>
+            <div className="text-2xl font-black text-slate-800 tracking-tight">
+               {formatCurrency(financials.currentMonthCost)}
+            </div>
+            
+            <div className={`flex items-center gap-1 text-xs font-bold mt-1 ${financials.isIncrease ? 'text-red-600' : 'text-emerald-600'}`}>
+               {financials.isIncrease ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+               <span>{financials.diffPercent.toFixed(1)}%</span>
+               <span className="text-slate-400 font-normal">vs. mês anterior</span>
+            </div>
+          </div>
+       </div>
+
+       {/* Rankings Widget - Compact Card */}
+       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden w-full sm:w-[320px] flex flex-col">
+          {/* Tabs Header */}
+          <div className="flex border-b border-slate-100">
+             <button 
+                onClick={() => setActiveTab('KM')}
+                className={`flex-1 py-2.5 flex justify-center items-center transition-colors ${activeTab === 'KM' ? 'bg-blue-50 text-blue-600 border-b-2 border-blue-600' : 'text-slate-400 hover:bg-slate-50'}`}
+                title="Maior Rodagem (KM)"
+             >
+                <Gauge size={16} />
+             </button>
+             <button 
+                onClick={() => setActiveTab('FUEL')}
+                className={`flex-1 py-2.5 flex justify-center items-center transition-colors ${activeTab === 'FUEL' ? 'bg-orange-50 text-orange-600 border-b-2 border-orange-600' : 'text-slate-400 hover:bg-slate-50'}`}
+                title="Maior Abastecimento (Litros)"
+             >
+                <Droplet size={16} />
+             </button>
+             <button 
+                onClick={() => setActiveTab('SPEED')}
+                className={`flex-1 py-2.5 flex justify-center items-center transition-colors ${activeTab === 'SPEED' ? 'bg-red-50 text-red-600 border-b-2 border-red-600' : 'text-slate-400 hover:bg-slate-50'}`}
+                title="Infrações (>90km/h)"
+             >
+                <AlertTriangle size={16} />
+             </button>
+          </div>
+
+          {/* List Content */}
+          <div className="p-3">
+             <div className="flex justify-between items-center mb-2">
+                <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                    {activeTab === 'KM' ? 'Top 5 - Rodagem (Mês)' : 
+                     activeTab === 'FUEL' ? 'Top 5 - Abastecimento (Mês)' : 
+                     'Top 5 - Excesso Vel. (Mês)'}
+                </span>
+                <Trophy size={10} className="text-yellow-500" />
+             </div>
+             
+             <div className="space-y-2">
+                {(() => {
+                   const list = activeTab === 'KM' ? rankings.km : activeTab === 'FUEL' ? rankings.fuel : rankings.speed;
+                   
+                   if (list.length === 0) return <div className="text-xs text-slate-400 text-center py-4 italic">Sem dados registrados neste mês.</div>;
+
+                   return list.map((item, idx) => (
+                      <div key={idx} className="flex items-center justify-between text-xs border-b border-slate-50 pb-1 last:border-0">
+                         <div className="flex items-start gap-2 w-full overflow-hidden">
+                            <span className={`w-4 h-4 rounded-full flex-shrink-0 flex items-center justify-center font-bold text-[9px] mt-0.5 ${idx === 0 ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100 text-slate-500'}`}>
+                               {idx + 1}
+                            </span>
+                            <div className="flex flex-col w-full min-w-0">
+                               {/* MODIFICADO: Exibir Contrato, Municipio e Motorista */}
+                               <div className="flex items-center justify-between gap-1">
+                                 <span className="font-bold text-slate-700 truncate" title={item.contract}>{item.contract}</span>
+                                 <span className="font-mono font-bold text-slate-600 ml-auto whitespace-nowrap">
+                                    {activeTab === 'KM' ? `${item.value}km` : 
+                                     activeTab === 'FUEL' ? `${item.value.toFixed(0)}L` : 
+                                     `${item.value}x`}
+                                 </span>
+                               </div>
+                               <div className="text-slate-500 text-[9px] truncate leading-tight" title={item.municipality}>
+                                 {item.municipality}
+                               </div>
+                               <div className="text-slate-400 text-[9px] truncate leading-tight" title={item.driver}>
+                                 {item.driver}
+                               </div>
+                            </div>
+                         </div>
+                      </div>
+                   ));
+                })()}
+             </div>
+          </div>
+       </div>
+    </div>
+  );
+};
+
 // --- Home Menu Component ---
 interface HomeMenuProps {
   onNavigate: (tab: Tab) => void;
@@ -30,7 +266,7 @@ interface HomeMenuProps {
 
 interface AlertItem {
   id: string;
-  type: 'SPEEDING' | 'EXTRA_TIME' | 'NO_SIGNAL';
+  type: 'SPEEDING' | 'EXTRA_TIME' | 'NO_SIGNAL' | 'PENDING_PAYMENT' | 'LATE_APPROVAL' | 'MISSING_LOG';
   date: string;
   title: string;
   details: React.ReactNode;
@@ -50,141 +286,128 @@ const HomeMenu: React.FC<HomeMenuProps> = ({ onNavigate, role, userName }) => {
   const showReports = role === UserRole.ADMIN || role === UserRole.GESTOR || role === UserRole.RH || role === UserRole.OPERADOR || role === UserRole.GERENCIA;
   const showRequisitions = role === UserRole.ADMIN || role === UserRole.GESTOR || role === UserRole.FINANCEIRO || role === UserRole.GERENCIA || role === UserRole.ENCARREGADO;
 
-  const canSeeNotifications = role === UserRole.ADMIN || role === UserRole.GERENCIA;
+  const canSeeNotifications = true; 
+  const canSeeDashboard = role === UserRole.ADMIN || role === UserRole.GERENCIA;
 
   useEffect(() => {
-    if (canSeeNotifications) {
-      fetchAlerts();
-    }
-  }, [canSeeNotifications]);
+    fetchAlerts();
+  }, [role]);
 
   const fetchAlerts = async () => {
     setLoadingAlerts(true);
     try {
-      const [logs, vehicles] = await Promise.all([
-        storageService.getLogs(),
-        storageService.getVehicles()
-      ]);
-
       const generatedAlerts: AlertItem[] = [];
-      
-      const getVehicleInfo = (log: DailyLog) => {
-        const v = vehicles.find(v => v.id === log.vehicleId);
-        return {
-           plate: log.historicalPlate || v?.plate || 'Desconhecido',
-           driver: log.historicalDriver || v?.driverName || 'Desconhecido',
-           contract: log.historicalContract || v?.contract || '-'
-        };
-      };
-
-      const sortedLogs = [...logs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      const now = new Date();
       const cutOffDate = new Date();
-      cutOffDate.setDate(cutOffDate.getDate() - 5); // Últimos 5 dias
+      cutOffDate.setDate(cutOffDate.getDate() - 5); 
       const cutOffStr = cutOffDate.toISOString().split('T')[0];
-      const recentLogs = sortedLogs.filter(l => l.date >= cutOffStr);
 
-      recentLogs.forEach(log => {
-        const info = getVehicleInfo(log);
-        if (log.maxSpeed > 90) {
-          generatedAlerts.push({
-            id: `speed-${log.id}`,
-            type: 'SPEEDING',
-            date: log.date,
-            severity: 'high',
-            title: `Excesso: ${log.maxSpeed} km/h`,
-            details: (
-              <div className="text-xs text-slate-600 mt-1">
-                <span className="font-bold text-slate-800">{info.plate}</span> - {info.driver}
-                <div className="mt-0.5 bg-red-50 text-red-700 px-2 py-0.5 rounded w-fit border border-red-100 font-medium">
-                    Ocorrências &gt; 90km/h: {log.speedingCount}x
-                </div>
-              </div>
-            )
+      // --- ALERTS FOR ADMIN, GESTOR, GERENCIA, OPERADOR (Safety) ---
+      if (role === UserRole.ADMIN || role === UserRole.GESTOR || role === UserRole.GERENCIA || role === UserRole.OPERADOR) {
+         const [logs, vehicles] = await Promise.all([
+            storageService.getLogs(),
+            storageService.getVehicles()
+         ]);
+         
+         // 1. Safety Alerts (Speeding, Extra Time, No Signal)
+         const recentLogs = logs.filter(l => l.date >= cutOffStr).sort((a,b) => b.date.localeCompare(a.date));
+
+         recentLogs.forEach(log => {
+             const v = vehicles.find(vh => vh.id === log.vehicleId);
+             const plate = log.historicalPlate || v?.plate || '???';
+             const driver = log.historicalDriver || v?.driverName || '???';
+
+             if (log.maxSpeed > 90) {
+                 generatedAlerts.push({
+                     id: `speed-${log.id}`, type: 'SPEEDING', date: log.date, severity: 'high',
+                     title: `Excesso: ${log.maxSpeed} km/h`,
+                     details: <span className="text-xs text-slate-600">{plate} - {driver} ({log.speedingCount}x)</span>
+                 });
+             }
+         });
+         
+         // NO SIGNAL Logic
+         const vehicleLogs: Record<string, DailyLog[]> = {};
+         logs.forEach(log => {
+            if (!vehicleLogs[log.vehicleId]) vehicleLogs[log.vehicleId] = [];
+            vehicleLogs[log.vehicleId].push(log);
+         });
+         Object.keys(vehicleLogs).forEach(vId => {
+             const vLogs = vehicleLogs[vId].sort((a, b) => b.date.localeCompare(a.date));
+             let consecutive = 0;
+             for (const l of vLogs) {
+                 if (l.nonOperatingReason === 'SEM SINAL') consecutive++;
+                 else break;
+             }
+             if (consecutive > 2) {
+                 const v = vehicles.find(vh => vh.id === vId);
+                 generatedAlerts.push({
+                     id: `nosignal-${vId}`, type: 'NO_SIGNAL', date: vLogs[0].date, severity: 'high',
+                     title: `Sem Sinal (${consecutive} dias)`,
+                     details: <span className="text-xs text-slate-600">{v?.plate} - {v?.municipality}</span>
+                 });
+             }
+         });
+
+         // 2. OPERADOR ALERTS: MISSING LOG FOR YESTERDAY
+         // Lógica: Para todos os veículos ATIVOS, verificar se existe log na data de ontem
+         if (role === UserRole.OPERADOR || role === UserRole.ADMIN) {
+             const yesterday = new Date();
+             yesterday.setDate(yesterday.getDate() - 1);
+             const yStr = yesterday.toLocaleDateString('pt-BR').split('/').reverse().join('-'); // Formata YYYY-MM-DD
+             
+             // Veículos ativos
+             const activeVehicles = vehicles.filter(v => v.status !== 'INATIVO');
+             
+             activeVehicles.forEach(v => {
+                 const hasLogYesterday = logs.some(l => l.vehicleId === v.id && l.date === yStr);
+                 if (!hasLogYesterday) {
+                     generatedAlerts.push({
+                         id: `missing-${v.id}-${yStr}`, type: 'MISSING_LOG', date: yStr, severity: 'medium',
+                         title: 'Diário Pendente (Ontem)',
+                         details: <span className="text-xs text-slate-600">Veículo <b>{v.plate}</b> sem registro em {yStr}.</span>
+                     });
+                 }
+             });
+         }
+      }
+
+      // --- ALERTS FOR FINANCEIRO & ADMIN ---
+      if (role === UserRole.FINANCEIRO || role === UserRole.ADMIN || role === UserRole.GERENCIA) {
+          const [refuelings, requisitions] = await Promise.all([
+             storageService.getRefuelings(),
+             storageService.getRequisitions()
+          ]);
+
+          // 1. Pending Refueling Payment (Cost = 0)
+          const pendingRefuelings = refuelings.filter(r => r.totalCost === 0 && r.date >= cutOffStr);
+          pendingRefuelings.forEach(r => {
+               generatedAlerts.push({
+                   id: `fuel-pend-${r.id}`, type: 'PENDING_PAYMENT', date: r.date, severity: 'high',
+                   title: 'Pendência em Abastecimento',
+                   details: <span className="text-xs text-slate-600">Placa {r.plateSnapshot}: Valor R$ 0,00 registrado (Falta NF ou Valor).</span>
+               });
           });
-        }
 
-        if (log.extraTimeStart && log.extraTimeEnd) {
-          const minutes = calculateDuration(log.extraTimeStart, log.extraTimeEnd);
-          if (minutes > 0) {
-            generatedAlerts.push({
-              id: `extra-${log.id}`,
-              type: 'EXTRA_TIME',
-              date: log.date,
-              severity: 'medium',
-              title: `Atividade Extra`,
-              details: (
-                <div className="text-xs flex flex-col gap-1 mt-1">
-                   <div className="flex items-center gap-1">
-                     <span className="font-bold text-slate-800">{info.plate}</span>
-                     <span className="text-slate-400">•</span>
-                     <span className="font-medium text-slate-600 truncate max-w-[120px]">{info.driver}</span>
-                   </div>
-                   <div className="flex items-center gap-2">
-                      <span className="text-[9px] font-bold uppercase bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200">
-                        {info.contract}
-                      </span>
-                      <span className="bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded font-mono text-[10px] font-bold">
-                        {log.extraTimeStart} - {log.extraTimeEnd}
-                      </span>
-                   </div>
-                </div>
-              )
-            });
-          }
-        }
-      });
-
-      const vehicleLogs: Record<string, DailyLog[]> = {};
-      logs.forEach(log => {
-        if (!vehicleLogs[log.vehicleId]) vehicleLogs[log.vehicleId] = [];
-        vehicleLogs[log.vehicleId].push(log);
-      });
-
-      Object.keys(vehicleLogs).forEach(vId => {
-         const vLogs = vehicleLogs[vId].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-         let consecutiveNoSignal = 0;
-         let lastDate = '';
-
-         for (const log of vLogs) {
-           if (log.nonOperatingReason === 'SEM SINAL') {
-             consecutiveNoSignal++;
-             if (!lastDate) lastDate = log.date;
-           } else {
-             break;
-           }
-         }
-
-         if (consecutiveNoSignal > 2) {
-            const currentV = vehicles.find(v => v.id === vId);
-            if (currentV) {
-              generatedAlerts.push({
-                id: `nosignal-${vId}`,
-                type: 'NO_SIGNAL',
-                date: lastDate,
-                severity: 'high',
-                title: `Sem Sinal (${consecutiveNoSignal} dias)`,
-                details: (
-                  <div className="text-xs text-slate-600 mt-1 flex flex-col gap-1.5">
-                     <div className="flex items-center justify-between">
-                        <span className="font-bold text-slate-800 text-sm">{currentV.plate}</span>
-                        <span className="text-[9px] bg-slate-100 border border-slate-200 px-1 rounded uppercase text-slate-500">{currentV.type}</span>
-                     </div>
-                     
-                     <div className="flex items-center gap-2 text-slate-600">
-                        <UserCircle size={12} className="text-slate-400" />
-                        <span className="font-medium truncate">{currentV.driverName}</span>
-                     </div>
-
-                     <div className="flex items-center gap-2 text-slate-600">
-                        <MapPin size={12} className="text-slate-400" />
-                        <span className="uppercase font-bold text-xs">{currentV.municipality}</span>
-                     </div>
-                  </div>
-                )
-              });
-            }
-         }
-      });
+          // 2. Pending Requisition Analysis > 24h
+          const pendingReqs = requisitions.filter(r => r.status === RequisitionStatus.PENDING);
+          const msPerDay = 24 * 60 * 60 * 1000;
+          
+          pendingReqs.forEach(r => {
+               // Combine date and time if available, or just date
+               const reqDateTimeStr = r.requestTime ? `${r.date}T${r.requestTime}:00` : `${r.date}T00:00:00`;
+               const reqTime = new Date(reqDateTimeStr).getTime();
+               const diff = now.getTime() - reqTime;
+               
+               if (diff > msPerDay) {
+                   generatedAlerts.push({
+                       id: `req-late-${r.id}`, type: 'LATE_APPROVAL', date: r.date, severity: 'high',
+                       title: 'Análise Pendente > 24h',
+                       details: <span className="text-xs text-slate-600">Req #{r.internalId} de {r.requesterName} aguarda análise há mais de 1 dia.</span>
+                   });
+               }
+          });
+      }
 
       generatedAlerts.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       setAlerts(generatedAlerts);
@@ -211,6 +434,9 @@ const HomeMenu: React.FC<HomeMenuProps> = ({ onNavigate, role, userName }) => {
           case 'SPEEDING': return <Gauge size={18} />;
           case 'NO_SIGNAL': return <WifiOff size={18} />;
           case 'EXTRA_TIME': return <Clock size={18} />;
+          case 'PENDING_PAYMENT': return <DollarSign size={18} />;
+          case 'LATE_APPROVAL': return <Clock3 size={18} />;
+          case 'MISSING_LOG': return <FileText size={18} />;
           default: return <AlertTriangle size={18} />;
       }
   };
@@ -220,6 +446,9 @@ const HomeMenu: React.FC<HomeMenuProps> = ({ onNavigate, role, userName }) => {
           case 'SPEEDING': return 'bg-red-100 text-red-700 border-red-200';
           case 'NO_SIGNAL': return 'bg-orange-100 text-orange-700 border-orange-200';
           case 'EXTRA_TIME': return 'bg-blue-100 text-blue-700 border-blue-200';
+          case 'PENDING_PAYMENT': return 'bg-rose-100 text-rose-700 border-rose-200';
+          case 'LATE_APPROVAL': return 'bg-purple-100 text-purple-700 border-purple-200';
+          case 'MISSING_LOG': return 'bg-yellow-100 text-yellow-700 border-yellow-200';
           default: return 'bg-slate-100 text-slate-700 border-slate-200';
       }
   };
@@ -236,14 +465,6 @@ const HomeMenu: React.FC<HomeMenuProps> = ({ onNavigate, role, userName }) => {
           <div className="absolute -bottom-32 left-20 w-[800px] h-[800px] bg-slate-200/30 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob animation-delay-4000"></div>
           
           <div className="absolute inset-0 opacity-[0.4]" style={{backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.1'/%3E%3C/svg%3E")`}}></div>
-      </div>
-
-      {/* Status Badge - Hide on Print */}
-      <div className="flex justify-center w-full relative z-20 -mt-2 mb-4 print:hidden">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-b-xl bg-white border-b border-x border-slate-200 shadow-sm transform -translate-y-2">
-              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-              <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">Sistema Online</span>
-          </div>
       </div>
 
       {/* Notifications Drawer (Slide-over) */}
@@ -282,15 +503,15 @@ const HomeMenu: React.FC<HomeMenuProps> = ({ onNavigate, role, userName }) => {
                               </div>
                               <div>
                                 <p className="text-slate-800 font-bold">Tudo Tranquilo!</p>
-                                <p className="text-slate-500 text-sm mt-1">Nenhuma ocorrência registrada recentemente.</p>
+                                <p className="text-slate-500 text-sm mt-1">Nenhuma ocorrência pendente.</p>
                               </div>
                            </div>
                         ) : (
                             alerts.map(alert => (
                                 <div key={alert.id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow relative overflow-hidden group">
                                     <div className={`absolute left-0 top-0 bottom-0 w-1 ${
-                                        alert.type === 'SPEEDING' ? 'bg-red-500' : 
-                                        alert.type === 'NO_SIGNAL' ? 'bg-orange-500' : 'bg-blue-500'
+                                        alert.type === 'SPEEDING' || alert.type === 'PENDING_PAYMENT' || alert.type === 'LATE_APPROVAL' ? 'bg-red-500' : 
+                                        alert.type === 'NO_SIGNAL' || alert.type === 'MISSING_LOG' ? 'bg-orange-500' : 'bg-blue-500'
                                     }`}></div>
 
                                     <div className="pl-3">
@@ -317,17 +538,19 @@ const HomeMenu: React.FC<HomeMenuProps> = ({ onNavigate, role, userName }) => {
 
       <div className="relative z-10 max-w-7xl mx-auto w-full flex-1 print:max-w-none print:w-full">
         
-        {/* --- Header Section --- */}
-        <div className="flex items-center justify-between mb-10 animate-in slide-in-from-top-4 duration-700 print:hidden">
-            <div className="flex items-start gap-6">
+        {/* --- Header Section (Redesigned) --- */}
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 mb-10 animate-in slide-in-from-top-4 duration-700 print:hidden">
+            
+            {/* Left Side: Greeting & Bell */}
+            <div className="flex items-start gap-4">
                 {canSeeNotifications && (
                     <button 
                         onClick={handleOpenNotifications}
-                        className={`relative p-3.5 rounded-2xl transition-all group mt-1 border ${
+                        className={`relative p-3 rounded-2xl transition-all group mt-1 border flex-shrink-0 ${
                            hasNewNotifications 
                              ? 'bg-indigo-50 border-indigo-200 text-indigo-600 shadow-lg shadow-indigo-100' 
-                             : 'bg-white border-slate-100 text-slate-500 hover:text-indigo-600 hover:border-indigo-100 shadow-lg shadow-indigo-500/5'
-                        } hover:scale-105`}
+                             : 'bg-white border-slate-100 text-slate-500 hover:text-indigo-600 hover:border-indigo-100 shadow-sm'
+                        }`}
                     >
                         <Bell size={24} className={hasNewNotifications ? "animate-[swing_1s_ease-in-out_infinite]" : ""} />
                         
@@ -337,26 +560,34 @@ const HomeMenu: React.FC<HomeMenuProps> = ({ onNavigate, role, userName }) => {
                                 <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500 border-2 border-white"></span>
                             </span>
                         )}
-                        
-                        <div className="absolute left-0 top-full mt-2 bg-slate-800 text-white text-xs font-bold px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-20 shadow-xl">
-                            {alerts.length > 0 ? `${alerts.length} Alertas` : 'Sem Alertas'}
-                        </div>
                     </button>
                 )}
 
                 <div>
-                    <div className="flex items-center gap-2 text-slate-500 mb-1">
-                    <CalendarDays size={14} />
-                    <span className="text-xs font-bold uppercase tracking-wide">
-                        {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
-                    </span>
+                    <div className="inline-flex items-center gap-2 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-100 mb-2 w-fit">
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+                        <span className="text-[9px] font-bold text-emerald-700 uppercase tracking-widest">System Online</span>
                     </div>
-                    <h1 className="text-3xl md:text-4xl font-bold text-slate-900 tracking-tight">
-                    Olá, <span className="text-indigo-600">{userName}</span>
+
+                    <div className="flex items-center gap-2 text-slate-500 mb-1">
+                        <CalendarDays size={14} />
+                        <span className="text-xs font-bold uppercase tracking-wide">
+                            {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                        </span>
+                    </div>
+                    <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
+                        Olá, <span className="text-indigo-600">{userName}</span>
                     </h1>
-                    <p className="text-slate-500 text-sm mt-1">Bem-vindo ao seu painel de controle.</p>
+                    <p className="text-slate-500 text-sm mt-1">Bem-vindo ao seu painel.</p>
                 </div>
             </div>
+
+            {/* Right Side: Dashboard Widgets (Admin/Gerencia) */}
+            {canSeeDashboard && (
+                <div className="w-full lg:w-auto self-end lg:self-center">
+                    <DashboardRankings />
+                </div>
+            )}
         </div>
 
         {/* --- Main Content (Full Width Cards) --- */}
@@ -666,13 +897,13 @@ const App: React.FC = () => {
       {/* Sidebar (Desktop) - Modernized */}
       <aside className="hidden md:flex print:hidden flex-col w-72 h-screen sticky top-0 shadow-2xl z-50 bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 border-r border-slate-800/50">
         <div 
-          className="p-6 flex justify-center cursor-pointer hover:bg-white/5 transition-colors border-b border-slate-800/50 relative overflow-hidden"
+          className="p-4 flex justify-center cursor-pointer hover:bg-white/5 transition-colors border-b border-slate-800/50 relative overflow-hidden"
           onClick={() => setActiveTab(Tab.HOME)}
         >
            {/* Logo Glow Effect */}
            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl pointer-events-none"></div>
            <div className="relative z-10">
-               <ParisLogo variant="light" size="medium" />
+               <ParisLogo variant="light" size="normal" />
            </div>
         </div>
         
@@ -752,7 +983,7 @@ const App: React.FC = () => {
                  </div>
               </div>
               <button onClick={signOut} className="w-full bg-red-900/20 text-red-400 py-3 rounded-lg font-bold flex items-center justify-center gap-2 border border-red-900/30">
-                <LogOut size={18} /> Sair
+                <LogOut size={18} /> Finalizar Sessão
               </button>
            </div>
         </div>

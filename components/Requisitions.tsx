@@ -1,17 +1,24 @@
-
 import React, { useState, useEffect } from 'react';
 import { Requisition, RequisitionStatus, Vehicle, FuelType, ContractType, UserRole, UserVehicle, UserProfile, GasStation, RefuelingLog } from '../types';
 import { storageService } from '../services/storage';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   FileText, Plus, Check, X, Search, Filter, Clock, User, Truck, Fuel, MapPin, AlertCircle, 
-  Calendar, Loader2, Send, ThumbsUp, ThumbsDown, Eye, Users, Settings, Link as LinkIcon, Save, AlertTriangle, ArrowLeft, Gauge, Receipt, Trash2, RotateCcw
+  Calendar, Loader2, Send, ThumbsUp, ThumbsDown, Eye, Users, Settings, Link as LinkIcon, Save, AlertTriangle, ArrowLeft, Gauge, Receipt, Trash2, RotateCcw, ShoppingCart, List
 } from 'lucide-react';
 import MultiSelect from './MultiSelect';
 
 const EXTERNAL_EQUIPMENT_TYPES = [
   'CARRO', 'MOTO', 'BARCO', 'BALSA', 'LANCHA', 'MOTOR DE POPA', 'GALÃO', 'GERADOR', 'TAMBOR'
 ];
+
+interface CartItem {
+    id: string;
+    fuelType: FuelType;
+    liters: number;
+    isFullTank: boolean;
+    observation?: string;
+}
 
 const Requisitions: React.FC = () => {
   const { user } = useAuth();
@@ -47,13 +54,19 @@ const Requisitions: React.FC = () => {
   const [manageViewMode, setManageViewMode] = useState<'LIST' | 'EDIT'>('LIST');
 
   // Forms
-  // fuelType initialized to empty string to force selection
-  const [newReq, setNewReq] = useState<Partial<Requisition>>({
-    fuelType: '' as any, 
-    liters: 0,
-    isFullTank: false,
-    observation: '',
-    vehicleId: ''
+  
+  // CART STATE
+  const [selectedVehicleForCart, setSelectedVehicleForCart] = useState<string>('');
+  const [selectedExternalType, setSelectedExternalType] = useState<string>('');
+  const [selectedExternalPlate, setSelectedExternalPlate] = useState<string>('');
+  const [selectedMunicipality, setSelectedMunicipality] = useState<string>('');
+  
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [currentItem, setCurrentItem] = useState<Partial<CartItem>>({
+      fuelType: '' as any,
+      liters: 0,
+      isFullTank: false,
+      observation: ''
   });
 
   const [approvalData, setApprovalData] = useState({
@@ -153,60 +166,119 @@ const Requisitions: React.FC = () => {
      }
   };
 
-  // --- CREATE REQUISITION LOGIC ---
+  // --- CART LOGIC ---
+  const handleAddItemToCart = () => {
+      if (!currentItem.fuelType) {
+          alert("Selecione o tipo de item/combustível.");
+          return;
+      }
+
+      setCartItems(prev => [...prev, {
+          id: crypto.randomUUID(),
+          fuelType: currentItem.fuelType as FuelType,
+          liters: currentItem.isFullTank ? 0 : Number(currentItem.liters),
+          isFullTank: currentItem.isFullTank || false,
+          observation: currentItem.observation || ''
+      }]);
+
+      // Reset item input
+      setCurrentItem({
+          fuelType: '' as any,
+          liters: 0,
+          isFullTank: false,
+          observation: ''
+      });
+  };
+
+  const handleRemoveItemFromCart = (id: string) => {
+      setCartItems(prev => prev.filter(item => item.id !== id));
+  };
   
-  const handleCreateRequisition = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSaveCart = async () => {
     if (!user) return;
-    if (!newReq.vehicleId) return;
-    if (!newReq.fuelType) {
-        alert("Selecione o tipo de combustível.");
+    if (!selectedVehicleForCart) {
+        alert("Selecione um veículo.");
+        return;
+    }
+    if (cartItems.length === 0) {
+        alert("Adicione pelo menos um item à lista.");
         return;
     }
     
     setLoading(true);
 
-    const nextId = await storageService.getNextInternalId();
     const now = new Date();
     
     // Snapshot data
     let municipality = '';
     let requesterName = user.email.split('@')[0].toUpperCase();
-    let isExternal = newReq.vehicleId === 'EXTERNAL';
+    let isExternal = selectedVehicleForCart === 'EXTERNAL';
 
     if (!isExternal) {
-        const v = vehicles.find(vh => vh.id === newReq.vehicleId);
+        const v = vehicles.find(vh => vh.id === selectedVehicleForCart);
         if (v) municipality = v.municipality;
     } else {
-        municipality = newReq.municipality ? newReq.municipality.toUpperCase() : '';
+        municipality = selectedMunicipality ? selectedMunicipality.toUpperCase() : '';
     }
 
-    const requisition: Requisition = {
-      id: crypto.randomUUID(),
-      internalId: nextId,
-      date: getTodayLocal(),
-      requestTime: now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-      requesterId: user.id,
-      requesterName: requesterName,
-      vehicleId: newReq.vehicleId,
-      externalType: isExternal ? newReq.externalType : undefined,
-      externalPlate: isExternal && newReq.externalPlate ? newReq.externalPlate.toUpperCase() : undefined,
-      fuelType: newReq.fuelType as FuelType,
-      liters: newReq.isFullTank ? 0 : Number(newReq.liters), // Se for tanque cheio, salva 0 inicialmente
-      isFullTank: newReq.isFullTank || false,
-      observation: newReq.observation ? newReq.observation.toUpperCase() : '',
-      municipality: municipality,
-      status: RequisitionStatus.PENDING
-    };
-
-    await storageService.saveRequisition(requisition);
-    await loadData();
-    setShowForm(false);
-    // Reset form with empty fuelType
-    setNewReq({ fuelType: '' as any, liters: 0, isFullTank: false, observation: '', vehicleId: '' });
+    // Filter items: Only save actual Fuels to DB. Discard others from DB logic.
+    // However, build one consolidated WhatsApp message for ALL items.
     
-    // Generate WhatsApp Link automatically
-    const waLink = generateWhatsAppLink(requisition);
+    const fuelItems = cartItems.filter(item => 
+        [FuelType.DIESEL, FuelType.DIESEL_S10, FuelType.GASOLINA, FuelType.ETANOL].includes(item.fuelType)
+    );
+
+    const internalIds: number[] = [];
+
+    // Save Requisitions for Fuels
+    for (const item of fuelItems) {
+        const nextId = await storageService.getNextInternalId();
+        internalIds.push(nextId);
+
+        const requisition: Requisition = {
+            id: crypto.randomUUID(),
+            internalId: nextId,
+            date: getTodayLocal(),
+            requestTime: now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+            requesterId: user.id,
+            requesterName: requesterName,
+            vehicleId: selectedVehicleForCart,
+            externalType: isExternal ? selectedExternalType : undefined,
+            externalPlate: isExternal && selectedExternalPlate ? selectedExternalPlate.toUpperCase() : undefined,
+            fuelType: item.fuelType,
+            liters: item.liters,
+            isFullTank: item.isFullTank,
+            observation: item.observation ? item.observation.toUpperCase() : '',
+            municipality: municipality,
+            status: RequisitionStatus.PENDING
+        };
+
+        await storageService.saveRequisition(requisition);
+    }
+    
+    await loadData();
+    
+    // Generate WhatsApp Link automatically with ALL items
+    const waLink = generateConsolidatedWhatsAppLink(
+        selectedVehicleForCart, 
+        requesterName, 
+        municipality, 
+        cartItems, 
+        internalIds,
+        isExternal,
+        selectedExternalType,
+        selectedExternalPlate
+    );
+    
+    setShowForm(false);
+    
+    // Reset Cart
+    setCartItems([]);
+    setSelectedVehicleForCart('');
+    setSelectedExternalType('');
+    setSelectedExternalPlate('');
+    setSelectedMunicipality('');
+    
     window.open(waLink, '_blank');
   };
 
@@ -375,12 +447,36 @@ const Requisitions: React.FC = () => {
 
   // --- WHATSAPP GENERATOR ---
   const generateWhatsAppLink = (req: Requisition) => {
+      // Wrapper for single item backward compatibility
+      return generateConsolidatedWhatsAppLink(
+          req.vehicleId, 
+          req.requesterName || '', 
+          req.municipality, 
+          [{ id: '', fuelType: req.fuelType, liters: req.liters, isFullTank: req.isFullTank || false, observation: req.observation }], 
+          [req.internalId],
+          req.vehicleId === 'EXTERNAL',
+          req.externalType || '',
+          req.externalPlate || ''
+      );
+  };
+
+  const generateConsolidatedWhatsAppLink = (
+      vehicleId: string, 
+      requesterName: string, 
+      municipality: string, 
+      items: CartItem[], 
+      internalIds: number[],
+      isExternal: boolean,
+      extType: string,
+      extPlate: string
+    ) => {
+     
      // Find last refueling info
      let lastRefuelingText = "Último Abastecimento: Não encontrado";
      
-     if (req.vehicleId !== 'EXTERNAL') {
+     if (!isExternal) {
          const vRefuelings = refuelings
-             .filter(r => r.vehicleId === req.vehicleId && r.date <= req.date)
+             .filter(r => r.vehicleId === vehicleId && r.date <= getTodayLocal())
              .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
          
          if (vRefuelings.length > 0) {
@@ -391,26 +487,32 @@ const Requisitions: React.FC = () => {
      }
 
      let vehicleInfo = "";
-     if (req.vehicleId === 'EXTERNAL') {
-         vehicleInfo = `${req.externalType} - ${req.externalPlate || 'S/ Placa'}`;
+     if (isExternal) {
+         vehicleInfo = `${extType} - ${extPlate || 'S/ Placa'}`;
      } else {
-         const v = vehicles.find(vh => vh.id === req.vehicleId);
+         const v = vehicles.find(vh => vh.id === vehicleId);
          vehicleInfo = `${v?.plate} - ${v?.model}`;
      }
 
-     const qtdText = req.isFullTank ? "COMPLETAR TANQUE" : `${req.liters} L`;
+     const idsString = internalIds.length > 0 ? internalIds.join(', ') : 'N/A (Insumos)';
 
-     const text = `*SOLICITAÇÃO DE ABASTECIMENTO Nº: ${req.internalId}*
-Encarregado: ${req.requesterName}
+     const rawText = `*SOLICITAÇÃO DE ABASTECIMENTO Nº: ${idsString}*
+Encarregado: ${requesterName}
 Veículo: ${vehicleInfo}
-Município: ${req.municipality}
-Combustível: ${req.fuelType}
-Quantidade: ${qtdText}
-Observação: ${req.observation || '-'}
+Município: ${municipality}
 
-ℹ️ ${lastRefuelingText}`;
+*Itens Solicitados:*
+${items.map((item, i) => `${i + 1}. ${item.fuelType} - ${item.isFullTank ? "TANQUE CHEIO" : item.liters + " L"} ${item.observation ? `(${item.observation})` : ''}`).join('\n')}
 
-     return `https://wa.me/?text=${encodeURIComponent(text)}`;
+ℹ️ ${lastRefuelingText}
+
+👇 *ENQUETE DE APROVAÇÃO:*
+Responda com uma das opções:
+1️⃣ Autorizado
+2️⃣ Recusado
+3️⃣ Liberado`;
+
+     return `https://wa.me/?text=${encodeURIComponent(rawText)}`;
   };
   
   // --- HELPERS ---
@@ -456,7 +558,7 @@ Observação: ${req.observation || '-'}
             {/* New Request Button for Encarregado/Financeiro/Admin */}
             {(isEncarregado || isFinanceiro || isAdmin) && (
                  <button 
-                    onClick={() => setShowForm(true)}
+                    onClick={() => { setShowForm(true); setCartItems([]); setSelectedVehicleForCart(''); }}
                     className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 shadow-lg transition-all"
                  >
                     <Plus size={20} /> Nova Requisição
@@ -559,97 +661,99 @@ Observação: ${req.observation || '-'}
                 )}
 
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                    <table className="w-full text-sm text-left">
-                        <thead className="bg-slate-50 text-slate-600 font-bold uppercase text-xs">
-                            <tr>
-                                <th className="px-6 py-3">Nº Int</th>
-                                <th className="px-6 py-3">Data / Solicitante</th>
-                                <th className="px-6 py-3">Veículo</th>
-                                <th className="px-6 py-3">Status</th>
-                                <th className="px-6 py-3">Detalhes</th>
-                                <th className="px-6 py-3 text-center">Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {requisitions
-                              .filter(r => (isFinanceiro || isAdmin) ? true : r.requesterId === user?.id)
-                              .filter(r => {
-                                  // Filtro adicional para Admin/Financeiro na aba de histórico
-                                  if (!(isFinanceiro || isAdmin)) return true;
-                                  
-                                  const rDate = new Date(r.date).getTime();
-                                  const start = historyStartDate ? new Date(historyStartDate).getTime() : null;
-                                  const end = historyEndDate ? new Date(historyEndDate).getTime() : null;
-                                  const matchesDate = (!start || rDate >= start) && (!end || rDate <= end);
-                                  const matchesRequester = !historyRequester || r.requesterName === historyRequester;
-                                  
-                                  return matchesDate && matchesRequester;
-                              })
-                              .map(req => (
-                                <tr key={req.id} className="hover:bg-slate-50">
-                                    <td className="px-6 py-3 font-mono font-bold text-slate-700">#{req.internalId}</td>
-                                    <td className="px-6 py-3">
-                                        <div className="font-bold text-slate-800">{req.date}</div> 
-                                        <div className="text-xs text-slate-500">{req.requesterName}</div>
-                                    </td>
-                                    <td className="px-6 py-3">
-                                        {req.vehicleId === 'EXTERNAL' ? (
-                                            <span className="text-orange-600 font-bold">{req.externalType} - {req.externalPlate}</span>
-                                        ) : (
-                                            (() => {
-                                                const v = vehicles.find(veh => veh.id === req.vehicleId);
-                                                return <span className="font-medium">{v?.plate} <span className="text-slate-400 text-xs font-normal">({v?.model})</span></span>
-                                            })()
-                                        )}
-                                    </td>
-                                    <td className="px-6 py-3">
-                                        <span className={`px-2 py-1 rounded text-xs font-bold border ${
-                                            req.status === RequisitionStatus.PENDING ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
-                                            req.status === RequisitionStatus.APPROVED ? 'bg-green-50 text-green-700 border-green-200' :
-                                            'bg-red-50 text-red-700 border-red-200'
-                                        }`}>
-                                            {(req.status === 'REPROVADA' || req.status === 'RECUSADA') ? 'RECUSADA' : req.status}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-3 text-xs">
-                                        {req.isFullTank ? (
-                                            <div className="font-bold text-blue-600 flex items-center gap-1">
-                                                <Gauge size={14} /> TANQUE CHEIO
-                                            </div>
-                                        ) : (
-                                            <div className="font-bold">{req.liters}L</div>
-                                        )}
-                                        <div className="text-slate-500">{req.fuelType} • {req.municipality}</div>
-                                    </td>
-                                    <td className="px-6 py-3 text-center">
-                                        <div className="flex justify-center items-center gap-2">
-                                            <button 
-                                                onClick={() => window.open(generateWhatsAppLink(req), '_blank')}
-                                                className="text-green-600 hover:bg-green-50 p-2 rounded-full transition-colors"
-                                                title="Enviar no WhatsApp"
-                                            >
-                                                <Send size={16} />
-                                            </button>
-                                            
-                                            {/* ADMIN DELETE BUTTON (Works for Pending or any status) */}
-                                            {isAdmin && (
-                                                <button 
-                                                    onClick={() => handleDelete(req.id)}
-                                                    className="text-red-600 hover:bg-red-50 p-2 rounded-full transition-colors"
-                                                    title="Excluir Requisição (ADMIN)"
-                                                >
-                                                    <Trash2 size={16} />
-                                                </button>
-                                            )}
-                                        </div>
-                                    </td>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left">
+                            <thead className="bg-slate-50 text-slate-600 font-bold uppercase text-xs">
+                                <tr>
+                                    <th className="px-6 py-3">Nº Int</th>
+                                    <th className="px-6 py-3">Data / Solicitante</th>
+                                    <th className="px-6 py-3">Veículo</th>
+                                    <th className="px-6 py-3">Status</th>
+                                    <th className="px-6 py-3">Detalhes</th>
+                                    <th className="px-6 py-3 text-center">Ações</th>
                                 </tr>
-                            ))}
-                            {requisitions.length === 0 && (
-                                <tr><td colSpan={6} className="p-8 text-center text-slate-400">Nenhuma requisição encontrada.</td></tr>
-                            )}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {requisitions
+                                .filter(r => (isFinanceiro || isAdmin) ? true : r.requesterId === user?.id)
+                                .filter(r => {
+                                    // Filtro adicional para Admin/Financeiro na aba de histórico
+                                    if (!(isFinanceiro || isAdmin)) return true;
+                                    
+                                    const rDate = new Date(r.date).getTime();
+                                    const start = historyStartDate ? new Date(historyStartDate).getTime() : null;
+                                    const end = historyEndDate ? new Date(historyEndDate).getTime() : null;
+                                    const matchesDate = (!start || rDate >= start) && (!end || rDate <= end);
+                                    const matchesRequester = !historyRequester || r.requesterName === historyRequester;
+                                    
+                                    return matchesDate && matchesRequester;
+                                })
+                                .map(req => (
+                                    <tr key={req.id} className="hover:bg-slate-50">
+                                        <td className="px-6 py-3 font-mono font-bold text-slate-700">#{req.internalId}</td>
+                                        <td className="px-6 py-3">
+                                            <div className="font-bold text-slate-800">{req.date}</div> 
+                                            <div className="text-xs text-slate-500">{req.requesterName}</div>
+                                        </td>
+                                        <td className="px-6 py-3">
+                                            {req.vehicleId === 'EXTERNAL' ? (
+                                                <span className="text-orange-600 font-bold">{req.externalType} - {req.externalPlate}</span>
+                                            ) : (
+                                                (() => {
+                                                    const v = vehicles.find(veh => veh.id === req.vehicleId);
+                                                    return <span className="font-medium">{v?.plate} <span className="text-slate-400 text-xs font-normal">({v?.model})</span></span>
+                                                })()
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-3">
+                                            <span className={`px-2 py-1 rounded text-xs font-bold border ${
+                                                req.status === RequisitionStatus.PENDING ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
+                                                req.status === RequisitionStatus.APPROVED ? 'bg-green-50 text-green-700 border-green-200' :
+                                                'bg-red-50 text-red-700 border-red-200'
+                                            }`}>
+                                                {(req.status === 'REPROVADA' || req.status === 'RECUSADA') ? 'RECUSADA' : req.status}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-3 text-xs">
+                                            {req.isFullTank ? (
+                                                <div className="font-bold text-blue-600 flex items-center gap-1">
+                                                    <Gauge size={14} /> TANQUE CHEIO
+                                                </div>
+                                            ) : (
+                                                <div className="font-bold">{req.liters}L</div>
+                                            )}
+                                            <div className="text-slate-500">{req.fuelType} • {req.municipality}</div>
+                                        </td>
+                                        <td className="px-6 py-3 text-center">
+                                            <div className="flex justify-center items-center gap-2">
+                                                <button 
+                                                    onClick={() => window.open(generateWhatsAppLink(req), '_blank')}
+                                                    className="text-green-600 hover:bg-green-50 p-2 rounded-full transition-colors"
+                                                    title="Enviar no WhatsApp"
+                                                >
+                                                    <Send size={16} />
+                                                </button>
+                                                
+                                                {/* ADMIN DELETE BUTTON */}
+                                                {isAdmin && (
+                                                    <button 
+                                                        onClick={() => handleDelete(req.id)}
+                                                        className="text-red-600 hover:bg-red-50 p-2 rounded-full transition-colors"
+                                                        title="Excluir Requisição (ADMIN)"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                                {requisitions.length === 0 && (
+                                    <tr><td colSpan={6} className="p-8 text-center text-slate-400">Nenhuma requisição encontrada.</td></tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         )}
@@ -955,7 +1059,7 @@ Observação: ${req.observation || '-'}
                                             const isSelected = selectedVehiclesForUser.includes(v.id);
                                             return (
                                              <label key={v.id} className={`flex items-center gap-3 p-3 mb-1 rounded-lg cursor-pointer transition-all border ${isSelected ? 'bg-blue-50 border-blue-300 shadow-sm' : 'bg-white border-slate-200 hover:border-blue-200'}`}>
-                                                 <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${isSelected ? 'bg-blue-600 border-blue-600' : 'bg-white border-slate-300'}`}>
+                                                 <div className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 transition-colors ${isSelected ? 'bg-blue-600 border-blue-600' : 'bg-white border-slate-300'}`}>
                                                      {isSelected && <Check size={14} className="text-white" />}
                                                  </div>
                                                  <input 
@@ -993,23 +1097,27 @@ Observação: ${req.observation || '-'}
             </div>
         )}
 
-        {/* --- MODAL: NEW REQUISITION --- */}
+        {/* --- MODAL: NEW REQUISITION (CART SYSTEM) --- */}
         {showForm && (
             <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-                <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full overflow-hidden">
-                    <div className="bg-orange-600 p-4 flex justify-between items-center text-white">
-                        <h3 className="font-bold flex items-center gap-2"><FileText /> Nova Requisição</h3>
+                <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh]">
+                    <div className="bg-orange-600 p-4 flex justify-between items-center text-white flex-shrink-0">
+                        <h3 className="font-bold flex items-center gap-2"><FileText /> Nova Requisição (Carrinho)</h3>
                         <button onClick={() => setShowForm(false)}><X /></button>
                     </div>
-                    <form onSubmit={handleCreateRequisition} className="p-6">
+                    
+                    <div className="p-6 overflow-y-auto flex-1">
                         
-                        {/* Vehicle Selection */}
-                        <div className="mb-4">
-                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Veículo</label>
+                        {/* Vehicle Selection - GLOBAL for Cart */}
+                        <div className="mb-6 p-4 bg-slate-50 border border-slate-200 rounded-lg">
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Veículo (Para todos os itens)</label>
                             <select 
                                 required
-                                value={newReq.vehicleId}
-                                onChange={(e) => setNewReq({...newReq, vehicleId: e.target.value})}
+                                value={selectedVehicleForCart}
+                                onChange={(e) => {
+                                    setSelectedVehicleForCart(e.target.value);
+                                    // Reset items if vehicle changes? No, keep items, user might correct vehicle.
+                                }}
                                 className={inputClass}
                             >
                                 <option value="">Selecione...</option>
@@ -1018,119 +1126,170 @@ Observação: ${req.observation || '-'}
                                 ))}
                                 <option value="EXTERNAL">-- VEÍCULO NÃO CADASTRADO / EXTERNO --</option>
                             </select>
+
+                             {/* External Fields */}
+                            {selectedVehicleForCart === 'EXTERNAL' && (
+                                <div className="grid grid-cols-2 gap-4 mt-4 animate-in slide-in-from-top-2">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tipo</label>
+                                        <select 
+                                            className={inputClass}
+                                            required
+                                            value={selectedExternalType}
+                                            onChange={(e) => setSelectedExternalType(e.target.value)}
+                                        >
+                                            <option value="">Selecione...</option>
+                                            {EXTERNAL_EQUIPMENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Placa / Identificação</label>
+                                        <input 
+                                            type="text" 
+                                            className={inputClass}
+                                            placeholder="Ex: ABC-1234 ou Nº Série"
+                                            value={selectedExternalPlate}
+                                            onChange={(e) => setSelectedExternalPlate(e.target.value.toUpperCase())}
+                                        />
+                                    </div>
+                                    <div className="col-span-2">
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Município</label>
+                                        <input 
+                                            type="text" 
+                                            required
+                                            className={inputClass}
+                                            value={selectedMunicipality}
+                                            onChange={(e) => setSelectedMunicipality(e.target.value.toUpperCase())}
+                                        />
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
-                        {/* External Fields */}
-                        {newReq.vehicleId === 'EXTERNAL' && (
-                            <div className="grid grid-cols-2 gap-4 mb-4 bg-orange-50 p-4 rounded-lg border border-orange-200 animate-in slide-in-from-top-2">
+                        {/* Add Item Form */}
+                        <div className="mb-6 pb-6 border-b border-slate-200">
+                             <h4 className="font-bold text-slate-700 mb-3 flex items-center gap-2"><Plus size={16} /> Adicionar Item</h4>
+                             <div className="grid grid-cols-2 gap-4 mb-4">
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Tipo</label>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Produto / Insumo</label>
                                     <select 
+                                        value={currentItem.fuelType || ''}
+                                        onChange={(e) => setCurrentItem({...currentItem, fuelType: e.target.value as FuelType})}
                                         className={inputClass}
-                                        required
-                                        value={newReq.externalType || ''}
-                                        onChange={(e) => setNewReq({...newReq, externalType: e.target.value})}
                                     >
                                         <option value="">Selecione...</option>
-                                        {EXTERNAL_EQUIPMENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                        {Object.values(FuelType).map(f => <option key={f} value={f}>{f}</option>)}
                                     </select>
                                 </div>
+                                
+                                {/* Logic for Liters vs Full Tank */}
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Placa / Identificação</label>
-                                    <input 
-                                        type="text" 
-                                        className={inputClass}
-                                        placeholder="Ex: ABC-1234 ou Nº Série"
-                                        value={newReq.externalPlate || ''}
-                                        onChange={(e) => setNewReq({...newReq, externalPlate: e.target.value.toUpperCase()})}
-                                    />
+                                    <div className="flex justify-between items-center mb-1">
+                                        <label className="block text-xs font-bold text-slate-500 uppercase">Quantidade (L)</label>
+                                        <label className="flex items-center gap-1.5 text-xs font-bold text-blue-600 cursor-pointer select-none">
+                                            <input 
+                                                type="checkbox" 
+                                                className="accent-blue-600 w-4 h-4"
+                                                checked={currentItem.isFullTank || false}
+                                                onChange={(e) => {
+                                                    setCurrentItem({
+                                                        ...currentItem, 
+                                                        isFullTank: e.target.checked,
+                                                        liters: e.target.checked ? 0 : currentItem.liters
+                                                    });
+                                                }}
+                                            />
+                                            Completar
+                                        </label>
+                                    </div>
+                                    
+                                    <div className="relative">
+                                        <input 
+                                            type="number" 
+                                            step="0.1"
+                                            disabled={currentItem.isFullTank}
+                                            value={currentItem.isFullTank ? '' : currentItem.liters}
+                                            onChange={(e) => setCurrentItem({...currentItem, liters: Number(e.target.value)})}
+                                            className={`${inputClass} ${currentItem.isFullTank ? 'bg-slate-100 text-transparent' : ''}`}
+                                            placeholder={currentItem.isFullTank ? '' : "0.0"}
+                                        />
+                                        {currentItem.isFullTank && (
+                                            <div className="absolute inset-0 flex items-center px-3 text-sm font-bold text-blue-800 pointer-events-none">
+                                                <Gauge size={16} className="mr-2" /> TANQUE CHEIO
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                                <div className="col-span-2">
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Município</label>
-                                    <input 
-                                        type="text" 
-                                        required
-                                        className={inputClass}
-                                        value={newReq.municipality || ''}
-                                        onChange={(e) => setNewReq({...newReq, municipality: e.target.value.toUpperCase()})}
-                                    />
-                                </div>
-                            </div>
-                        )}
-
-                        <div className="grid grid-cols-2 gap-4 mb-4">
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Combustível</label>
-                                <select 
-                                    required
-                                    value={newReq.fuelType || ''}
-                                    onChange={(e) => setNewReq({...newReq, fuelType: e.target.value as FuelType})}
-                                    className={inputClass}
-                                >
-                                    <option value="">Selecione...</option>
-                                    {Object.values(FuelType).map(f => <option key={f} value={f}>{f}</option>)}
-                                </select>
                             </div>
                             
-                            {/* Logic for Liters vs Full Tank */}
-                            <div>
-                                <div className="flex justify-between items-center mb-1">
-                                    <label className="block text-xs font-bold text-slate-500 uppercase">Litros</label>
-                                    <label className="flex items-center gap-1.5 text-xs font-bold text-blue-600 cursor-pointer select-none">
-                                        <input 
-                                            type="checkbox" 
-                                            className="accent-blue-600 w-4 h-4"
-                                            checked={newReq.isFullTank || false}
-                                            onChange={(e) => {
-                                                setNewReq({
-                                                    ...newReq, 
-                                                    isFullTank: e.target.checked,
-                                                    liters: e.target.checked ? 0 : newReq.liters
-                                                });
-                                            }}
-                                        />
-                                        Completar Tanque
-                                    </label>
-                                </div>
-                                
-                                <div className="relative">
+                            <div className="flex gap-2 items-end">
+                                <div className="flex-1">
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Observação (Op.)</label>
                                     <input 
-                                        type="number" 
-                                        required={!newReq.isFullTank}
-                                        disabled={newReq.isFullTank}
-                                        step="0.1"
-                                        value={newReq.isFullTank ? '' : newReq.liters}
-                                        onChange={(e) => setNewReq({...newReq, liters: Number(e.target.value)})}
-                                        className={`${inputClass} ${newReq.isFullTank ? 'bg-slate-100 text-transparent' : ''}`}
-                                        placeholder={newReq.isFullTank ? '' : "0.0"}
+                                        type="text" 
+                                        className={inputClass}
+                                        value={currentItem.observation}
+                                        onChange={(e) => setCurrentItem({...currentItem, observation: e.target.value.toUpperCase()})}
                                     />
-                                    {newReq.isFullTank && (
-                                        <div className="absolute inset-0 flex items-center px-3 text-sm font-bold text-blue-800 pointer-events-none">
-                                            <Gauge size={16} className="mr-2" /> TANQUE CHEIO
-                                        </div>
-                                    )}
                                 </div>
+                                <button 
+                                    type="button" 
+                                    onClick={handleAddItemToCart}
+                                    className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2.5 rounded-lg font-bold flex items-center gap-2 h-[42px]"
+                                >
+                                    <Plus size={18} /> Incluir
+                                </button>
                             </div>
                         </div>
 
-                        <div className="mb-6">
-                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Observação</label>
-                            <textarea 
-                                className={inputClass}
-                                rows={3}
-                                value={newReq.observation}
-                                onChange={(e) => setNewReq({...newReq, observation: e.target.value.toUpperCase()})}
-                            />
+                        {/* Cart List */}
+                        <div>
+                            <h4 className="font-bold text-slate-700 mb-3 flex items-center gap-2"><ShoppingCart size={16} /> Itens na Requisição</h4>
+                            {cartItems.length === 0 ? (
+                                <div className="text-center p-6 border-2 border-dashed border-slate-200 rounded-lg text-slate-400 text-sm">
+                                    Nenhum item adicionado à lista.
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {cartItems.map((item, index) => (
+                                        <div key={item.id} className="flex justify-between items-center p-3 bg-white border border-slate-200 rounded-lg shadow-sm">
+                                            <div className="flex items-center gap-3">
+                                                <div className="bg-slate-100 text-slate-500 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold">
+                                                    {index + 1}
+                                                </div>
+                                                <div>
+                                                    <div className="font-bold text-slate-800">{item.fuelType}</div>
+                                                    <div className="text-xs text-slate-500">
+                                                        {item.isFullTank ? "TANQUE CHEIO" : `${item.liters} Litros`}
+                                                        {item.observation && <span className="text-orange-600 ml-2">({item.observation})</span>}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <button 
+                                                onClick={() => handleRemoveItemFromCart(item.id)}
+                                                className="text-red-500 hover:bg-red-50 p-2 rounded-full"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
 
-                        <div className="flex justify-end gap-2">
-                            <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-bold">Cancelar</button>
-                            <button type="submit" className="bg-orange-600 hover:bg-orange-700 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2">
-                                <Save size={18} /> Gerar Requisição
-                            </button>
-                        </div>
+                    </div>
+                    
+                    <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-2 flex-shrink-0">
+                        <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-bold">Cancelar</button>
+                        <button 
+                            type="button" 
+                            onClick={handleSaveCart}
+                            className="bg-orange-600 hover:bg-orange-700 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2"
+                        >
+                            <Send size={18} /> Gerar Requisição
+                        </button>
+                    </div>
 
-                    </form>
                 </div>
             </div>
         )}

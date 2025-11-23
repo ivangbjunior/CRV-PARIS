@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Vehicle, DailyLog, RefuelingLog, UserRole } from '../types';
 import { storageService } from '../services/storage';
@@ -110,17 +109,20 @@ const DailyLogs: React.FC = () => {
       return;
     }
 
-    // DUPLICATE CHECK
-    const duplicateLog = existingLogs.find(l => 
+    // --- REFORÇO DA VERIFICAÇÃO DE DUPLICIDADE ---
+    // Recarrega logs para garantir que não haja conflito com lançamentos feitos em outra aba ou recentemente
+    const freshLogs = await storageService.getLogs();
+    const duplicateLog = freshLogs.find(l => 
       l.vehicleId === formData.vehicleId && 
       l.date === formData.date
     );
 
     if (duplicateLog) {
-      setErrorMsg("ATENÇÃO: JÁ EXISTE UM LANÇAMENTO DESTE VEÍCULO PARA ESTA DATA.");
+      setErrorMsg("BLOQUEADO: Já existe um registro para este veículo nesta data. Não é permitido duplicidade.");
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
+    // ------------------------------------------------
 
     // Time validation only if operating
     if (isOperating) {
@@ -164,7 +166,10 @@ const DailyLogs: React.FC = () => {
 
     setLoading(true);
     await storageService.saveLog(newLog);
-    await loadData(); // Refresh logs for duplicate check
+    
+    // Update local state immediately to block subsequent clicks
+    setExistingLogs(prev => [...prev, newLog]);
+    await loadData(); 
     
     setLoading(false);
     setSuccessMsg('Lançamento salvo com sucesso!');

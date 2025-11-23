@@ -108,7 +108,16 @@ export enum FuelType {
   GASOLINA = 'GASOLINA',
   DIESEL = 'DIESEL',
   DIESEL_S10 = 'DIESEL S10',
-  ETANOL = 'ETANOL'
+  ETANOL = 'ETANOL',
+  // Novos Itens (Não Combustíveis) - Apenas para Requisição/WhatsApp
+  ARLA_32 = 'ARLA 32',
+  OLEO_MOTOR = 'ÓLEO MOTOR',
+  OLEO_HIDRAULICO = 'ÓLEO HIDRÁULICO',
+  OLEO_TRANSMISSAO = 'ÓLEO TRANSMISSÃO',
+  OLEO_2T = 'ÓLEO 2T',
+  GRAXA = 'GRAXA',
+  ADITIVO = 'ADITIVO RADIADOR',
+  OUTROS = 'OUTROS'
 }
 
 export interface RefuelingLog {
