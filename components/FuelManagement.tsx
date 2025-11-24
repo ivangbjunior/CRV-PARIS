@@ -427,8 +427,8 @@ const FuelManagement: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 print:hidden">
         <div>
           <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-3">
-            <Fuel className="text-orange-600" size={32} />
-            Gestão de Abastecimento
+            <Fuel className="text-blue-600" size={32} />
+            Abastecimento
           </h1>
           <p className="text-slate-500">Controle de combustível e cadastro de postos conveniados.</p>
         </div>
@@ -476,7 +476,7 @@ const FuelManagement: React.FC = () => {
             {activeTab === 'REFUELING' && (
                 <button
                     onClick={() => { resetForms(); setShowForm(!showForm); }}
-                    className={`${showForm ? 'bg-slate-600 hover:bg-slate-700' : 'bg-red-600 hover:bg-red-700'} text-white px-6 py-2 rounded-lg font-bold flex items-center justify-center gap-2 shadow transition-colors w-full sm:w-auto whitespace-nowrap h-[40px]`}
+                    className={`${showForm ? 'bg-slate-600 hover:bg-slate-700' : 'bg-blue-600 hover:bg-blue-700'} text-white px-6 py-2 rounded-lg font-bold flex items-center justify-center gap-2 shadow transition-colors w-full sm:w-auto whitespace-nowrap h-[40px]`}
                 >
                     {showForm ? <X size={18} /> : <Plus size={18} />}
                     {showForm ? 'Cancelar' : 'Novo Abastecimento'}
@@ -485,7 +485,7 @@ const FuelManagement: React.FC = () => {
              {activeTab === 'STATIONS' && (
                 <button
                     onClick={() => { resetForms(); setShowForm(!showForm); }}
-                    className={`${showForm ? 'bg-slate-600 hover:bg-slate-700' : 'bg-red-600 hover:bg-red-700'} text-white px-6 py-2 rounded-lg font-bold flex items-center justify-center gap-2 shadow transition-colors w-full sm:w-auto whitespace-nowrap h-[40px]`}
+                    className={`${showForm ? 'bg-slate-600 hover:bg-slate-700' : 'bg-blue-600 hover:bg-blue-700'} text-white px-6 py-2 rounded-lg font-bold flex items-center justify-center gap-2 shadow transition-colors w-full sm:w-auto whitespace-nowrap h-[40px]`}
                 >
                      {showForm ? <X size={18} /> : <Plus size={18} />}
                     {showForm ? 'Cancelar' : 'Novo Posto'}
@@ -577,14 +577,14 @@ const FuelManagement: React.FC = () => {
             {showForm && !isReadOnly && (
                 <div className="bg-white rounded-xl shadow-lg border border-slate-200 p-6 animate-in fade-in slide-in-from-top-2 print:hidden">
                     <h3 className="font-bold text-lg text-slate-800 mb-4 flex items-center gap-2">
-                        <Droplet className="text-orange-500" />
+                        <Droplet className="text-blue-500" />
                         {isEditing ? 'Editar Abastecimento' : 'Registrar Novo Abastecimento'}
                     </h3>
                     
-                    <div className="mb-6 flex items-center p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                    <div className="mb-6 flex items-center p-3 bg-blue-50 border border-blue-200 rounded-lg">
                         <label className="relative inline-flex items-center cursor-pointer">
                         <input type="checkbox" className="sr-only peer" checked={isExternal} onChange={(e) => { setIsExternal(e.target.checked); setCurrentRefueling({ ...currentRefueling, vehicleId: '' }); }} />
-                        <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-600"></div>
+                        <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                         <span className="ml-3 text-sm font-bold text-slate-700 flex items-center gap-2">
                             <Fuel size={16} />
                             Abastecimento de Equipamento Externo / Não Cadastrado (Balsas, Barcos, Motos...)
@@ -609,7 +609,7 @@ const FuelManagement: React.FC = () => {
                             <>
                                 <div className="">
                                     <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Identificação</label>
-                                    <select required value={externalData.identifier} onChange={e => setExternalData({...externalData, identifier: e.target.value})} className={`${inputClass} font-bold border-orange-300 bg-orange-50`}>
+                                    <select required value={externalData.identifier} onChange={e => setExternalData({...externalData, identifier: e.target.value})} className={`${inputClass} font-bold border-blue-300 bg-blue-50`}>
                                         <option value="">Selecione o tipo...</option>
                                         {EXTERNAL_EQUIPMENT_TYPES.map(type => (<option key={type} value={type}>{type}</option>))}
                                     </select>
