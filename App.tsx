@@ -173,33 +173,33 @@ const DashboardRankings: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col sm:flex-row gap-4 items-start">
+    <div className="flex flex-col sm:flex-row gap-6 items-start">
        
        {/* Card 1: Financeiro (Custo Mês) */}
-       <div className="w-full sm:w-[240px] h-auto min-h-[140px] bg-slate-900 rounded-xl shadow-xl border border-slate-800 flex flex-col p-4 relative overflow-hidden shrink-0">
+       <div className="w-full sm:w-[260px] h-auto min-h-[160px] bg-slate-900 rounded-xl shadow-xl border border-slate-800 flex flex-col p-5 relative overflow-hidden shrink-0">
           <div className="flex flex-col h-full bg-slate-900 text-white justify-between">
               <div>
-                <div className="flex items-center gap-2 mb-3">
+                <div className="flex items-center gap-2 mb-4">
                     <div className="p-1.5 bg-slate-800 rounded-md border border-slate-700">
-                        <DollarSign size={14} className="text-emerald-400" />
+                        <DollarSign size={16} className="text-emerald-400" />
                     </div>
                     <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Custo Mês</span>
                 </div>
                 
-                <div className="text-2xl font-black tracking-tight truncate mb-3 text-white">
+                <div className="text-3xl font-black tracking-tight truncate mb-4 text-white">
                     {formatCurrency(financials.currentMonthCost)}
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-slate-800/50 flex flex-col gap-2">
-                <div className="flex flex-col gap-0.5">
-                    <span className="text-[10px] text-slate-500 uppercase font-bold">Mês Anterior (Mesmo Período)</span>
-                    <span className="text-sm font-bold text-slate-300">{formatCurrency(financials.lastMonthCost)}</span>
+              <div className="pt-4 border-t border-slate-800/50 flex flex-col gap-3">
+                <div className="flex flex-col gap-1">
+                    <span className="text-xs text-slate-500 uppercase font-bold">Mês Anterior (Mesmo Período)</span>
+                    <span className="text-base font-bold text-slate-300">{formatCurrency(financials.lastMonthCost)}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                    <span className="text-[10px] text-slate-500 uppercase font-bold">Variação</span>
-                    <div className={`flex items-center gap-1 text-xs font-bold ${financials.isIncrease ? 'text-red-400' : 'text-emerald-400'}`}>
-                        {financials.isIncrease ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                    <span className="text-xs text-slate-500 uppercase font-bold">Variação</span>
+                    <div className={`flex items-center gap-1 text-sm font-bold ${financials.isIncrease ? 'text-red-400' : 'text-emerald-400'}`}>
+                        {financials.isIncrease ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
                         <span>{financials.diffPercent.toFixed(1)}%</span>
                     </div>
                 </div>
@@ -207,55 +207,55 @@ const DashboardRankings: React.FC = () => {
           </div>
        </div>
 
-       {/* Card 2: Ranking (Tabs) - Enlarged Text and Size */}
-       <div className={`w-full sm:w-[320px] h-[220px] rounded-xl shadow-xl border border-slate-200 flex flex-col overflow-hidden transition-colors duration-300 shrink-0 ${getCardBackgroundColor()}`}>
+       {/* Card 2: Ranking (Tabs) - ENLARGED SIZE AND FONTS */}
+       <div className={`w-full sm:w-[350px] h-[260px] rounded-xl shadow-xl border border-slate-200 flex flex-col overflow-hidden transition-colors duration-300 shrink-0 ${getCardBackgroundColor()}`}>
           <div className="flex flex-col h-full">
             {/* Header Tabs */}
             <div className="flex border-b border-slate-200/50 bg-white/50">
                 <button 
                     onClick={() => setActiveTab('KM')}
-                    className={`flex-1 py-2 text-xs font-bold transition-colors uppercase ${activeTab === 'KM' ? 'bg-blue-100 text-blue-700 border-b-2 border-blue-500' : 'text-slate-500 hover:bg-slate-50'}`}
+                    className={`flex-1 py-3 text-xs font-black transition-colors uppercase tracking-wide ${activeTab === 'KM' ? 'bg-blue-100 text-blue-700 border-b-2 border-blue-500' : 'text-slate-500 hover:bg-slate-50'}`}
                 >
                     Rodagem
                 </button>
                 <button 
                     onClick={() => setActiveTab('FUEL')}
-                    className={`flex-1 py-2 text-xs font-bold transition-colors uppercase ${activeTab === 'FUEL' ? 'bg-orange-100 text-orange-700 border-b-2 border-orange-500' : 'text-slate-500 hover:bg-slate-50'}`}
+                    className={`flex-1 py-3 text-xs font-black transition-colors uppercase tracking-wide ${activeTab === 'FUEL' ? 'bg-orange-100 text-orange-700 border-b-2 border-orange-500' : 'text-slate-500 hover:bg-slate-50'}`}
                 >
                     Consumo
                 </button>
                 <button 
                     onClick={() => setActiveTab('SPEED')}
-                    className={`flex-1 py-2 text-xs font-bold transition-colors uppercase ${activeTab === 'SPEED' ? 'bg-red-100 text-red-700 border-b-2 border-red-500' : 'text-slate-500 hover:bg-slate-50'}`}
+                    className={`flex-1 py-3 text-xs font-black transition-colors uppercase tracking-wide ${activeTab === 'SPEED' ? 'bg-red-100 text-red-700 border-b-2 border-red-500' : 'text-slate-500 hover:bg-slate-50'}`}
                 >
                     Infrações
                 </button>
             </div>
 
             {/* List Content */}
-            <div className="flex-1 overflow-y-auto p-2 custom-scrollbar">
-                <div className="space-y-1.5">
+            <div className="flex-1 overflow-y-auto p-3 custom-scrollbar">
+                <div className="space-y-2">
                     {(() => {
                     const list = activeTab === 'KM' ? rankings.km : activeTab === 'FUEL' ? rankings.fuel : rankings.speed;
 
                     if (list.length === 0) return (
-                            <div className="flex items-center justify-center h-full text-slate-400 text-xs font-medium">
+                            <div className="flex items-center justify-center h-full text-slate-400 text-sm font-medium">
                                 Sem dados para este período.
                             </div>
                     );
 
                     return list.map((item, idx) => (
-                        <div key={idx} className="flex items-center gap-3 bg-white/90 p-2 rounded-lg border border-slate-100 shadow-sm hover:border-slate-300 transition-colors">
-                                <div className={`w-6 h-6 rounded-md flex-shrink-0 flex items-center justify-center font-black text-[10px] border ${getRankStyle(idx)}`}>
+                        <div key={idx} className="flex items-center gap-3 bg-white/90 p-2.5 rounded-lg border border-slate-100 shadow-sm hover:border-slate-300 transition-colors">
+                                <div className={`w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center font-black text-sm border ${getRankStyle(idx)}`}>
                                     {idx + 1}º
                                 </div>
                                 
                                 <div className="flex-1 min-w-0">
-                                    <div className="font-bold text-slate-800 text-xs truncate" title={item.contract}>{item.contract}</div>
-                                    <div className="text-[10px] text-slate-500 font-medium truncate uppercase">{item.driver.split(' ')[0]} - {item.municipality}</div>
+                                    <div className="font-bold text-slate-800 text-sm truncate" title={item.contract}>{item.contract}</div>
+                                    <div className="text-xs text-slate-500 font-bold truncate uppercase">{item.driver.split(' ')[0]} - {item.municipality}</div>
                                 </div>
                                 
-                                <div className="font-bold text-slate-900 text-xs whitespace-nowrap bg-slate-50 px-2 py-0.5 rounded border border-slate-200">
+                                <div className="font-bold text-slate-900 text-sm whitespace-nowrap bg-slate-50 px-2.5 py-1 rounded border border-slate-200 shadow-sm">
                                     {activeTab === 'KM' ? `${item.value} km` : 
                                     activeTab === 'FUEL' ? `${item.value.toFixed(0)} L` : 
                                     `${item.value}x`}
@@ -627,17 +627,17 @@ const HomeMenu: React.FC<HomeMenuProps> = ({ onNavigate, role, userName }) => {
                 )}
 
                 <div className="flex flex-col">
-                    <div className="flex items-center gap-2 text-blue-600 mb-1">
-                        <CalendarDays size={16} />
-                        <span className="text-sm font-bold uppercase tracking-wider">
+                    <div className="flex items-center gap-2 text-blue-600 mb-2">
+                        <CalendarDays size={20} />
+                        <span className="text-xl font-bold uppercase tracking-wider">
                             {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
                         </span>
                     </div>
                     
-                    <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight leading-tight">
+                    <h1 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tight leading-tight">
                         Olá, <span className="text-indigo-600">{userName}</span>
                     </h1>
-                    <p className="text-slate-500 text-base font-medium mt-1">Bem-vindo ao seu painel.</p>
+                    <p className="text-slate-500 text-lg font-medium mt-1">Bem-vindo ao seu painel.</p>
                 </div>
             </div>
 
