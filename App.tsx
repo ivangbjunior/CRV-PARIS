@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Vehicles from './components/Vehicles';
 import DailyLogs from './components/DailyLogs';
 import Reports from './components/Reports';
@@ -7,9 +6,10 @@ import FuelManagement from './components/FuelManagement';
 import Requisitions from './components/Requisitions';
 import Login from './components/Login';
 import { useAuth } from './contexts/AuthContext';
-import { LayoutDashboard, Truck, FileSpreadsheet, Menu, X, Home, ChevronRight, Fuel, LogOut, UserCircle, ShieldCheck, AlertTriangle, DollarSign, FileText, Bell, Gauge, Clock, Clock3, WifiOff, CheckCircle2, Loader2, Activity, CalendarDays, MapPin, Zap, TrendingUp, TrendingDown, ArrowRightLeft } from 'lucide-react';
+import { LayoutDashboard, Truck, FileSpreadsheet, Menu, X, Home, ChevronRight, Fuel, LogOut, UserCircle, ShieldCheck, AlertTriangle, DollarSign, FileText, Bell, Gauge, Clock, WifiOff, CheckCircle2, Loader2, Activity, CalendarDays, MapPin, Zap, TrendingUp, TrendingDown, Trophy, Droplet, Clock3, ArrowRightLeft } from 'lucide-react';
 import { UserRole, DailyLog, Vehicle, RefuelingLog, RequisitionStatus } from './types';
 import { storageService } from './services/storage';
+import { calculateDuration, formatMinutesToTime } from './utils/timeUtils';
 import { ParisLogo } from './components/ParisLogo';
 
 enum Tab {
@@ -21,7 +21,7 @@ enum Tab {
   REQUISITIONS = 'requisitions'
 }
 
-// --- Dashboard Rankings Component (Static Layout) ---
+// --- Dashboard Rankings Component ---
 const DashboardRankings: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'KM' | 'FUEL' | 'SPEED'>('KM');
   const [loading, setLoading] = useState(true);
@@ -51,12 +51,12 @@ const DashboardRankings: React.FC = () => {
         const currentYear = now.getFullYear();
         const currentDay = now.getDate();
 
-        // 1. Process Financials
+        // 1. Process Financials (Month to Date Comparison)
         let currentCost = 0;
         let lastCost = 0;
 
         refuelings.forEach(r => {
-          const rDate = new Date(r.date + 'T12:00:00');
+          const rDate = new Date(r.date + 'T12:00:00'); // Fix timezone issue
           const rMonth = rDate.getMonth();
           const rYear = rDate.getFullYear();
           const rDay = rDate.getDate();
@@ -65,16 +65,11 @@ const DashboardRankings: React.FC = () => {
             currentCost += r.totalCost;
           }
 
+          // Compare with same period last month
           const lastMonthDate = new Date();
           lastMonthDate.setMonth(now.getMonth() - 1);
           
-          // Verifica se é o mês anterior e se o dia é menor ou igual ao dia atual (Same Period)
-          // Nota: setMonth -1 lida corretamente com virada de ano
-          const isPreviousMonth = 
-             rYear === lastMonthDate.getFullYear() && 
-             rMonth === lastMonthDate.getMonth();
-
-          if (isPreviousMonth && rDay <= currentDay) {
+          if (rYear === lastMonthDate.getFullYear() && rMonth === lastMonthDate.getMonth() && rDay <= currentDay) {
             lastCost += r.totalCost;
           }
         });
@@ -98,6 +93,7 @@ const DashboardRankings: React.FC = () => {
         const fuelMap: Record<string, number> = {};
         const speedMap: Record<string, number> = {};
 
+        // Helper to get vehicle details
         const getVDetails = (id: string) => {
              const v = vehicles.find(v => v.id === id);
              return v ? { 
@@ -111,10 +107,13 @@ const DashboardRankings: React.FC = () => {
              };
         };
 
+        // KM & Speed Logic (Current Month)
         logs.forEach(log => {
           const lDate = new Date(log.date + 'T12:00:00');
           if (lDate.getMonth() === currentMonth && lDate.getFullYear() === currentYear) {
+             // KM
              kmMap[log.vehicleId] = (kmMap[log.vehicleId] || 0) + (log.kmDriven || 0);
+             // Speed
              if (log.maxSpeed > 90) {
                 const count = log.speedingCount > 0 ? log.speedingCount : 1;
                 speedMap[log.vehicleId] = (speedMap[log.vehicleId] || 0) + count;
@@ -122,6 +121,7 @@ const DashboardRankings: React.FC = () => {
           }
         });
 
+        // Fuel Logic (Current Month - Liters)
         refuelings.forEach(ref => {
           const rDate = new Date(ref.date + 'T12:00:00');
           if (rDate.getMonth() === currentMonth && rDate.getFullYear() === currentYear) {
@@ -132,7 +132,7 @@ const DashboardRankings: React.FC = () => {
         const sortAndMap = (map: Record<string, number>) => {
            return Object.entries(map)
              .sort(([, a], [, b]) => b - a)
-             .slice(0, 10) // Pega mais items para caso a lista seja esticada
+             .slice(0, 5)
              .map(([id, val]) => ({ id, ...getVDetails(id), value: val }));
         };
 
@@ -151,123 +151,108 @@ const DashboardRankings: React.FC = () => {
     fetchData();
   }, []);
 
-  if (loading) return <div className="animate-pulse bg-white/50 h-24 w-full rounded-xl"></div>;
+  if (loading) return <div className="animate-pulse bg-white/50 h-24 w-64 rounded-xl"></div>;
 
   const formatCurrency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
 
-  const getRankStyle = (idx: number) => {
-      if (idx === 0) return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-      if (idx === 1) return 'bg-slate-200 text-slate-800 border-slate-300';
-      if (idx === 2) return 'bg-orange-100 text-orange-800 border-orange-300';
-      return 'bg-slate-50 text-slate-600';
-  };
-
-  // Determine background color based on active tab
-  const getCardBackgroundColor = () => {
-      switch(activeTab) {
-          case 'KM': return 'bg-blue-50/50';
-          case 'FUEL': return 'bg-orange-50/50';
-          case 'SPEED': return 'bg-red-50/50';
-          default: return 'bg-white';
-      }
-  };
-
   return (
-    <div className="flex flex-col sm:flex-row gap-6 items-start">
-       
-       {/* Card 1: Financeiro (Custo Mês) */}
-       <div className="w-full sm:w-[260px] h-auto min-h-[160px] bg-slate-900 rounded-xl shadow-xl border border-slate-800 flex flex-col p-5 relative overflow-hidden shrink-0">
-          <div className="flex flex-col h-full bg-slate-900 text-white justify-between">
-              <div>
-                <div className="flex items-center gap-2 mb-4">
-                    <div className="p-1.5 bg-slate-800 rounded-md border border-slate-700">
-                        <DollarSign size={16} className="text-emerald-400" />
-                    </div>
-                    <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Custo Mês</span>
-                </div>
-                
-                <div className="text-3xl font-black tracking-tight truncate mb-4 text-white">
-                    {formatCurrency(financials.currentMonthCost)}
-                </div>
-              </div>
-
-              <div className="pt-4 border-t border-slate-800/50 flex flex-col gap-3">
-                <div className="flex flex-col gap-1">
-                    <span className="text-xs text-slate-500 uppercase font-bold">Mês Anterior (Mesmo Período)</span>
-                    <span className="text-lg font-bold text-slate-300">{formatCurrency(financials.lastMonthCost)}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                    <span className="text-xs text-slate-500 uppercase font-bold">Variação</span>
-                    <div className={`flex items-center gap-1 text-sm font-bold ${financials.isIncrease ? 'text-red-400' : 'text-emerald-400'}`}>
-                        {financials.isIncrease ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-                        <span>{financials.diffPercent.toFixed(1)}%</span>
-                    </div>
-                </div>
-              </div>
+    <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-stretch">
+       {/* Financial Widget - Transparent */}
+       <div className="bg-slate-900/5 backdrop-blur-md border border-slate-900/10 rounded-xl p-4 min-w-[200px] flex flex-col justify-between h-full shadow-sm hover:bg-slate-900/10 transition-colors">
+          <div className="flex items-center gap-2 text-slate-600 mb-1">
+             <div className="p-1.5 bg-white/60 rounded-lg shadow-sm">
+               <DollarSign size={14} className="text-emerald-600" />
+             </div>
+             <span className="text-[10px] font-bold uppercase tracking-wider">Custo Combustível (Mês)</span>
+          </div>
+          
+          <div>
+            <div className="text-2xl font-black text-slate-800 tracking-tight">
+               {formatCurrency(financials.currentMonthCost)}
+            </div>
+            
+            <div className={`flex items-center gap-1 text-xs font-bold mt-1 ${financials.isIncrease ? 'text-red-600' : 'text-emerald-600'}`}>
+               {financials.isIncrease ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+               <span>{financials.diffPercent.toFixed(1)}%</span>
+               <span className="text-slate-400 font-normal">vs. mês anterior</span>
+            </div>
           </div>
        </div>
 
-       {/* Card 2: Ranking (Tabs) - INCREASED SIZE & FONTS */}
-       <div className={`w-full sm:w-[350px] h-[260px] rounded-xl shadow-xl border border-slate-200 flex flex-col overflow-hidden transition-colors duration-300 shrink-0 ${getCardBackgroundColor()}`}>
-          <div className="flex flex-col h-full">
-            {/* Header Tabs */}
-            <div className="flex border-b border-slate-200/50 bg-white/50">
-                <button 
-                    onClick={() => setActiveTab('KM')}
-                    className={`flex-1 py-3 text-xs font-black transition-colors uppercase tracking-wide ${activeTab === 'KM' ? 'bg-blue-100 text-blue-700 border-b-2 border-blue-500' : 'text-slate-500 hover:bg-slate-50'}`}
-                >
-                    Rodagem
-                </button>
-                <button 
-                    onClick={() => setActiveTab('FUEL')}
-                    className={`flex-1 py-3 text-xs font-black transition-colors uppercase tracking-wide ${activeTab === 'FUEL' ? 'bg-orange-100 text-orange-700 border-b-2 border-orange-500' : 'text-slate-500 hover:bg-slate-50'}`}
-                >
-                    Consumo
-                </button>
-                <button 
-                    onClick={() => setActiveTab('SPEED')}
-                    className={`flex-1 py-3 text-xs font-black transition-colors uppercase tracking-wide ${activeTab === 'SPEED' ? 'bg-red-100 text-red-700 border-b-2 border-red-500' : 'text-slate-500 hover:bg-slate-50'}`}
-                >
-                    Infrações
-                </button>
-            </div>
+       {/* Rankings Widget - Compact Card */}
+       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden w-full sm:w-[320px] flex flex-col">
+          {/* Tabs Header */}
+          <div className="flex border-b border-slate-100">
+             <button 
+                onClick={() => setActiveTab('KM')}
+                className={`flex-1 py-2.5 flex justify-center items-center transition-colors ${activeTab === 'KM' ? 'bg-blue-50 text-blue-600 border-b-2 border-blue-600' : 'text-slate-400 hover:bg-slate-50'}`}
+                title="Maior Rodagem (KM)"
+             >
+                <Gauge size={16} />
+             </button>
+             <button 
+                onClick={() => setActiveTab('FUEL')}
+                className={`flex-1 py-2.5 flex justify-center items-center transition-colors ${activeTab === 'FUEL' ? 'bg-orange-50 text-orange-600 border-b-2 border-orange-600' : 'text-slate-400 hover:bg-slate-50'}`}
+                title="Maior Abastecimento (Litros)"
+             >
+                <Droplet size={16} />
+             </button>
+             <button 
+                onClick={() => setActiveTab('SPEED')}
+                className={`flex-1 py-2.5 flex justify-center items-center transition-colors ${activeTab === 'SPEED' ? 'bg-red-50 text-red-600 border-b-2 border-red-600' : 'text-slate-400 hover:bg-slate-50'}`}
+                title="Infrações (>90km/h)"
+             >
+                <AlertTriangle size={16} />
+             </button>
+          </div>
 
-            {/* List Content */}
-            <div className="flex-1 overflow-y-auto p-3 custom-scrollbar">
-                <div className="space-y-2">
-                    {(() => {
-                    const list = activeTab === 'KM' ? rankings.km : activeTab === 'FUEL' ? rankings.fuel : rankings.speed;
+          {/* List Content */}
+          <div className="p-3">
+             <div className="flex justify-between items-center mb-2">
+                <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                    {activeTab === 'KM' ? 'Top 5 - Rodagem (Mês)' : 
+                     activeTab === 'FUEL' ? 'Top 5 - Abastecimento (Mês)' : 
+                     'Top 5 - Excesso Vel. (Mês)'}
+                </span>
+                <Trophy size={10} className="text-yellow-500" />
+             </div>
+             
+             <div className="space-y-2">
+                {(() => {
+                   const list = activeTab === 'KM' ? rankings.km : activeTab === 'FUEL' ? rankings.fuel : rankings.speed;
+                   
+                   if (list.length === 0) return <div className="text-xs text-slate-400 text-center py-4 italic">Sem dados registrados neste mês.</div>;
 
-                    if (list.length === 0) return (
-                            <div className="flex items-center justify-center h-full text-slate-400 text-sm font-medium">
-                                Sem dados para este período.
+                   return list.map((item, idx) => (
+                      <div key={idx} className="flex items-center justify-between text-xs border-b border-slate-50 pb-1 last:border-0">
+                         <div className="flex items-start gap-2 w-full overflow-hidden">
+                            <span className={`w-4 h-4 rounded-full flex-shrink-0 flex items-center justify-center font-bold text-[9px] mt-0.5 ${idx === 0 ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100 text-slate-500'}`}>
+                               {idx + 1}
+                            </span>
+                            <div className="flex flex-col w-full min-w-0">
+                               {/* MODIFICADO: Exibir Contrato, Municipio e Motorista */}
+                               <div className="flex items-center justify-between gap-1">
+                                 <span className="font-bold text-slate-700 truncate" title={item.contract}>{item.contract}</span>
+                                 <span className="font-mono font-bold text-slate-600 ml-auto whitespace-nowrap">
+                                    {activeTab === 'KM' ? `${item.value}km` : 
+                                     activeTab === 'FUEL' ? `${item.value.toFixed(0)}L` : 
+                                     `${item.value}x`}
+                                 </span>
+                               </div>
+                               <div className="text-slate-500 text-[9px] truncate leading-tight" title={item.municipality}>
+                                 {item.municipality}
+                               </div>
+                               <div className="text-slate-400 text-[9px] truncate leading-tight" title={item.driver}>
+                                 {item.driver}
+                               </div>
                             </div>
-                    );
-
-                    return list.map((item, idx) => (
-                        <div key={idx} className="flex items-center gap-3 bg-white/90 p-3 rounded-lg border border-slate-100 shadow-sm hover:border-slate-300 transition-colors">
-                                <div className={`w-9 h-9 rounded-lg flex-shrink-0 flex items-center justify-center font-black text-base border ${getRankStyle(idx)}`}>
-                                    {idx + 1}º
-                                </div>
-                                
-                                <div className="flex-1 min-w-0">
-                                    <div className="font-bold text-slate-800 text-sm truncate" title={item.contract}>{item.contract}</div>
-                                    <div className="text-xs text-slate-500 font-bold truncate uppercase">{(item.driver || '?').split(' ')[0]} - {item.municipality}</div>
-                                </div>
-                                
-                                <div className="font-bold text-slate-900 text-sm whitespace-nowrap bg-slate-50 px-3 py-1.5 rounded border border-slate-200 shadow-sm">
-                                    {activeTab === 'KM' ? `${item.value} km` : 
-                                    activeTab === 'FUEL' ? `${item.value.toFixed(0)} L` : 
-                                    `${item.value}x`}
-                                </div>
-                        </div>
-                    ));
-                    })()}
-                </div>
-            </div>
+                         </div>
+                      </div>
+                   ));
+                })()}
+             </div>
           </div>
        </div>
-
     </div>
   );
 };
@@ -602,14 +587,14 @@ const HomeMenu: React.FC<HomeMenuProps> = ({ onNavigate, role, userName }) => {
       <div className="relative z-10 max-w-7xl mx-auto w-full flex-1 print:max-w-none print:w-full">
         
         {/* --- Header Section (Redesigned) --- */}
-        <div className="flex flex-col xl:flex-row items-start justify-between gap-8 mb-10 animate-in slide-in-from-top-4 duration-700 print:hidden">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 mb-10 animate-in slide-in-from-top-4 duration-700 print:hidden">
             
             {/* Left Side: Greeting & Bell */}
-            <div className="flex items-start gap-5 flex-shrink-0">
+            <div className="flex items-start gap-4">
                 {canSeeNotifications && (
                     <button 
                         onClick={handleOpenNotifications}
-                        className={`relative p-3 rounded-2xl transition-all group mt-2 border flex-shrink-0 ${
+                        className={`relative p-3 rounded-2xl transition-all group mt-1 border flex-shrink-0 ${
                            hasNewNotifications 
                              ? 'bg-indigo-50 border-indigo-200 text-indigo-600 shadow-lg shadow-indigo-100' 
                              : 'bg-white border-slate-100 text-slate-500 hover:text-indigo-600 hover:border-indigo-100 shadow-sm'
@@ -626,25 +611,29 @@ const HomeMenu: React.FC<HomeMenuProps> = ({ onNavigate, role, userName }) => {
                     </button>
                 )}
 
-                <div className="flex flex-col">
-                    <div className="flex items-center gap-2 text-blue-600 mb-2">
-                        <CalendarDays size={20} />
-                        <span className="text-xl font-bold uppercase tracking-wider">
+                <div>
+                    <div className="inline-flex items-center gap-2 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-100 mb-2 w-fit">
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+                        <span className="text-[9px] font-bold text-emerald-700 uppercase tracking-widest">System Online</span>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-slate-500 mb-1">
+                        <CalendarDays size={14} />
+                        <span className="text-xs font-bold uppercase tracking-wide">
                             {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
                         </span>
                     </div>
-                    
-                    <h1 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tight leading-tight">
+                    <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
                         Olá, <span className="text-indigo-600">{userName}</span>
                     </h1>
-                    <p className="text-slate-500 text-lg font-medium mt-1">Bem-vindo ao seu painel.</p>
+                    <p className="text-slate-500 text-sm mt-1">Bem-vindo ao seu painel.</p>
                 </div>
             </div>
 
-            {/* Right Side: Dashboard Widgets (Fixed) */}
+            {/* Right Side: Dashboard Widgets (Admin/Gerencia) */}
             {canSeeDashboard && (
-                <div className="w-full xl:w-auto mt-6 xl:mt-0 flex justify-end">
-                     <DashboardRankings />
+                <div className="w-full lg:w-auto self-end lg:self-center">
+                    <DashboardRankings />
                 </div>
             )}
         </div>

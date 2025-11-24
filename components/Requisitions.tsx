@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { Requisition, RequisitionStatus, Vehicle, FuelType, ContractType, UserRole, UserVehicle, UserProfile, GasStation, RefuelingLog, FUEL_TYPES_LIST, SUPPLY_TYPES_LIST } from '../types';
 import { storageService } from '../services/storage';
@@ -143,21 +144,12 @@ const Requisitions: React.FC = () => {
   };
 
   // --- DELETE REQUISITION (ADMIN) ---
-  const handleDelete = async (e: React.MouseEvent, id: string) => {
-    e.stopPropagation(); // Previne propagação do clique
-    
-    // Confirmação explícita
-    if (window.confirm("ATENÇÃO ADMIN: Tem certeza que deseja excluir permanentemente esta requisição? Esta ação não pode ser desfeita.")) {
+  const handleDelete = async (id: string) => {
+    if (!isAdmin) return;
+    if (confirm("ATENÇÃO ADMIN: Tem certeza que deseja excluir permanentemente esta requisição? Esta ação não pode ser desfeita.")) {
         setLoading(true);
-        try {
-            await storageService.deleteRequisition(id);
-            await loadData();
-        } catch (error) {
-            console.error("Erro ao excluir:", error);
-            alert("Ocorreu um erro ao excluir a requisição.");
-        } finally {
-            setLoading(false);
-        }
+        await storageService.deleteRequisition(id);
+        await loadData();
     }
   };
 
@@ -237,7 +229,10 @@ const Requisitions: React.FC = () => {
         municipality = selectedMunicipality ? selectedMunicipality.toUpperCase() : '';
     }
 
+    // --- MUDANÇA: AGORA SALVAMOS TODOS OS ITENS, INCLUSIVE INSUMOS ---
     const itemsToSave = cartItems; 
+    // Antes filtravamos apenas combustiveis, agora permitimos tudo.
+
     const internalIds: number[] = [];
 
     // Save Requisitions for ALL Items
@@ -795,11 +790,10 @@ ${itemsList}
                                                     <Send size={16} />
                                                 </button>
                                                 
-                                                {/* ADMIN DELETE BUTTON - FIX */}
+                                                {/* ADMIN DELETE BUTTON */}
                                                 {isAdmin && (
                                                     <button 
-                                                        type="button"
-                                                        onClick={(e) => handleDelete(e, req.id)}
+                                                        onClick={() => handleDelete(req.id)}
                                                         className="text-red-600 hover:bg-red-50 p-2 rounded-full transition-colors"
                                                         title="Excluir Requisição (ADMIN)"
                                                     >
@@ -949,8 +943,7 @@ ${itemsList}
                                             
                                             {isAdmin && (
                                                 <button 
-                                                    type="button"
-                                                    onClick={(e) => handleDelete(e, req.id)}
+                                                    onClick={() => handleDelete(req.id)}
                                                     className="text-red-600 hover:bg-red-50 px-2 py-1 rounded text-xs"
                                                     title="Excluir"
                                                 >

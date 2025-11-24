@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { DailyLog, DailyLogReport, Vehicle, ContractType, VehicleType, UserRole } from '../types';
 import { storageService } from '../services/storage';
@@ -677,7 +676,7 @@ const Reports: React.FC = () => {
              <thead className="bg-slate-100 text-slate-600 font-semibold uppercase tracking-wider text-sm print:bg-slate-200 print:text-slate-900">
                <tr>
                  <th className="px-4 py-3 border-b print:px-1 print:py-1">Data</th>
-                 <th className="px-4 py-3 border-b min-w-[200px] print:px-1 print:py-1">Veículo / Motorista / Local</th>
+                 <th className="px-4 py-3 border-b min-w-[200px] print:px-1 print:py-1">Veículo / Motorista</th>
                  <th className="px-4 py-3 border-b bg-blue-50 print:bg-transparent print:px-1 print:py-1">Expediente</th>
                  <th className="px-4 py-3 border-b bg-blue-50 print:bg-transparent print:px-1 print:py-1">Int./Extras</th>
                  <th className="px-4 py-3 border-b bg-green-50 text-green-700 print:bg-transparent print:text-black print:px-1 print:py-1">T.Ligado</th>
