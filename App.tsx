@@ -194,7 +194,7 @@ const DashboardRankings: React.FC = () => {
               <div className="pt-4 border-t border-slate-800/50 flex flex-col gap-3">
                 <div className="flex flex-col gap-1">
                     <span className="text-xs text-slate-500 uppercase font-bold">Mês Anterior (Mesmo Período)</span>
-                    <span className="text-base font-bold text-slate-300">{formatCurrency(financials.lastMonthCost)}</span>
+                    <span className="text-lg font-bold text-slate-300">{formatCurrency(financials.lastMonthCost)}</span>
                 </div>
                 <div className="flex items-center justify-between">
                     <span className="text-xs text-slate-500 uppercase font-bold">Variação</span>
@@ -207,7 +207,7 @@ const DashboardRankings: React.FC = () => {
           </div>
        </div>
 
-       {/* Card 2: Ranking (Tabs) - ENLARGED SIZE AND FONTS */}
+       {/* Card 2: Ranking (Tabs) - INCREASED SIZE & FONTS */}
        <div className={`w-full sm:w-[350px] h-[260px] rounded-xl shadow-xl border border-slate-200 flex flex-col overflow-hidden transition-colors duration-300 shrink-0 ${getCardBackgroundColor()}`}>
           <div className="flex flex-col h-full">
             {/* Header Tabs */}
@@ -245,17 +245,17 @@ const DashboardRankings: React.FC = () => {
                     );
 
                     return list.map((item, idx) => (
-                        <div key={idx} className="flex items-center gap-3 bg-white/90 p-2.5 rounded-lg border border-slate-100 shadow-sm hover:border-slate-300 transition-colors">
-                                <div className={`w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center font-black text-sm border ${getRankStyle(idx)}`}>
+                        <div key={idx} className="flex items-center gap-3 bg-white/90 p-3 rounded-lg border border-slate-100 shadow-sm hover:border-slate-300 transition-colors">
+                                <div className={`w-9 h-9 rounded-lg flex-shrink-0 flex items-center justify-center font-black text-base border ${getRankStyle(idx)}`}>
                                     {idx + 1}º
                                 </div>
                                 
                                 <div className="flex-1 min-w-0">
                                     <div className="font-bold text-slate-800 text-sm truncate" title={item.contract}>{item.contract}</div>
-                                    <div className="text-xs text-slate-500 font-bold truncate uppercase">{item.driver.split(' ')[0]} - {item.municipality}</div>
+                                    <div className="text-xs text-slate-500 font-bold truncate uppercase">{(item.driver || '?').split(' ')[0]} - {item.municipality}</div>
                                 </div>
                                 
-                                <div className="font-bold text-slate-900 text-sm whitespace-nowrap bg-slate-50 px-2.5 py-1 rounded border border-slate-200 shadow-sm">
+                                <div className="font-bold text-slate-900 text-sm whitespace-nowrap bg-slate-50 px-3 py-1.5 rounded border border-slate-200 shadow-sm">
                                     {activeTab === 'KM' ? `${item.value} km` : 
                                     activeTab === 'FUEL' ? `${item.value.toFixed(0)} L` : 
                                     `${item.value}x`}
