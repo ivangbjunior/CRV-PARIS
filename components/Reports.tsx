@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { DailyLog, DailyLogReport, Vehicle, ContractType, VehicleType, UserRole } from '../types';
 import { storageService } from '../services/storage';
@@ -720,11 +721,14 @@ const Reports: React.FC = () => {
                                  {log.historicalDriver || log.vehicle.driverName}
                               </span>
                            </div>
-                           <div className="flex items-center gap-1 text-slate-500 text-sm truncate max-w-[220px] print:text-xs print:whitespace-normal" title={log.historicalMunicipality || log.vehicle.municipality}>
-                              <MapPin size={14} className="text-slate-400 print:hidden" />
-                              <span>{log.historicalMunicipality || log.vehicle.municipality}</span>
+                           
+                           {/* MUNICÍPIO MERGED HERE */}
+                           <div className="flex items-center gap-1 text-slate-500 text-xs truncate max-w-[220px]">
+                                <MapPin size={12} className="text-slate-400 print:hidden" />
+                                <span>{log.historicalMunicipality || log.vehicle.municipality}</span>
                            </div>
-                            {log.vehicle.foreman && log.vehicle.foreman !== '-' && (
+
+                           {log.vehicle.foreman && log.vehicle.foreman !== '-' && (
                              <div className="flex items-center gap-1 text-slate-400 text-[10px] truncate max-w-[220px] print:hidden" title={`Equipe: ${log.vehicle.foreman}`}>
                                 <HardHat size={10} className="text-slate-300" />
                                 <span>{log.vehicle.foreman}</span>
@@ -732,7 +736,7 @@ const Reports: React.FC = () => {
                            )}
                         </div>
                      </td>
-
+                     
                      {log.nonOperatingReason ? (
                         <td colSpan={5} className="px-4 py-3 align-middle print:px-1 print:py-1">
                            <div className={`flex items-center gap-2 p-2 rounded-lg border ${getNonOperatingColor(log.nonOperatingReason)} print:border-none print:p-0`}>

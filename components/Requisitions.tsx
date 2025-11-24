@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Requisition, RequisitionStatus, Vehicle, FuelType, ContractType, UserRole, UserVehicle, UserProfile, GasStation, RefuelingLog } from '../types';
+import { Requisition, RequisitionStatus, Vehicle, FuelType, ContractType, UserRole, UserVehicle, UserProfile, GasStation, RefuelingLog, FUEL_TYPES_LIST, SUPPLY_TYPES_LIST } from '../types';
 import { storageService } from '../services/storage';
 import { useAuth } from '../contexts/AuthContext';
 import { 
@@ -12,10 +12,6 @@ import MultiSelect from './MultiSelect';
 const EXTERNAL_EQUIPMENT_TYPES = [
   'CARRO', 'MOTO', 'BARCO', 'BALSA', 'LANCHA', 'MOTOR DE POPA', 'GALÃO', 'GERADOR', 'TAMBOR'
 ];
-
-// Definição dos grupos para o select
-const FUEL_OPTIONS = [FuelType.DIESEL, FuelType.DIESEL_S10, FuelType.GASOLINA, FuelType.ETANOL];
-const SUPPLY_OPTIONS = Object.values(FuelType).filter(t => !FUEL_OPTIONS.includes(t));
 
 interface CartItem {
     id: string;
@@ -147,12 +143,21 @@ const Requisitions: React.FC = () => {
   };
 
   // --- DELETE REQUISITION (ADMIN) ---
-  const handleDelete = async (id: string) => {
-    if (!isAdmin) return;
-    if (confirm("ATENÇÃO ADMIN: Tem certeza que deseja excluir permanentemente esta requisição? Esta ação não pode ser desfeita.")) {
+  const handleDelete = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation(); // Previne propagação do clique
+    
+    // Confirmação explícita
+    if (window.confirm("ATENÇÃO ADMIN: Tem certeza que deseja excluir permanentemente esta requisição? Esta ação não pode ser desfeita.")) {
         setLoading(true);
-        await storageService.deleteRequisition(id);
-        await loadData();
+        try {
+            await storageService.deleteRequisition(id);
+            await loadData();
+        } catch (error) {
+            console.error("Erro ao excluir:", error);
+            alert("Ocorreu um erro ao excluir a requisição.");
+        } finally {
+            setLoading(false);
+        }
     }
   };
 
@@ -232,17 +237,11 @@ const Requisitions: React.FC = () => {
         municipality = selectedMunicipality ? selectedMunicipality.toUpperCase() : '';
     }
 
-    // Filter items: Only save actual Fuels to DB. Discard others from DB logic.
-    // However, build one consolidated WhatsApp message for ALL items.
-    
-    const fuelItems = cartItems.filter(item => 
-        [FuelType.DIESEL, FuelType.DIESEL_S10, FuelType.GASOLINA, FuelType.ETANOL].includes(item.fuelType)
-    );
-
+    const itemsToSave = cartItems; 
     const internalIds: number[] = [];
 
-    // Save Requisitions for Fuels
-    for (const item of fuelItems) {
+    // Save Requisitions for ALL Items
+    for (const item of itemsToSave) {
         const nextId = await storageService.getNextInternalId();
         internalIds.push(nextId);
 
@@ -707,7 +706,8 @@ ${itemsList}
                                     <th className="px-6 py-3">Data / Solicitante</th>
                                     <th className="px-6 py-3">Veículo</th>
                                     <th className="px-6 py-3">Status</th>
-                                    <th className="px-6 py-3">Detalhes</th>
+                                    <th className="px-6 py-3">Combustível</th>
+                                    <th className="px-6 py-3">Insumos</th>
                                     <th className="px-6 py-3 text-center">Ações</th>
                                 </tr>
                             </thead>
@@ -726,7 +726,9 @@ ${itemsList}
                                     
                                     return matchesDate && matchesRequester;
                                 })
-                                .map(req => (
+                                .map(req => {
+                                    const isFuel = FUEL_TYPES_LIST.includes(req.fuelType);
+                                    return (
                                     <tr key={req.id} className="hover:bg-slate-50">
                                         <td className="px-6 py-3 font-mono font-bold text-slate-700">#{req.internalId}</td>
                                         <td className="px-6 py-3">
@@ -752,16 +754,37 @@ ${itemsList}
                                                 {(req.status === 'REPROVADA' || req.status === 'RECUSADA') ? 'RECUSADA' : req.status}
                                             </span>
                                         </td>
+                                        
+                                        {/* COLUNA COMBUSTÍVEL */}
                                         <td className="px-6 py-3 text-xs">
-                                            {req.isFullTank ? (
-                                                <div className="font-bold text-blue-600 flex items-center gap-1">
-                                                    <Gauge size={14} /> TANQUE CHEIO
+                                            {isFuel ? (
+                                                <>
+                                                    {req.isFullTank ? (
+                                                        <div className="font-bold text-blue-600 flex items-center gap-1">
+                                                            <Gauge size={14} /> TANQUE CHEIO
+                                                        </div>
+                                                    ) : (
+                                                        <div className="font-bold">{req.liters}L</div>
+                                                    )}
+                                                    <div className="text-slate-500">{req.fuelType} • {req.municipality}</div>
+                                                </>
+                                            ) : (
+                                                <span className="text-slate-300">-</span>
+                                            )}
+                                        </td>
+                                        
+                                        {/* COLUNA INSUMOS */}
+                                        <td className="px-6 py-3 text-xs">
+                                            {!isFuel ? (
+                                                <div className="bg-orange-50 text-orange-800 border border-orange-100 px-2 py-1 rounded w-fit">
+                                                    <div className="font-bold">{req.fuelType}</div>
+                                                    <div className="text-[10px] opacity-80">{req.liters > 0 ? `${req.liters} un/L` : '-'}</div>
                                                 </div>
                                             ) : (
-                                                <div className="font-bold">{req.liters}L</div>
+                                                 <span className="text-slate-300">-</span>
                                             )}
-                                            <div className="text-slate-500">{req.fuelType} • {req.municipality}</div>
                                         </td>
+
                                         <td className="px-6 py-3 text-center">
                                             <div className="flex justify-center items-center gap-2">
                                                 <button 
@@ -772,10 +795,11 @@ ${itemsList}
                                                     <Send size={16} />
                                                 </button>
                                                 
-                                                {/* ADMIN DELETE BUTTON */}
+                                                {/* ADMIN DELETE BUTTON - FIX */}
                                                 {isAdmin && (
                                                     <button 
-                                                        onClick={() => handleDelete(req.id)}
+                                                        type="button"
+                                                        onClick={(e) => handleDelete(e, req.id)}
                                                         className="text-red-600 hover:bg-red-50 p-2 rounded-full transition-colors"
                                                         title="Excluir Requisição (ADMIN)"
                                                     >
@@ -785,9 +809,9 @@ ${itemsList}
                                             </div>
                                         </td>
                                     </tr>
-                                ))}
+                                )})}
                                 {requisitions.length === 0 && (
-                                    <tr><td colSpan={6} className="p-8 text-center text-slate-400">Nenhuma requisição encontrada.</td></tr>
+                                    <tr><td colSpan={7} className="p-8 text-center text-slate-400">Nenhuma requisição encontrada.</td></tr>
                                 )}
                             </tbody>
                         </table>
@@ -857,7 +881,8 @@ ${itemsList}
                                 <th className="px-6 py-3">Nº Int</th>
                                 <th className="px-6 py-3">Solicitante</th>
                                 <th className="px-6 py-3">Veículo</th>
-                                <th className="px-6 py-3">Pedido</th>
+                                <th className="px-6 py-3">Combustível</th>
+                                <th className="px-6 py-3">Insumo</th>
                                 <th className="px-6 py-3 text-center">Aprovar/Reprovar</th>
                             </tr>
                         </thead>
@@ -872,7 +897,9 @@ ${itemsList}
                                     const matchesRequester = !filterRequester || r.requesterName === filterRequester;
                                     return matchesDate && matchesRequester;
                                 })
-                                .map(req => (
+                                .map(req => {
+                                    const isFuel = FUEL_TYPES_LIST.includes(req.fuelType);
+                                    return (
                                 <tr key={req.id} className="hover:bg-slate-50">
                                     <td className="px-6 py-3 font-mono font-bold">#{req.internalId}</td>
                                     <td className="px-6 py-3">
@@ -889,16 +916,28 @@ ${itemsList}
                                             })()
                                         )}
                                     </td>
+                                    
                                     <td className="px-6 py-3">
-                                        {req.isFullTank ? (
-                                            <div className="bg-blue-100 text-blue-800 text-xs font-bold px-2 py-1 rounded w-fit flex items-center gap-1">
-                                                <Gauge size={12} /> COMPLETAR
-                                            </div>
-                                        ) : (
-                                            <div className="font-bold">{req.liters}L</div>
-                                        )}
-                                        <div className="text-xs text-slate-500 mt-1">{req.fuelType} • {req.municipality}</div>
+                                        {isFuel ? (
+                                            <>
+                                                {req.isFullTank ? (
+                                                    <div className="bg-blue-100 text-blue-800 text-xs font-bold px-2 py-1 rounded w-fit flex items-center gap-1">
+                                                        <Gauge size={12} /> COMPLETAR
+                                                    </div>
+                                                ) : (
+                                                    <div className="font-bold">{req.liters}L</div>
+                                                )}
+                                                <div className="text-xs text-slate-500 mt-1">{req.fuelType} • {req.municipality}</div>
+                                            </>
+                                        ) : <span className="text-slate-300">-</span>}
                                     </td>
+
+                                    <td className="px-6 py-3">
+                                         {!isFuel ? (
+                                             <div className="text-orange-700 font-bold text-xs">{req.fuelType} ({req.liters})</div>
+                                         ) : <span className="text-slate-300">-</span>}
+                                    </td>
+
                                     <td className="px-6 py-3 text-center">
                                         <div className="flex justify-center gap-2">
                                             <button 
@@ -910,7 +949,8 @@ ${itemsList}
                                             
                                             {isAdmin && (
                                                 <button 
-                                                    onClick={() => handleDelete(req.id)}
+                                                    type="button"
+                                                    onClick={(e) => handleDelete(e, req.id)}
                                                     className="text-red-600 hover:bg-red-50 px-2 py-1 rounded text-xs"
                                                     title="Excluir"
                                                 >
@@ -920,9 +960,9 @@ ${itemsList}
                                         </div>
                                     </td>
                                 </tr>
-                            ))}
+                            )})}
                             {requisitions.filter(r => r.status === RequisitionStatus.PENDING).length === 0 && (
-                                <tr><td colSpan={5} className="p-8 text-center text-slate-400">Nenhuma requisição pendente encontrada.</td></tr>
+                                <tr><td colSpan={6} className="p-8 text-center text-slate-400">Nenhuma requisição pendente encontrada.</td></tr>
                             )}
                         </tbody>
                     </table>
@@ -1138,7 +1178,7 @@ ${itemsList}
         {/* --- MODAL: NEW REQUISITION (CART SYSTEM) --- */}
         {showForm && (
             <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-[9999] p-4 sm:p-6">
-                <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full flex flex-col max-h-[90dvh] overflow-hidden">
+                <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full flex flex-col max-h-[95dvh] overflow-hidden">
                     <div className="bg-orange-600 p-4 flex justify-between items-center text-white flex-shrink-0 sticky top-0 z-20 shadow-md">
                         <h3 className="font-bold flex items-center gap-2"><FileText /> Nova Requisição (Carrinho)</h3>
                         <button onClick={() => setShowForm(false)} className="p-1 hover:bg-orange-700 rounded transition-colors"><X /></button>
@@ -1219,10 +1259,10 @@ ${itemsList}
                                     >
                                         <option value="">Selecione o item...</option>
                                         <optgroup label="COMBUSTÍVEL">
-                                            {FUEL_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
+                                            {FUEL_TYPES_LIST.map(f => <option key={f} value={f}>{f}</option>)}
                                         </optgroup>
                                         <optgroup label="INSUMOS">
-                                            {SUPPLY_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
+                                            {SUPPLY_TYPES_LIST.map(f => <option key={f} value={f}>{f}</option>)}
                                         </optgroup>
                                     </select>
                                 </div>

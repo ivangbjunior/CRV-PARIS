@@ -1,4 +1,5 @@
 
+
 export enum ContractType {
   MANUTENCAO = 'MANUTENÇÃO',
   LINHA_VIVA = 'LINHA VIVA',
@@ -119,6 +120,17 @@ export enum FuelType {
   ADITIVO = 'ADITIVO RADIADOR',
   OUTROS = 'OUTROS'
 }
+
+// Lista auxiliar para saber o que é combustível (para cálculos)
+export const FUEL_TYPES_LIST = [
+  FuelType.GASOLINA,
+  FuelType.DIESEL,
+  FuelType.DIESEL_S10,
+  FuelType.ETANOL
+];
+
+// Lista auxiliar para Insumos
+export const SUPPLY_TYPES_LIST = Object.values(FuelType).filter(t => !FUEL_TYPES_LIST.includes(t));
 
 export interface RefuelingLog {
   id: string;

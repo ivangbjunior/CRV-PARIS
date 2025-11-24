@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Vehicle, DailyLog, RefuelingLog, UserRole } from '../types';
 import { storageService } from '../services/storage';
-import { ClipboardList, Save, AlertTriangle, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
+import { ClipboardList, Save, AlertTriangle, AlertCircle, CheckCircle, Loader2, Clock, MapPin, Gauge } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 const NON_OPERATING_OPTIONS = [
@@ -30,12 +30,13 @@ const DailyLogs: React.FC = () => {
     return `${year}-${month}-${day}`;
   };
 
+  // State initialized with undefined for metrics to show empty inputs
   const [formData, setFormData] = useState<Partial<DailyLog>>({
     date: getTodayLocal(),
-    speedingCount: 0,
+    speedingCount: undefined,
     observations: '',
-    maxSpeed: 0,
-    kmDriven: 0,
+    maxSpeed: undefined,
+    kmDriven: undefined,
     nonOperatingReason: ''
   });
   const [successMsg, setSuccessMsg] = useState('');
@@ -63,26 +64,21 @@ const DailyLogs: React.FC = () => {
       }
   }
 
-  // Check if there is a refueling record for the selected vehicle on the selected date
-  const hasRefuelingToday = refuelings.some(r => 
-    r.vehicleId === formData.vehicleId && 
-    r.date === formData.date
-  );
-
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
     
-    let val: string | number = value;
+    let val: string | number | undefined = value;
     if (type === 'number') {
-      val = value === '' ? 0 : Number(value);
+      // Se estiver vazio, define como undefined para limpar o input
+      val = value === '' ? undefined : Number(value);
     }
 
     setFormData(prev => {
       const newData = { ...prev, [name]: val };
 
-      // Logic: If maxSpeed changes and is <= 90, reset speedingCount to 0
-      if (name === 'maxSpeed') {
-        if ((val as number) <= 90) {
+      // Logic: If maxSpeed changes and is <= 90, reset speedingCount to 0 (or undefined if empty preference)
+      if (name === 'maxSpeed' && typeof val === 'number') {
+        if (val <= 90) {
           newData.speedingCount = 0;
         }
       }
@@ -110,7 +106,6 @@ const DailyLogs: React.FC = () => {
     }
 
     // --- REFORÇO DA VERIFICAÇÃO DE DUPLICIDADE ---
-    // Recarrega logs para garantir que não haja conflito com lançamentos feitos em outra aba ou recentemente
     const freshLogs = await storageService.getLogs();
     const duplicateLog = freshLogs.find(l => 
       l.vehicleId === formData.vehicleId && 
@@ -137,9 +132,8 @@ const DailyLogs: React.FC = () => {
     const newLog: DailyLog = {
       id: crypto.randomUUID(),
       vehicleId: formData.vehicleId,
-      date: formData.date,
+      date: formData.date!,
       
-      // If operating, use form values. If not, use defaults/empty.
       firstIgnition: isOperating ? (formData.firstIgnition || '') : '',
       startTime: isOperating ? formData.startTime! : '',
       lunchStart: isOperating ? (formData.lunchStart || '') : '',
@@ -148,26 +142,24 @@ const DailyLogs: React.FC = () => {
       extraTimeStart: isOperating ? (formData.extraTimeStart || '') : '',
       extraTimeEnd: isOperating ? (formData.extraTimeEnd || '') : '',
       
-      // If not operating, metrics are 0
-      kmDriven: isOperating ? (formData.kmDriven || 0) : 0,
-      maxSpeed: isOperating ? (formData.maxSpeed || 0) : 0,
-      speedingCount: isOperating ? (formData.speedingCount || 0) : 0,
+      // Converte undefined/null para 0 ao salvar
+      kmDriven: isOperating ? (Number(formData.kmDriven) || 0) : 0,
+      maxSpeed: isOperating ? (Number(formData.maxSpeed) || 0) : 0,
+      speedingCount: isOperating ? (Number(formData.speedingCount) || 0) : 0,
       
       observations: formData.observations || '',
       nonOperatingReason: formData.nonOperatingReason || undefined,
       
-      // Snapshot current details for history
       historicalDriver: selectedVehicle?.driverName || '',
       historicalMunicipality: selectedVehicle?.municipality || '',
       historicalContract: selectedVehicle?.contract || '',
-      historicalPlate: selectedVehicle?.plate || '', // Snapshot Plate
-      historicalModel: selectedVehicle?.model || '', // Snapshot Model
+      historicalPlate: selectedVehicle?.plate || '',
+      historicalModel: selectedVehicle?.model || '',
     };
 
     setLoading(true);
     await storageService.saveLog(newLog);
     
-    // Update local state immediately to block subsequent clicks
     setExistingLogs(prev => [...prev, newLog]);
     await loadData(); 
     
@@ -183,9 +175,9 @@ const DailyLogs: React.FC = () => {
       lunchStart: '',
       lunchEnd: '',
       endTime: '',
-      kmDriven: 0,
-      maxSpeed: 0,
-      speedingCount: 0,
+      kmDriven: undefined,
+      maxSpeed: undefined,
+      speedingCount: undefined,
       observations: '',
       extraTimeStart: '',
       extraTimeEnd: '',
@@ -197,6 +189,8 @@ const DailyLogs: React.FC = () => {
   };
 
   const inputClass = "w-full rounded-lg border border-slate-300 bg-slate-50 p-2.5 text-slate-800 focus:border-blue-600 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition-all";
+  const smallInputClass = "w-full rounded border border-slate-300 bg-white p-2 text-center text-sm font-medium text-slate-800 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none transition-all";
+  
   const isOperating = !formData.nonOperatingReason;
 
   if (loading && vehicles.length === 0) {
@@ -245,224 +239,214 @@ const DailyLogs: React.FC = () => {
                  </p>
             </div>
         ) : (
-            <form onSubmit={handleSubmit} className="p-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-8">
+            <form onSubmit={handleSubmit} className="p-6 md:p-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-6">
                 
-                {/* Section: Identificação */}
-                <div className="col-span-1 md:col-span-2 lg:col-span-4 pb-2 border-b border-slate-100 mb-2">
-                <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider">Dados Principais</h3>
+                {/* --- 1. DADOS PRINCIPAIS --- */}
+                <div className="col-span-1 md:col-span-2 lg:col-span-4 border-b border-slate-100 pb-2 mb-2">
+                  <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider flex items-center gap-2">
+                    <MapPin size={14} /> Dados Principais
+                  </h3>
                 </div>
 
                 <div className="lg:col-span-1">
-                <label className="block text-sm font-medium text-slate-700 mb-1">Data</label>
-                <input
-                    type="date"
-                    name="date"
-                    value={formData.date}
-                    onChange={handleChange}
-                    required
-                    className={inputClass}
-                />
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Data</label>
+                  <input
+                      type="date"
+                      name="date"
+                      value={formData.date}
+                      onChange={handleChange}
+                      required
+                      className={inputClass}
+                  />
                 </div>
 
-                <div className="lg:col-span-2">
-                <label className="block text-sm font-medium text-slate-700 mb-1">Veículo / Motorista</label>
-                <select
-                    name="vehicleId"
-                    value={formData.vehicleId || ''}
-                    onChange={handleChange}
-                    required
-                    className={inputClass}
-                >
-                    <option value="">Selecione o Veículo...</option>
-                    {vehicles.map(v => (
-                    <option key={v.id} value={v.id}>
-                        {v.plate} - {v.driverName} ({v.type})
-                    </option>
-                    ))}
-                </select>
+                <div className="lg:col-span-3">
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Veículo / Motorista</label>
+                  <select
+                      name="vehicleId"
+                      value={formData.vehicleId || ''}
+                      onChange={handleChange}
+                      required
+                      className={inputClass}
+                  >
+                      <option value="">Selecione o Veículo...</option>
+                      {vehicles.map(v => (
+                      <option key={v.id} value={v.id}>
+                          {v.plate} - {v.driverName} ({v.type})
+                      </option>
+                      ))}
+                  </select>
                 </div>
 
-                <div className="lg:col-span-1">
-                <label className="block text-sm font-medium text-slate-700 mb-1">Situação do Veículo</label>
-                <select
-                    name="nonOperatingReason"
-                    value={formData.nonOperatingReason || ''}
-                    onChange={handleChange}
-                    className={`${inputClass} ${!isOperating ? 'bg-orange-50 border-orange-300 font-bold text-orange-800' : 'bg-green-50 border-green-200'}`}
-                >
-                    <option value="">EM OPERAÇÃO (NORMAL)</option>
-                    {NON_OPERATING_OPTIONS.map(opt => (
-                    <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                </select>
+                {/* --- STATUS OPERACIONAL --- */}
+                <div className="col-span-1 md:col-span-2 lg:col-span-4 mt-2">
+                   <div className={`p-4 rounded-xl border-2 transition-colors ${!isOperating ? 'bg-orange-50 border-orange-200' : 'bg-slate-50 border-slate-200'}`}>
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Status Operacional do Dia</label>
+                      <select
+                          name="nonOperatingReason"
+                          value={formData.nonOperatingReason || ''}
+                          onChange={handleChange}
+                          className={`w-full p-3 rounded-lg font-bold text-sm outline-none border transition-colors ${
+                              !isOperating 
+                                ? 'bg-white text-orange-700 border-orange-300 shadow-sm' 
+                                : 'bg-white text-green-700 border-green-300 shadow-sm'
+                          }`}
+                      >
+                          <option value="">🟢 EM OPERAÇÃO (VEÍCULO RODOU NORMALMENTE)</option>
+                          {NON_OPERATING_OPTIONS.map(opt => (
+                            <option key={opt} value={opt}>🔴 {opt}</option>
+                          ))}
+                      </select>
+                   </div>
                 </div>
 
                 {!isOperating ? (
-                <div className="col-span-1 md:col-span-2 lg:col-span-4 bg-orange-50 border border-orange-200 rounded-lg p-4 flex items-start gap-3">
+                <div className="col-span-1 md:col-span-2 lg:col-span-4 bg-orange-50 border border-orange-200 rounded-lg p-4 flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
                     <AlertCircle className="text-orange-600 mt-1 flex-shrink-0" size={24} />
                     <div>
-                    <h4 className="font-bold text-orange-800">Registro de Veículo Não Operacional</h4>
-                    <p className="text-sm text-orange-700 mt-1">
-                        Ao selecionar a opção <strong>{formData.nonOperatingReason}</strong>, não é necessário preencher horários, quilometragem ou velocidade. 
-                        O sistema registrará apenas o status do veículo para esta data.
-                    </p>
+                      <h4 className="font-bold text-orange-800">Registro de Veículo Parado / Não Operacional</h4>
+                      <p className="text-sm text-orange-700 mt-1">
+                          Ao selecionar a opção <strong>{formData.nonOperatingReason}</strong>, o sistema registrará apenas o status. 
+                          Não é necessário preencher horários ou quilometragem.
+                      </p>
                     </div>
                 </div>
                 ) : (
                 <>
-                    {/* Section: Horários Operacionais */}
-                    <div className="col-span-1 md:col-span-2 lg:col-span-4 pb-2 border-b border-slate-100 mt-4 mb-2">
-                    <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider">Horários & Jornada</h3>
+                    {/* --- 2. HORÁRIOS & JORNADA --- */}
+                    <div className="col-span-1 md:col-span-2 lg:col-span-4 border-b border-slate-100 pb-2 mt-4 mb-2">
+                      <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider flex items-center gap-2">
+                         <Clock size={14} /> Horários & Jornada
+                      </h3>
                     </div>
 
-                    <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">1ª Ignição</label>
-                    <input
-                        type="time"
-                        name="firstIgnition"
-                        value={formData.firstIgnition || ''}
-                        onChange={handleChange}
-                        className={inputClass}
-                    />
-                    </div>
+                    <div className="col-span-1 md:col-span-2 lg:col-span-4 bg-slate-50 rounded-xl p-5 border border-slate-200">
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 items-end">
+                            
+                            {/* Grupo Jornada */}
+                            <div className="col-span-2 md:col-span-3 lg:col-span-2 space-y-3 border-r border-slate-200 pr-4">
+                                <span className="text-xs font-black text-blue-900 uppercase tracking-wide block mb-2">Jornada Principal</span>
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div className="col-span-2">
+                                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">1ª Ignição</label>
+                                    <input type="time" name="firstIgnition" value={formData.firstIgnition || ''} onChange={handleChange} className={smallInputClass} />
+                                  </div>
+                                  <div>
+                                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Ligou <span className="text-red-500">*</span></label>
+                                    <input type="time" name="startTime" value={formData.startTime || ''} onChange={handleChange} required={isOperating} className={`${smallInputClass} border-blue-300 bg-blue-50 text-blue-900`} />
+                                  </div>
+                                  <div>
+                                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Desligou <span className="text-red-500">*</span></label>
+                                    <input type="time" name="endTime" value={formData.endTime || ''} onChange={handleChange} required={isOperating} className={`${smallInputClass} border-blue-300 bg-blue-50 text-blue-900`} />
+                                  </div>
+                                </div>
+                            </div>
 
-                    <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Hora que ligou <span className="text-red-500">*</span></label>
-                    <input
-                        type="time"
-                        name="startTime"
-                        value={formData.startTime || ''}
-                        onChange={handleChange}
-                        required={isOperating}
-                        className={`${inputClass} bg-blue-50 border-blue-200`}
-                    />
-                    </div>
-                    
-                    <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Hora que desligou <span className="text-red-500">*</span></label>
-                    <input
-                        type="time"
-                        name="endTime"
-                        value={formData.endTime || ''}
-                        onChange={handleChange}
-                        required={isOperating}
-                        className={`${inputClass} bg-blue-50 border-blue-200`}
-                    />
-                    </div>
+                            {/* Grupo Intervalo */}
+                            <div className="col-span-2 md:col-span-3 lg:col-span-2 space-y-3 border-r border-slate-200 px-4 md:border-r-0 lg:border-r">
+                                <span className="text-xs font-black text-slate-500 uppercase tracking-wide block mb-2">Intervalo / Pausa</span>
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div>
+                                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">Início</label>
+                                    <input type="time" name="lunchStart" value={formData.lunchStart || ''} onChange={handleChange} className={smallInputClass} />
+                                  </div>
+                                  <div>
+                                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">Fim</label>
+                                    <input type="time" name="lunchEnd" value={formData.lunchEnd || ''} onChange={handleChange} className={smallInputClass} />
+                                  </div>
+                                </div>
+                            </div>
 
-                    <div className="hidden lg:block"></div> {/* Spacer */}
+                            {/* Grupo Extra */}
+                            <div className="col-span-2 md:col-span-3 lg:col-span-2 space-y-3 pl-0 lg:pl-4">
+                                <span className="text-xs font-black text-orange-800 uppercase tracking-wide block mb-2">Horas Extras</span>
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div>
+                                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">Início Extra</label>
+                                    <input type="time" name="extraTimeStart" value={formData.extraTimeStart || ''} onChange={handleChange} className={`${smallInputClass} focus:border-orange-500 focus:ring-orange-200`} />
+                                  </div>
+                                  <div>
+                                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">Fim Extra</label>
+                                    <input type="time" name="extraTimeEnd" value={formData.extraTimeEnd || ''} onChange={handleChange} className={`${smallInputClass} focus:border-orange-500 focus:ring-orange-200`} />
+                                  </div>
+                                </div>
+                            </div>
 
-                    <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Início Intervalo</label>
-                    <input
-                        type="time"
-                        name="lunchStart"
-                        value={formData.lunchStart || ''}
-                        onChange={handleChange}
-                        className={inputClass}
-                    />
-                    </div>
-
-                    <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Fim de Intervalo</label>
-                    <input
-                        type="time"
-                        name="lunchEnd"
-                        value={formData.lunchEnd || ''}
-                        onChange={handleChange}
-                        className={inputClass}
-                    />
-                    </div>
-
-                    <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Atividade Extra (Início)</label>
-                    <input
-                        type="time"
-                        name="extraTimeStart"
-                        value={formData.extraTimeStart || ''}
-                        onChange={handleChange}
-                        className={`${inputClass} focus:ring-orange-500 focus:border-orange-500`}
-                    />
-                    </div>
-                    <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Atividade Extra (Fim)</label>
-                    <input
-                        type="time"
-                        name="extraTimeEnd"
-                        value={formData.extraTimeEnd || ''}
-                        onChange={handleChange}
-                        className={`${inputClass} focus:ring-orange-500 focus:border-orange-500`}
-                    />
+                        </div>
                     </div>
 
 
-                    {/* Section: Métricas */}
-                    <div className="col-span-1 md:col-span-2 lg:col-span-4 pb-2 border-b border-slate-100 mt-4 mb-2">
-                    <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider">Métricas & Ocorrências</h3>
+                    {/* --- 3. MÉTRICAS --- */}
+                    <div className="col-span-1 md:col-span-2 lg:col-span-4 border-b border-slate-100 pb-2 mt-4 mb-2">
+                      <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider flex items-center gap-2">
+                         <Gauge size={14} /> Métricas & Ocorrências
+                      </h3>
                     </div>
 
-                    <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">KM Rodados</label>
-                    <div className="relative">
-                        <input
-                        type="number"
-                        name="kmDriven"
-                        value={formData.kmDriven}
-                        onChange={handleChange}
-                        min="0"
-                        className={`${inputClass} pr-8`}
-                        />
-                        <span className="absolute right-3 top-2.5 text-gray-400 text-xs font-medium">KM</span>
-                    </div>
-                    </div>
-
-                    <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Velocidade Máxima</label>
-                    <div className="relative">
-                        <input
-                        type="number"
-                        name="maxSpeed"
-                        value={formData.maxSpeed}
-                        onChange={handleChange}
-                        min="0"
-                        className={`${inputClass} pr-8 ${
-                            (formData.maxSpeed || 0) > 90 ? 'text-red-600 font-bold border-red-300 bg-red-50' : ''
-                        }`}
-                        />
-                        <span className="absolute right-3 top-2.5 text-gray-400 text-xs font-medium">Km/h</span>
-                    </div>
+                    <div className="lg:col-span-1">
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">KM Rodados</label>
+                      <div className="relative">
+                          <input
+                          type="number"
+                          name="kmDriven"
+                          value={formData.kmDriven === undefined ? '' : formData.kmDriven}
+                          onChange={handleChange}
+                          min="0"
+                          placeholder="0"
+                          className={`${inputClass} pr-8`}
+                          />
+                          <span className="absolute right-3 top-2.5 text-gray-400 text-xs font-medium">KM</span>
+                      </div>
                     </div>
 
-                    <div className="col-span-1">
-                    <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-2">
-                        Ocorrências {'>'} 90km/h
-                        {(formData.maxSpeed || 0) > 90 && <AlertTriangle size={14} className="text-red-500" />}
-                    </label>
-                    <input
-                        type="number"
-                        name="speedingCount"
-                        value={formData.speedingCount}
-                        onChange={handleChange}
-                        min="0"
-                        disabled={(formData.maxSpeed || 0) <= 90}
-                        className={`${inputClass} ${(formData.maxSpeed || 0) <= 90 ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : ''}`}
-                        placeholder={(formData.maxSpeed || 0) <= 90 ? "N/A (Vel. < 90)" : "Quantas vezes excedeu?"}
-                    />
+                    <div className="lg:col-span-1">
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Velocidade Máx.</label>
+                      <div className="relative">
+                          <input
+                          type="number"
+                          name="maxSpeed"
+                          value={formData.maxSpeed === undefined ? '' : formData.maxSpeed}
+                          onChange={handleChange}
+                          min="0"
+                          placeholder="0"
+                          className={`${inputClass} pr-8 ${
+                              (formData.maxSpeed || 0) > 90 ? 'text-red-600 font-bold border-red-300 bg-red-50' : ''
+                          }`}
+                          />
+                          <span className="absolute right-3 top-2.5 text-gray-400 text-xs font-medium">Km/h</span>
+                      </div>
+                    </div>
+
+                    <div className="lg:col-span-2">
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1 flex items-center gap-2">
+                          Ocorrências de Excesso {'>'} 90km/h
+                          {(formData.maxSpeed || 0) > 90 && <AlertTriangle size={14} className="text-red-500" />}
+                      </label>
+                      <input
+                          type="number"
+                          name="speedingCount"
+                          value={formData.speedingCount === undefined ? '' : formData.speedingCount}
+                          onChange={handleChange}
+                          min="0"
+                          placeholder=""
+                          disabled={(formData.maxSpeed || 0) <= 90}
+                          className={`${inputClass} ${(formData.maxSpeed || 0) <= 90 ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : ''}`}
+                      />
                     </div>
                 </>
                 )}
 
-                <div className="col-span-1 md:col-span-2 lg:col-span-4">
-                <label className="block text-sm font-medium text-slate-700 mb-1">Observações Diárias</label>
-                <textarea
-                    name="observations"
-                    value={formData.observations}
-                    onChange={handleChange}
-                    rows={3}
-                    className={`${inputClass} resize-none`}
-                    placeholder="Descreva ocorrências, manutenção necessária, etc..."
-                />
+                <div className="col-span-1 md:col-span-2 lg:col-span-4 mt-2">
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Observações Diárias</label>
+                  <textarea
+                      name="observations"
+                      value={formData.observations}
+                      onChange={handleChange}
+                      rows={2}
+                      className={`${inputClass} resize-none`}
+                      placeholder="Descreva ocorrências, manutenção necessária, etc..."
+                  />
                 </div>
 
             </div>

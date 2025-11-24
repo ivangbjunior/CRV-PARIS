@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
-import { GasStation, RefuelingLog, Vehicle, FuelType, ContractType, UserRole, UserProfile } from '../types';
+import { GasStation, RefuelingLog, Vehicle, FuelType, ContractType, UserRole, UserProfile, FUEL_TYPES_LIST, SUPPLY_TYPES_LIST } from '../types';
 import { storageService } from '../services/storage';
 import PasswordModal from './PasswordModal';
 import { useAuth } from '../contexts/AuthContext';
 import { 
-  Fuel, Plus, Save, Trash2, Edit2, Droplet, Filter, X, Calendar, Printer, AlertCircle, Users, ChevronDown, ChevronUp, Anchor, FileText, MapPin, Clock, ClipboardList, ChevronLeft, ChevronRight, Loader2
+  Fuel, Plus, Save, Trash2, Edit2, Droplet, Filter, X, Calendar, Printer, AlertCircle, Users, ChevronDown, ChevronUp, MapPin, Clock, ClipboardList, ChevronLeft, ChevronRight, Loader2
 } from 'lucide-react';
 import { PrintHeader } from './PrintHeader';
 
@@ -378,8 +377,15 @@ const FuelManagement: React.FC = () => {
     currentPage * ITEMS_PER_PAGE
   );
 
-  const totalLiters = filteredRefuelings.reduce((acc, curr) => acc + curr.liters, 0);
-  const totalCost = filteredRefuelings.reduce((acc, curr) => acc + curr.totalCost, 0);
+  // Totals Calculation
+  // Regra: Somar litros APENAS se for Combustível.
+  const totalLiters = filteredRefuelings
+    .filter(r => FUEL_TYPES_LIST.includes(r.fuelType))
+    .reduce((acc, curr) => acc + curr.liters, 0);
+
+  // Regra: Somar CUSTO de TUDO (Combustível + Insumos).
+  const totalCost = filteredRefuelings
+    .reduce((acc, curr) => acc + curr.totalCost, 0);
 
   const activeFiltersCount = [
     filterDateStart, filterDateEnd, filterPlate, filterStation, 
@@ -388,9 +394,6 @@ const FuelManagement: React.FC = () => {
 
   const inputClass = "w-full rounded-lg border border-slate-300 bg-slate-50 p-2.5 text-slate-800 focus:border-blue-600 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition-all";
   const selectClass = "w-full rounded-lg border border-slate-300 bg-white p-2 text-slate-700 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none transition-all h-[42px] shadow-sm";
-
-  // Filter only valid fuels for selection (exclude OIL, GREASE, etc.)
-  const validFuels = [FuelType.DIESEL, FuelType.DIESEL_S10, FuelType.GASOLINA, FuelType.ETANOL];
 
   if (loading && activeTab === 'REFUELING' && refuelings.length === 0) {
       return <div className="flex justify-center items-center h-64"><Loader2 className="animate-spin text-blue-600" size={48} /></div>;
@@ -406,8 +409,8 @@ const FuelManagement: React.FC = () => {
         details={
             <>
                 <span>Registros: {filteredRefuelings.length}</span>
-                <span>Total Litros: {totalLiters.toFixed(2)} L</span>
-                <span>Total Valor: {formatCurrency(totalCost)}</span>
+                <span>Total Litros (Comb.): {totalLiters.toFixed(2)} L</span>
+                <span>Total Valor (Geral): {formatCurrency(totalCost)}</span>
             </>
         }
       />
@@ -666,15 +669,20 @@ const FuelManagement: React.FC = () => {
                         </div>
 
                         <div>
-                            <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Combustível</label>
+                            <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Item / Combustível</label>
                             <select required value={currentRefueling.fuelType || ''} onChange={e => setCurrentRefueling({...currentRefueling, fuelType: e.target.value as FuelType})} className={inputClass}>
                                 <option value="">Selecione...</option>
-                                {validFuels.map(f => (<option key={f} value={f}>{f}</option>))}
+                                <optgroup label="COMBUSTÍVEIS">
+                                    {FUEL_TYPES_LIST.map(f => (<option key={f} value={f}>{f}</option>))}
+                                </optgroup>
+                                <optgroup label="INSUMOS">
+                                    {SUPPLY_TYPES_LIST.map(f => (<option key={f} value={f}>{f}</option>)}
+                                </optgroup>
                             </select>
                         </div>
 
                         <div>
-                            <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Litros</label>
+                            <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Litros / Quantidade</label>
                             <input type="number" step="0.01" required placeholder="0.00" value={currentRefueling.liters || ''} onChange={e => setCurrentRefueling({...currentRefueling, liters: Number(e.target.value)})} className={inputClass} />
                         </div>
 
@@ -704,17 +712,17 @@ const FuelManagement: React.FC = () => {
             )}
 
              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 print:hidden">
-                <div className="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
-                    <p className="text-xs font-bold text-slate-500 uppercase">Registros Listados</p>
-                    <p className="text-2xl font-bold text-slate-800">{filteredRefuelings.length}</p>
+                <div className="bg-white p-2 md:p-3 rounded-lg shadow-sm border border-slate-200">
+                    <p className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Registros Listados</p>
+                    <p className="text-lg md:text-xl font-bold text-slate-800">{filteredRefuelings.length}</p>
                 </div>
-                <div className="bg-blue-50 p-4 rounded-lg shadow-sm border border-blue-100">
-                    <p className="text-xs font-bold text-blue-600 uppercase">Total Litros</p>
-                    <p className="text-2xl font-bold text-blue-800">{totalLiters.toFixed(2)} L</p>
+                <div className="bg-blue-50 p-2 md:p-3 rounded-lg shadow-sm border border-blue-100">
+                    <p className="text-[10px] md:text-xs font-bold text-blue-600 uppercase">Total Litros (Comb.)</p>
+                    <p className="text-lg md:text-xl font-bold text-blue-800">{totalLiters.toFixed(2)} L</p>
                 </div>
-                <div className="bg-green-50 p-4 rounded-lg shadow-sm border border-green-100">
-                    <p className="text-xs font-bold text-green-600 uppercase">Total Valor</p>
-                    <p className="text-2xl font-bold text-green-800">{formatCurrency(totalCost)}</p>
+                <div className="bg-green-50 p-2 md:p-3 rounded-lg shadow-sm border border-green-100">
+                    <p className="text-[10px] md:text-xs font-bold text-green-600 uppercase">Total Valor (Geral)</p>
+                    <p className="text-lg md:text-xl font-bold text-green-800">{formatCurrency(totalCost)}</p>
                 </div>
              </div>
 
@@ -728,6 +736,7 @@ const FuelManagement: React.FC = () => {
                                 <th className="px-6 py-3 print:px-2">Posto</th>
                                 <th className="px-6 py-3 print:px-2">Documentos</th>
                                 <th className="px-6 py-3 print:px-2">Combustível</th>
+                                <th className="px-6 py-3 print:px-2">Insumos</th>
                                 <th className="px-6 py-3 print:px-2">Litros</th>
                                 <th className="px-6 py-3 print:px-2">Valor Total</th>
                                 <th className="px-6 py-3 print:hidden text-center">Ações</th>
@@ -735,11 +744,13 @@ const FuelManagement: React.FC = () => {
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {paginatedRefuelings.length === 0 ? (
-                                <tr><td colSpan={8} className="px-6 py-12 text-center text-slate-400">Nenhum abastecimento encontrado para os filtros selecionados.</td></tr>
+                                <tr><td colSpan={9} className="px-6 py-12 text-center text-slate-400">Nenhum abastecimento encontrado para os filtros selecionados.</td></tr>
                             ) : (
                                 paginatedRefuelings.map(item => {
                                     const station = stations.find(s => s.id === item.gasStationId);
                                     const isExt = item.vehicleId === 'EXTERNAL' || !vehicles.find(v => v.id === item.vehicleId);
+                                    const isFuel = FUEL_TYPES_LIST.includes(item.fuelType);
+
                                     return (
                                         <tr key={item.id} className="hover:bg-slate-50 transition-colors print:hover:bg-transparent">
                                             <td className="px-6 py-3 font-medium text-slate-900 print:px-2">
@@ -776,15 +787,36 @@ const FuelManagement: React.FC = () => {
                                                     {!item.invoiceNumber && !item.requisitionNumber && <span className="text-xs text-slate-300">-</span>}
                                                 </div>
                                             </td>
+                                            
+                                            {/* COLUNA COMBUSTÍVEL */}
                                             <td className="px-6 py-3 print:px-2">
-                                                <span className={`text-xs font-bold px-2 py-1 rounded border ${getFuelColor(item.fuelType)} print:border-none print:p-0 print:bg-transparent print:text-black`}>
-                                                    {item.fuelType}
-                                                </span>
+                                                {isFuel ? (
+                                                    <span className={`text-xs font-bold px-2 py-1 rounded border ${getFuelColor(item.fuelType)} print:border-none print:p-0 print:bg-transparent print:text-black`}>
+                                                        {item.fuelType}
+                                                    </span>
+                                                ) : <span className="text-slate-300">-</span>}
                                             </td>
-                                            <td className="px-6 py-3 font-mono print:px-2">{item.liters.toFixed(2)} L</td>
+                                            
+                                            {/* COLUNA INSUMOS */}
+                                            <td className="px-6 py-3 print:px-2">
+                                                {!isFuel ? (
+                                                    <span className="text-xs font-bold text-orange-700 bg-orange-50 px-2 py-1 rounded border border-orange-100">
+                                                        {item.fuelType} ({item.liters})
+                                                    </span>
+                                                ) : <span className="text-slate-300">-</span>}
+                                            </td>
+
+                                            <td className="px-6 py-3 font-mono print:px-2">
+                                                {isFuel ? `${item.liters.toFixed(2)} L` : '-'}
+                                            </td>
+                                            
                                             <td className="px-6 py-3 font-mono font-bold text-slate-700 print:px-2">
-                                                {item.totalCost > 0 ? formatCurrency(item.totalCost) : <span className="inline-flex items-center gap-1 bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-bold border border-red-200 animate-pulse print:animate-none print:bg-transparent print:text-red-700"><AlertCircle size={12} /> PENDÊNCIA</span>}
+                                                {/* Se for insumo, contabiliza o valor também */}
+                                                {(isFuel || !isFuel) && item.totalCost > 0 ? formatCurrency(item.totalCost) : (
+                                                     <span className="inline-flex items-center gap-1 bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-bold border border-red-200 animate-pulse print:animate-none print:bg-transparent print:text-red-700"><AlertCircle size={12} /> PENDÊNCIA</span>
+                                                )}
                                             </td>
+                                            
                                             <td className="px-6 py-3 print:hidden text-center">
                                                 {!isReadOnly && (
                                                     <div className="flex justify-center gap-2">
@@ -800,7 +832,7 @@ const FuelManagement: React.FC = () => {
                         </tbody>
                          <tfoot className="bg-slate-100 font-bold text-slate-800 border-t border-slate-300 print:bg-slate-200">
                              <tr>
-                                 <td colSpan={5} className="px-6 py-3 text-right uppercase text-xs tracking-wider">Totais do Período</td>
+                                 <td colSpan={6} className="px-6 py-3 text-right uppercase text-xs tracking-wider">Totais do Período</td>
                                  <td className="px-6 py-3 text-blue-800">{totalLiters.toFixed(2)} L</td>
                                  <td className="px-6 py-3 text-green-800">{formatCurrency(totalCost)}</td>
                                  <td className="print:hidden"></td>

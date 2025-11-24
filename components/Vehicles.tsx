@@ -5,7 +5,7 @@ import PasswordModal from './PasswordModal';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   Plus, Edit2, Trash2, Save, X, Car, Truck, Search, History, 
-  Calendar as CalendarIcon, MapPin, User, Filter, Printer, Loader2, Eye
+  Calendar as CalendarIcon, MapPin, User, Filter, Printer, Loader2, Eye, ArrowRightLeft
 } from 'lucide-react';
 import { PrintHeader } from './PrintHeader';
 
@@ -312,8 +312,8 @@ const Vehicles: React.FC = () => {
               </button>
             </div>
             
-            {/* Date Filter Bar */}
-            <div className="bg-slate-50 border-b border-slate-200 p-3 flex flex-wrap items-center gap-4 justify-end px-6">
+            {/* Date Filter Bar - UPDATED to bg-white per user request */}
+            <div className="bg-white border-b border-slate-200 p-3 flex flex-wrap items-center gap-4 justify-end px-6">
                 <div className="flex items-center gap-2 text-slate-600 mr-auto">
                     <Filter size={16} />
                     <span className="text-xs font-bold uppercase">Filtrar Período:</span>
@@ -324,7 +324,7 @@ const Vehicles: React.FC = () => {
                         type="date" 
                         value={historyDateRange.start}
                         onChange={(e) => setHistoryDateRange(prev => ({ ...prev, start: e.target.value }))}
-                        className="border border-slate-300 rounded pl-2 pr-2 py-1 text-sm text-slate-700"
+                        className="border border-slate-300 rounded pl-2 pr-2 py-1 text-sm text-slate-900 bg-white focus:ring-2 focus:ring-blue-100 outline-none"
                     />
                 </div>
                 <div className="flex items-center gap-2">
@@ -333,7 +333,7 @@ const Vehicles: React.FC = () => {
                         type="date" 
                         value={historyDateRange.end}
                         onChange={(e) => setHistoryDateRange(prev => ({ ...prev, end: e.target.value }))}
-                        className="border border-slate-300 rounded pl-2 pr-2 py-1 text-sm text-slate-700"
+                        className="border border-slate-300 rounded pl-2 pr-2 py-1 text-sm text-slate-900 bg-white focus:ring-2 focus:ring-blue-100 outline-none"
                     />
                 </div>
             </div>
@@ -358,7 +358,15 @@ const Vehicles: React.FC = () => {
 
                  return (
                     <div className="relative border-l-2 border-slate-200 ml-3 space-y-8 pl-8 py-2">
-                    {filteredHistoryLogs.map((log) => {
+                    {filteredHistoryLogs.map((log, index) => {
+                        // Determine differences
+                        // The array is reversed (newest first). So 'next' item in array is the 'previous' chronological log.
+                        const previousLog = filteredHistoryLogs[index + 1];
+                        
+                        const isDriverChanged = previousLog && log.historicalDriver !== previousLog.historicalDriver;
+                        const isMuniChanged = previousLog && log.historicalMunicipality !== previousLog.historicalMunicipality;
+                        const isContractChanged = previousLog && log.historicalContract !== previousLog.historicalContract;
+
                         return (
                         <div key={log.id} className="relative group">
                         <div className="absolute -left-[41px] top-0 w-5 h-5 bg-blue-100 border-4 border-blue-600 rounded-full"></div>
@@ -369,36 +377,64 @@ const Vehicles: React.FC = () => {
                                 <CalendarIcon size={16} />
                                 <span>{formatDateDisplay(log.date)}</span>
                                 </div>
+                                <div className="text-xs font-medium text-slate-400 bg-white border px-2 py-0.5 rounded-full">
+                                    Movimentação Registrada
+                                </div>
                             </div>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                            <div className="flex items-start gap-3 bg-white p-3 rounded border border-slate-100">
-                                <User size={20} className="text-blue-500 mt-0.5" />
+                            
+                            {/* Motorista Box */}
+                            <div className={`flex items-start gap-3 p-3 rounded border transition-colors ${
+                                isDriverChanged 
+                                ? 'bg-yellow-50 border-yellow-300 ring-2 ring-yellow-300 shadow-sm' 
+                                : 'bg-white border-slate-100 opacity-70'
+                            }`}>
+                                <User size={20} className={`${isDriverChanged ? 'text-yellow-600' : 'text-slate-400'} mt-0.5`} />
                                 <div>
-                                <p className="text-xs text-slate-500 uppercase font-bold">Motorista</p>
-                                <p className="text-slate-800 font-bold text-sm">
-                                    {log.historicalDriver || "N/A"}
-                                </p>
+                                    <p className={`text-xs uppercase font-bold flex items-center gap-1 ${isDriverChanged ? 'text-yellow-700' : 'text-slate-400'}`}>
+                                        Motorista
+                                        {isDriverChanged && <ArrowRightLeft size={10} />}
+                                    </p>
+                                    <p className={`${isDriverChanged ? 'text-slate-900' : 'text-slate-500'} font-bold text-sm`}>
+                                        {log.historicalDriver || "N/A"}
+                                    </p>
                                 </div>
                             </div>
                             
-                            <div className="flex items-start gap-3 bg-white p-3 rounded border border-slate-100">
-                                <MapPin size={20} className="text-green-500 mt-0.5" />
+                            {/* Municipio Box */}
+                            <div className={`flex items-start gap-3 p-3 rounded border transition-colors ${
+                                isMuniChanged 
+                                ? 'bg-yellow-50 border-yellow-300 ring-2 ring-yellow-300 shadow-sm' 
+                                : 'bg-white border-slate-100 opacity-70'
+                            }`}>
+                                <MapPin size={20} className={`${isMuniChanged ? 'text-yellow-600' : 'text-slate-400'} mt-0.5`} />
                                 <div>
-                                <p className="text-xs text-slate-500 uppercase font-bold">Município</p>
-                                <p className="text-slate-800 font-bold text-sm">
-                                    {log.historicalMunicipality || "N/A"}
-                                </p>
+                                    <p className={`text-xs uppercase font-bold flex items-center gap-1 ${isMuniChanged ? 'text-yellow-700' : 'text-slate-400'}`}>
+                                        Município
+                                        {isMuniChanged && <ArrowRightLeft size={10} />}
+                                    </p>
+                                    <p className={`${isMuniChanged ? 'text-slate-900' : 'text-slate-500'} font-bold text-sm`}>
+                                        {log.historicalMunicipality || "N/A"}
+                                    </p>
                                 </div>
                             </div>
 
-                            <div className="flex items-start gap-3 bg-white p-3 rounded border border-slate-100">
-                                <Truck size={20} className="text-purple-500 mt-0.5" />
+                            {/* Contrato Box */}
+                            <div className={`flex items-start gap-3 p-3 rounded border transition-colors ${
+                                isContractChanged 
+                                ? 'bg-yellow-50 border-yellow-300 ring-2 ring-yellow-300 shadow-sm' 
+                                : 'bg-white border-slate-100 opacity-70'
+                            }`}>
+                                <Truck size={20} className={`${isContractChanged ? 'text-yellow-600' : 'text-slate-400'} mt-0.5`} />
                                 <div>
-                                <p className="text-xs text-slate-500 uppercase font-bold">Contrato</p>
-                                <p className="text-slate-800 font-bold text-sm">
-                                    {log.historicalContract || "N/A"}
-                                </p>
+                                    <p className={`text-xs uppercase font-bold flex items-center gap-1 ${isContractChanged ? 'text-yellow-700' : 'text-slate-400'}`}>
+                                        Contrato
+                                        {isContractChanged && <ArrowRightLeft size={10} />}
+                                    </p>
+                                    <p className={`${isContractChanged ? 'text-slate-900' : 'text-slate-500'} font-bold text-sm`}>
+                                        {log.historicalContract || "N/A"}
+                                    </p>
                                 </div>
                             </div>
                             </div>
@@ -510,7 +546,7 @@ const Vehicles: React.FC = () => {
             <form onSubmit={handleSave} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div>
                 <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Placa</label>
-                <input type="text" name="plate" value={currentVehicle.plate || ''} onChange={handleInputChange} placeholder="ABC-1234" required className={`${inputClass} uppercase font-mono`} />
+                <input type="text" name="plate" value={currentVehicle.plate || ''} onChange={handleInputChange} placeholder="ABC-1234" required className={`${inputClass} uppercase`} />
               </div>
 
               <div>
@@ -609,7 +645,7 @@ const Vehicles: React.FC = () => {
                   const statusDisplay = getVehicleStatusDisplay(vehicle);
                   return (
                     <tr key={vehicle.id} className="hover:bg-blue-50/30 transition-colors group">
-                      <td className="px-6 py-4 font-bold text-slate-900 font-mono print:px-2 print:py-2">{vehicle.plate}</td>
+                      <td className="px-6 py-4 font-bold text-slate-900 print:px-2 print:py-2">{vehicle.plate}</td>
                       <td className="px-6 py-4 print:px-2 print:py-2">
                         <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold border ${statusDisplay.className} print:border-none print:p-0 print:bg-transparent print:text-black`}>
                           {statusDisplay.label}
