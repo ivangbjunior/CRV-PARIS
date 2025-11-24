@@ -163,11 +163,11 @@ const DashboardRankings: React.FC = () => {
              <div className="p-1.5 bg-white/60 rounded-lg shadow-sm">
                <DollarSign size={14} className="text-emerald-600" />
              </div>
-             <span className="text-[10px] font-bold uppercase tracking-wider">Custo Combustível (Mês)</span>
+             <span className="text-xs font-bold uppercase tracking-wider">Mês Anterior (Mesmo Período)</span>
           </div>
           
           <div>
-            <div className="text-2xl font-black text-slate-800 tracking-tight">
+            <div className="text-3xl font-black text-slate-800 tracking-tight">
                {formatCurrency(financials.currentMonthCost)}
             </div>
             
@@ -180,7 +180,7 @@ const DashboardRankings: React.FC = () => {
        </div>
 
        {/* Rankings Widget - Compact Card */}
-       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden w-full sm:w-[320px] flex flex-col">
+       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden w-full sm:w-[350px] flex flex-col h-[260px]">
           {/* Tabs Header */}
           <div className="flex border-b border-slate-100">
              <button 
@@ -207,7 +207,7 @@ const DashboardRankings: React.FC = () => {
           </div>
 
           {/* List Content */}
-          <div className="p-3">
+          <div className="p-3 flex-1 overflow-y-auto">
              <div className="flex justify-between items-center mb-2">
                 <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
                     {activeTab === 'KM' ? 'Top 5 - Rodagem (Mês)' : 
@@ -224,26 +224,27 @@ const DashboardRankings: React.FC = () => {
                    if (list.length === 0) return <div className="text-xs text-slate-400 text-center py-4 italic">Sem dados registrados neste mês.</div>;
 
                    return list.map((item, idx) => (
-                      <div key={idx} className="flex items-center justify-between text-xs border-b border-slate-50 pb-1 last:border-0">
-                         <div className="flex items-start gap-2 w-full overflow-hidden">
-                            <span className={`w-4 h-4 rounded-full flex-shrink-0 flex items-center justify-center font-bold text-[9px] mt-0.5 ${idx === 0 ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100 text-slate-500'}`}>
+                      <div key={idx} className="flex items-center justify-between text-sm border-b border-slate-50 pb-2 last:border-0 mb-2">
+                         <div className="flex items-start gap-3 w-full overflow-hidden">
+                            <span className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center font-bold text-sm mt-0.5 ${idx === 0 ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100 text-slate-500'}`}>
                                {idx + 1}
                             </span>
-                            <div className="flex flex-col w-full min-w-0">
-                               {/* MODIFICADO: Exibir Contrato, Municipio e Motorista */}
+                            <div className="flex flex-col w-full min-w-0 justify-center min-h-[32px]">
                                <div className="flex items-center justify-between gap-1">
-                                 <span className="font-bold text-slate-700 truncate" title={item.contract}>{item.contract}</span>
-                                 <span className="font-mono font-bold text-slate-600 ml-auto whitespace-nowrap">
+                                 <span className="font-bold text-slate-700 truncate text-sm" title={item.contract}>{item.contract}</span>
+                                 <span className="font-mono font-bold text-slate-600 ml-auto whitespace-nowrap text-sm">
                                     {activeTab === 'KM' ? `${item.value}km` : 
                                      activeTab === 'FUEL' ? `${item.value.toFixed(0)}L` : 
                                      `${item.value}x`}
                                  </span>
                                </div>
-                               <div className="text-slate-500 text-[9px] truncate leading-tight" title={item.municipality}>
-                                 {item.municipality}
-                               </div>
-                               <div className="text-slate-400 text-[9px] truncate leading-tight" title={item.driver}>
-                                 {item.driver}
+                               <div className="flex items-center justify-between gap-2">
+                                   <div className="text-slate-500 text-xs truncate leading-tight" title={item.municipality}>
+                                     {item.municipality}
+                                   </div>
+                                   <div className="text-slate-400 text-xs font-medium truncate leading-tight" title={item.driver}>
+                                     {(item.driver || '?').split(' ')[0]}
+                                   </div>
                                </div>
                             </div>
                          </div>
@@ -619,14 +620,14 @@ const HomeMenu: React.FC<HomeMenuProps> = ({ onNavigate, role, userName }) => {
 
                     <div className="flex items-center gap-2 text-slate-500 mb-1">
                         <CalendarDays size={14} />
-                        <span className="text-xs font-bold uppercase tracking-wide">
+                        <span className="text-xl font-bold uppercase tracking-wide text-blue-900">
                             {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
                         </span>
                     </div>
-                    <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
+                    <h1 className="text-5xl font-bold text-slate-900 tracking-tight">
                         Olá, <span className="text-indigo-600">{userName}</span>
                     </h1>
-                    <p className="text-slate-500 text-sm mt-1">Bem-vindo ao seu painel.</p>
+                    <p className="text-slate-500 text-lg mt-1 font-medium">Bem-vindo ao seu painel.</p>
                 </div>
             </div>
 

@@ -676,7 +676,7 @@ const FuelManagement: React.FC = () => {
                                     {FUEL_TYPES_LIST.map(f => (<option key={f} value={f}>{f}</option>))}
                                 </optgroup>
                                 <optgroup label="INSUMOS">
-                                    {SUPPLY_TYPES_LIST.map(f => (<option key={f} value={f}>{f}</option>)}
+                                    {SUPPLY_TYPES_LIST.map(f => (<option key={f} value={f}>{f}</option>))}
                                 </optgroup>
                             </select>
                         </div>
