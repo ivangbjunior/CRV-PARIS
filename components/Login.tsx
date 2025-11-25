@@ -17,9 +17,12 @@ const Login: React.FC = () => {
 
     let emailToAuth = username.trim();
 
+    // Normalização: Supabase Auth exige email em minúsculas geralmente
     if (!emailToAuth.includes('@')) {
       const cleanUsername = emailToAuth.replace(/\s+/g, '').toLowerCase();
       emailToAuth = `${cleanUsername}@parisengenharia.com.br`;
+    } else {
+      emailToAuth = emailToAuth.toLowerCase();
     }
 
     try {
@@ -75,7 +78,7 @@ const Login: React.FC = () => {
                   value={username}
                   onChange={(e) => setUsername(e.target.value.toUpperCase())}
                   className="block w-full pl-10 pr-3 py-3 border border-slate-200 rounded-xl bg-white/50 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all uppercase font-medium shadow-sm"
-                  placeholder="USUÁRIO"
+                  placeholder="NOME DE USUÁRIO"
                   required
                   autoCapitalize="characters"
                   autoCorrect="off"
