@@ -6,7 +6,7 @@ import { calculateWorkHours } from '../utils/timeUtils';
 import PasswordModal from './PasswordModal';
 import MultiSelect, { MultiSelectOption } from './MultiSelect';
 import { useAuth } from '../contexts/AuthContext';
-import { Filter, FileText, Trash2, Edit3, Calendar, X, Save, Clock, AlertTriangle, Search, User, MapPin, Key, Ban, Settings, HardHat, Printer, Fuel, Droplet, MessageSquareText, Loader2, WifiOff, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Filter, FileText, Trash2, Edit3, Calendar, X, Save, Clock, AlertTriangle, Search, User, MapPin, Key, Ban, Settings, HardHat, Printer, Fuel, Droplet, MessageSquareText, Loader2, WifiOff, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Gauge } from 'lucide-react';
 import { PrintHeader } from './PrintHeader';
 import SelectWithSearch from './SelectWithSearch';
 
@@ -456,7 +456,7 @@ const Reports: React.FC = () => {
         </div>
       )}
 
-      {/* Edit Modal */}
+      {/* Edit Modal - UPDATED TO MATCH DAILYLOGS LAYOUT */}
       {showEditModal && editingLog && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 overflow-y-auto print:hidden">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl my-8 flex flex-col max-h-[90vh]">
@@ -471,17 +471,21 @@ const Reports: React.FC = () => {
             </div>
             
             <form onSubmit={saveEdit} className="p-6 overflow-y-auto">
-               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  <div className="col-span-full border-b pb-2 mb-2">
-                      <h4 className="text-xs font-bold uppercase text-slate-500">Dados do Veículo e Data</h4>
+               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-6">
+                  
+                  {/* --- 1. DADOS PRINCIPAIS --- */}
+                  <div className="col-span-full border-b border-slate-100 pb-2 mb-2">
+                      <h4 className="text-xs font-bold uppercase text-slate-500 flex items-center gap-2 tracking-wider">
+                        <MapPin size={14}/> Dados Principais
+                      </h4>
                   </div>
                   
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1">Data</label>
+                  <div className="lg:col-span-1">
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Data</label>
                     <input type="date" name="date" value={editingLog.date} onChange={handleEditChange} required className={editInputClass} />
                   </div>
                   
-                  <div className="lg:col-span-2 relative">
+                  <div className="lg:col-span-3 relative">
                     <SelectWithSearch 
                         label="Veículo (Cadastro Original)"
                         options={editVehicleOptions}
@@ -492,98 +496,140 @@ const Reports: React.FC = () => {
                     />
                   </div>
 
-                  <div className="lg:col-span-1">
-                    <label className="block text-xs font-bold text-slate-500 mb-1">Motorista (No Dia)</label>
-                    <input type="text" name="historicalDriver" value={editingLog.historicalDriver || ''} onChange={handleEditChange} className={editInputClass} />
+                  {/* Historical Data Snapshot - Optional Override (Advanced) */}
+                  <div className="col-span-full bg-slate-50 p-4 rounded-xl border border-slate-200 grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
+                      <div className="lg:col-span-3 pb-2 border-b border-slate-200 mb-1">
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-wide">Dados Históricos (Snapshot do dia)</span>
+                      </div>
+                      <div className="lg:col-span-1">
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Motorista</label>
+                        <input type="text" name="historicalDriver" value={editingLog.historicalDriver || ''} onChange={handleEditChange} className={editInputClass} placeholder="Manter original" />
+                      </div>
+                      <div className="lg:col-span-1">
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Município</label>
+                        <input type="text" name="historicalMunicipality" value={editingLog.historicalMunicipality || ''} onChange={handleEditChange} className={editInputClass} placeholder="Manter original" />
+                      </div>
+                      <div className="lg:col-span-1">
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Contrato</label>
+                        <select name="historicalContract" value={editingLog.historicalContract || ''} onChange={handleEditChange} className={editInputClass}>
+                          <option value="">Manter original</option>
+                          {Object.values(ContractType).map(type => (<option key={type} value={type}>{type}</option>))}
+                        </select>
+                      </div>
                   </div>
 
-                  <div className="lg:col-span-1">
-                    <label className="block text-xs font-bold text-slate-500 mb-1">Município (No Dia)</label>
-                     <input type="text" name="historicalMunicipality" value={editingLog.historicalMunicipality || ''} onChange={handleEditChange} className={editInputClass} />
-                  </div>
-                  
-                  <div className="lg:col-span-1">
-                    <label className="block text-xs font-bold text-slate-500 mb-1">Contrato (No Dia)</label>
-                     <select name="historicalContract" value={editingLog.historicalContract || ''} onChange={handleEditChange} className={editInputClass}>
-                      <option value="">Selecione...</option>
-                      {Object.values(ContractType).map(type => (<option key={type} value={type}>{type}</option>))}
-                    </select>
-                  </div>
-
-                  <div className="lg:col-span-1">
-                     <label className="block text-xs font-bold text-slate-500 mb-1">Status Operacional</label>
-                     <select name="nonOperatingReason" value={editingLog.nonOperatingReason || ''} onChange={handleEditChange} className={editInputClass}>
-                        <option value="">EM OPERAÇÃO (NORMAL)</option>
-                        {['OFICINA','GARAGEM','SEM SINAL','EM MANUTENÇÃO','NÃO LIGOU'].map(o => <option key={o} value={o}>{o}</option>)}
-                     </select>
+                  {/* STATUS OPERACIONAL */}
+                  <div className="col-span-full mt-2">
+                     <div className={`p-4 rounded-xl border-2 transition-colors ${editingLog.nonOperatingReason ? 'bg-orange-50 border-orange-200' : 'bg-white border-slate-200'}`}>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Status Operacional</label>
+                        <select name="nonOperatingReason" value={editingLog.nonOperatingReason || ''} onChange={handleEditChange} className="w-full p-3 rounded-lg font-bold text-sm outline-none border bg-white shadow-sm">
+                            <option value="">🟢 EM OPERAÇÃO (NORMAL)</option>
+                            {['OFICINA','GARAGEM','SEM SINAL','EM MANUTENÇÃO','NÃO LIGOU'].map(o => <option key={o} value={o}>🔴 {o}</option>)}
+                        </select>
+                     </div>
                   </div>
 
                   {!editingLog.nonOperatingReason && (
                     <>
-                      <div className="col-span-full border-b pb-2 mb-2 mt-2">
-                          <h4 className="text-xs font-bold uppercase text-slate-500">Horários</h4>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 mb-1">1ª Ignição</label>
-                        <input type="time" name="firstIgnition" value={editingLog.firstIgnition} onChange={handleEditChange} className={editInputClass} />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 mb-1">Início Expediente</label>
-                        <input type="time" name="startTime" value={editingLog.startTime} onChange={handleEditChange} required className={`${editInputClass} bg-blue-50`} />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 mb-1">Fim Expediente</label>
-                        <input type="time" name="endTime" value={editingLog.endTime} onChange={handleEditChange} required className={`${editInputClass} bg-blue-50`} />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 mb-1">Início Intervalo</label>
-                        <input type="time" name="lunchStart" value={editingLog.lunchStart} onChange={handleEditChange} className={editInputClass} />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 mb-1">Fim de Intervalo</label>
-                        <input type="time" name="lunchEnd" value={editingLog.lunchEnd} onChange={handleEditChange} className={editInputClass} />
+                      {/* --- 2. HORÁRIOS & JORNADA --- */}
+                      <div className="col-span-full border-b border-slate-100 pb-2 mb-2 mt-4">
+                          <h4 className="text-xs font-bold uppercase text-slate-500 flex items-center gap-2 tracking-wider">
+                            <Clock size={14}/> Horários & Jornada
+                          </h4>
                       </div>
                       
-                      <div className="hidden lg:block"></div>
+                      <div className="col-span-full bg-slate-50 rounded-xl p-5 border border-slate-200">
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 items-end">
+                            
+                            {/* Jornada Principal */}
+                            <div className="col-span-2 md:col-span-3 lg:col-span-2 space-y-3 border-r border-slate-200 pr-4">
+                                <span className="text-xs font-black text-blue-900 uppercase tracking-wide block mb-2">Jornada Principal</span>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="col-span-2">
+                                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">1ª Ignição</label>
+                                        <input type="time" name="firstIgnition" value={editingLog.firstIgnition} onChange={handleEditChange} className={editInputClass} />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Início</label>
+                                        <input type="time" name="startTime" value={editingLog.startTime} onChange={handleEditChange} required className={`${editInputClass} bg-blue-50 border-blue-200 text-blue-900`} />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Fim</label>
+                                        <input type="time" name="endTime" value={editingLog.endTime} onChange={handleEditChange} required className={`${editInputClass} bg-blue-50 border-blue-200 text-blue-900`} />
+                                    </div>
+                                </div>
+                            </div>
 
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 mb-1">Hora Extra (Início)</label>
-                        <input type="time" name="extraTimeStart" value={editingLog.extraTimeStart} onChange={handleEditChange} className={editInputClass} />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 mb-1">Hora Extra (Fim)</label>
-                        <input type="time" name="extraTimeEnd" value={editingLog.extraTimeEnd} onChange={handleEditChange} className={editInputClass} />
+                            {/* Intervalo */}
+                            <div className="col-span-2 md:col-span-3 lg:col-span-2 space-y-3 border-r border-slate-200 px-4 md:border-r-0 lg:border-r">
+                                <span className="text-xs font-black text-slate-500 uppercase tracking-wide block mb-2">Intervalo</span>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">Início</label>
+                                        <input type="time" name="lunchStart" value={editingLog.lunchStart} onChange={handleEditChange} className={editInputClass} />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">Fim</label>
+                                        <input type="time" name="lunchEnd" value={editingLog.lunchEnd} onChange={handleEditChange} className={editInputClass} />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Extra */}
+                            <div className="col-span-2 md:col-span-3 lg:col-span-2 space-y-3 pl-0 lg:pl-4">
+                                <span className="text-xs font-black text-orange-800 uppercase tracking-wide block mb-2">Extras</span>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">Início</label>
+                                        <input type="time" name="extraTimeStart" value={editingLog.extraTimeStart} onChange={handleEditChange} className={`${editInputClass} focus:border-orange-500 focus:ring-orange-200`} />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">Fim</label>
+                                        <input type="time" name="extraTimeEnd" value={editingLog.extraTimeEnd} onChange={handleEditChange} className={`${editInputClass} focus:border-orange-500 focus:ring-orange-200`} />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                       </div>
 
-                      <div className="col-span-full border-b pb-2 mb-2 mt-2">
-                          <h4 className="text-xs font-bold uppercase text-slate-500">Métricas</h4>
+                      {/* --- 3. MÉTRICAS --- */}
+                      <div className="col-span-full border-b border-slate-100 pb-2 mb-2 mt-4">
+                          <h4 className="text-xs font-bold uppercase text-slate-500 flex items-center gap-2 tracking-wider">
+                            <Gauge size={14}/> Métricas
+                          </h4>
                       </div>
 
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 mb-1">KM Rodados</label>
-                        <input type="number" name="kmDriven" value={editingLog.kmDriven === undefined ? '' : editingLog.kmDriven} onChange={handleEditChange} placeholder="" className={editInputClass} />
+                      <div className="lg:col-span-1">
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">KM Rodados</label>
+                        <div className="relative">
+                            <input type="number" name="kmDriven" value={editingLog.kmDriven === undefined ? '' : editingLog.kmDriven} onChange={handleEditChange} className={`${editInputClass} pr-8`} placeholder="" />
+                            <span className="absolute right-3 top-2.5 text-gray-400 text-xs font-medium">KM</span>
+                        </div>
                       </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 mb-1">Velocidade Máxima</label>
-                        <input type="number" name="maxSpeed" value={editingLog.maxSpeed === undefined ? '' : editingLog.maxSpeed} onChange={handleEditChange} placeholder="" className={editInputClass} />
+                      <div className="lg:col-span-1">
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Velocidade Máx</label>
+                        <div className="relative">
+                            <input type="number" name="maxSpeed" value={editingLog.maxSpeed === undefined ? '' : editingLog.maxSpeed} onChange={handleEditChange} className={`${editInputClass} pr-8`} placeholder="" />
+                            <span className="absolute right-3 top-2.5 text-gray-400 text-xs font-medium">Km/h</span>
+                        </div>
                       </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 mb-1">Qtd. Excesso Vel.</label>
-                        <input type="number" name="speedingCount" value={editingLog.speedingCount === undefined ? '' : editingLog.speedingCount} onChange={handleEditChange} placeholder="" className={editInputClass} />
+                      <div className="lg:col-span-2">
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Qtd. Excesso Vel.</label>
+                        <input type="number" name="speedingCount" value={editingLog.speedingCount === undefined ? '' : editingLog.speedingCount} onChange={handleEditChange} className={editInputClass} placeholder="" />
                       </div>
                     </>
                   )}
                   
-                   <div className="col-span-full">
-                    <label className="block text-xs font-bold text-slate-500 mb-1">Observações</label>
-                    <textarea name="observations" value={editingLog.observations} onChange={handleEditChange} rows={3} className={editInputClass} />
+                   <div className="col-span-full mt-2">
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Observações</label>
+                    <textarea name="observations" value={editingLog.observations} onChange={handleEditChange} rows={2} className={`${editInputClass} resize-none`} />
                   </div>
                </div>
                
-               <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-100">
-                  <button type="button" onClick={() => setShowEditModal(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium">Cancelar</button>
-                  <button type="submit" className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold flex items-center gap-2">
-                    {loading ? <Loader2 className="animate-spin"/> : <Save size={18} />} Salvar Alterações
+               <div className="flex justify-end gap-3 mt-8 pt-4 border-t border-slate-100">
+                  <button type="button" onClick={() => setShowEditModal(false)} className="px-6 py-2.5 text-slate-600 hover:bg-slate-100 rounded-lg font-medium transition-colors">Cancelar</button>
+                  <button type="submit" className="px-8 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold flex items-center gap-2 shadow-md transform active:scale-95 transition-all">
+                    {loading ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />} Salvar Alterações
                   </button>
                </div>
             </form>
