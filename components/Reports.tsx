@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { DailyLog, DailyLogReport, Vehicle, ContractType, VehicleType, UserRole } from '../types';
 import { storageService } from '../services/storage';
@@ -612,49 +613,49 @@ const Reports: React.FC = () => {
         )}
       </div>
 
-      {/* Resumo Compacto & Minimalista para Impressão - UPDATED CSS */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-2 print:w-full print:flex print:flex-row print:gap-6 print:justify-start print:border-b print:border-slate-200 print:pb-2 print:mb-2 relative z-0">
+      {/* Resumo Compacto & Minimalista para Impressão - UPDATED CSS FOR HORIZONTAL PRINT */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-2 print:w-full print:flex print:flex-row print:justify-between print:items-center print:gap-4 print:border-b print:border-slate-200 print:pb-2 print:mb-2 relative z-0 print:max-h-[40px] print:overflow-hidden">
             {/* Time */}
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 hover:border-blue-300 transition-all group print:border-none print:shadow-none print:p-0 print:bg-transparent print:block">
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 hover:border-blue-300 transition-all group print:border-none print:shadow-none print:p-0 print:bg-transparent print:flex print:items-center print:gap-1 print:m-0">
                 <div className="p-3 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors print:hidden">
                     <Clock size={20} strokeWidth={2} />
                 </div>
-                <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider print:text-slate-600 print:text-[9px] print:inline-block print:mr-1">Tempo Operação:</p>
-                    <p className="text-xl font-black text-slate-800 leading-none mt-1 print:text-xs print:mt-0 print:inline-block">{summary.formattedTime}</p>
+                <div className="print:flex print:items-center print:gap-1">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider print:text-slate-600 print:text-[9px] print:m-0">Tempo Operação:</p>
+                    <p className="text-xl font-black text-slate-800 leading-none mt-1 print:text-xs print:m-0">{summary.formattedTime}</p>
                 </div>
             </div>
 
             {/* KM */}
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 hover:border-green-300 transition-all group print:border-none print:shadow-none print:p-0 print:bg-transparent print:block">
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 hover:border-green-300 transition-all group print:border-none print:shadow-none print:p-0 print:bg-transparent print:flex print:items-center print:gap-1 print:m-0">
                 <div className="p-3 bg-green-50 text-green-600 rounded-lg group-hover:bg-green-600 group-hover:text-white transition-colors print:hidden">
                     <MapPin size={20} strokeWidth={2} />
                 </div>
-                <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider print:text-slate-600 print:text-[9px] print:inline-block print:mr-1">KM Total:</p>
-                    <p className="text-xl font-black text-slate-800 leading-none mt-1 print:text-xs print:mt-0 print:inline-block">{summary.totalKm} <span className="text-xs font-bold text-slate-400 print:hidden">km</span></p>
+                <div className="print:flex print:items-center print:gap-1">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider print:text-slate-600 print:text-[9px] print:m-0">KM Total:</p>
+                    <p className="text-xl font-black text-slate-800 leading-none mt-1 print:text-xs print:m-0">{summary.totalKm} <span className="text-xs font-bold text-slate-400 print:hidden">km</span></p>
                 </div>
             </div>
 
             {/* No Signal */}
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 hover:border-orange-300 transition-all group print:border-none print:shadow-none print:p-0 print:bg-transparent print:block">
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 hover:border-orange-300 transition-all group print:border-none print:shadow-none print:p-0 print:bg-transparent print:flex print:items-center print:gap-1 print:m-0">
                 <div className="p-3 bg-orange-50 text-orange-600 rounded-lg group-hover:bg-orange-600 group-hover:text-white transition-colors print:hidden">
                     <WifiOff size={20} strokeWidth={2} />
                 </div>
-                <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider print:text-slate-600 print:text-[9px] print:inline-block print:mr-1">Sem Sinal:</p>
-                    <p className="text-xl font-black text-slate-800 leading-none mt-1 print:text-xs print:mt-0 print:inline-block">{summary.daysNoSignal} <span className="text-xs font-bold text-slate-400 print:hidden">dias</span></p>
+                <div className="print:flex print:items-center print:gap-1">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider print:text-slate-600 print:text-[9px] print:m-0">Sem Sinal:</p>
+                    <p className="text-xl font-black text-slate-800 leading-none mt-1 print:text-xs print:m-0">{summary.daysNoSignal} <span className="text-xs font-bold text-slate-400 print:hidden">dias</span></p>
                 </div>
             </div>
 
             {/* Stopped */}
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 hover:border-red-300 transition-all group print:border-none print:shadow-none print:p-0 print:bg-transparent print:block">
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 hover:border-red-300 transition-all group print:border-none print:shadow-none print:p-0 print:bg-transparent print:flex print:items-center print:gap-1 print:m-0">
                 <div className="p-3 bg-red-50 text-red-600 rounded-lg group-hover:bg-red-600 group-hover:text-white transition-colors print:hidden">
                     <Ban size={20} strokeWidth={2} />
                 </div>
-                <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider print:text-slate-600 print:text-[9px] print:inline-block print:mr-1">Parado:</p>
-                    <p className="text-xl font-black text-slate-800 leading-none mt-1 print:text-xs print:mt-0 print:inline-block">{summary.daysStopped} <span className="text-xs font-bold text-slate-400 print:hidden">dias</span></p>
+                <div className="print:flex print:items-center print:gap-1">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider print:text-slate-600 print:text-[9px] print:m-0">Parado:</p>
+                    <p className="text-xl font-black text-slate-800 leading-none mt-1 print:text-xs print:m-0">{summary.daysStopped} <span className="text-xs font-bold text-slate-400 print:hidden">dias</span></p>
                 </div>
             </div>
         </div>
