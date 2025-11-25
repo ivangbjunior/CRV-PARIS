@@ -37,7 +37,7 @@ const Reports: React.FC = () => {
 
   const [showEditModal, setShowEditModal] = useState(false);
   // Modified state to handle undefined for empty inputs (standardization)
-  const [editingLog, setEditingLog] = useState<Partial<DailyLog> | null>(null);
+  const [editingLog, setEditingLog] = useState<Partial<DailyLogReport> | null>(null);
 
   const [obsModalData, setObsModalData] = useState<{content: string, date: string, plate: string} | null>(null);
 
@@ -224,11 +224,8 @@ const Reports: React.FC = () => {
   };
 
   const handleEditClick = (logReport: DailyLogReport) => {
-    // Copy and ensure 0 values are treated as they are, but keep the structure
-    const logToEdit: Partial<DailyLog> = {
-        ...logReport
-    };
-    
+    // We copy the full report into the editing state, but will sanitize it on save
+    const logToEdit = { ...logReport };
     setEditingLog(logToEdit);
     setShowEditModal(true);
   };
@@ -255,18 +252,51 @@ const Reports: React.FC = () => {
     if (editingLog && editingLog.id && editingLog.vehicleId && editingLog.date) {
       setLoading(true);
       
-      // Sanitize for saving: convert undefined to 0
-      const logToSave: DailyLog = {
-          ...editingLog as DailyLog,
-          kmDriven: editingLog.kmDriven || 0,
-          maxSpeed: editingLog.maxSpeed || 0,
-          speedingCount: editingLog.speedingCount || 0
-      };
+      try {
+          // Construct a clean DailyLog object, stripping out any DailyLogReport extra fields (like 'vehicle' object)
+          const logToSave: DailyLog = {
+              id: editingLog.id,
+              date: editingLog.date,
+              vehicleId: editingLog.vehicleId,
+              
+              firstIgnition: editingLog.firstIgnition || '',
+              startTime: editingLog.startTime || '',
+              lunchStart: editingLog.lunchStart || '',
+              lunchEnd: editingLog.lunchEnd || '',
+              endTime: editingLog.endTime || '',
+              
+              kmDriven: Number(editingLog.kmDriven) || 0,
+              maxSpeed: Number(editingLog.maxSpeed) || 0,
+              speedingCount: Number(editingLog.speedingCount) || 0,
+              
+              observations: editingLog.observations || '',
+              extraTimeStart: editingLog.extraTimeStart || '',
+              extraTimeEnd: editingLog.extraTimeEnd || '',
+              
+              nonOperatingReason: editingLog.nonOperatingReason || undefined,
+              
+              // Snapshots - Fallback to current vehicle info if snapshot is missing
+              historicalPlate: editingLog.historicalPlate || editingLog.vehicle?.plate || '',
+              historicalModel: editingLog.historicalModel || editingLog.vehicle?.model || '',
+              historicalDriver: editingLog.historicalDriver || editingLog.vehicle?.driverName || '',
+              historicalMunicipality: editingLog.historicalMunicipality || editingLog.vehicle?.municipality || '',
+              historicalContract: editingLog.historicalContract || editingLog.vehicle?.contract || '',
+              
+              // Optional fields
+              kmBeforeRefueling: editingLog.kmBeforeRefueling !== undefined ? Number(editingLog.kmBeforeRefueling) : undefined
+          };
 
-      await storageService.saveLog(logToSave);
-      setShowEditModal(false);
-      setEditingLog(null);
-      await loadData();
+          await storageService.saveLog(logToSave);
+          setShowEditModal(false);
+          setEditingLog(null);
+          await loadData();
+          
+      } catch (error) {
+          console.error("Failed to save edit:", error);
+          alert("Erro ao salvar alterações.");
+      } finally {
+          setLoading(false);
+      }
     }
   };
 
