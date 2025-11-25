@@ -390,6 +390,7 @@ const Reports: React.FC = () => {
         />
       </div>
 
+      {/* Obs Modal */}
       {obsModalData && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4 print:hidden animate-in fade-in duration-200">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full overflow-hidden">
@@ -424,6 +425,7 @@ const Reports: React.FC = () => {
         </div>
       )}
 
+      {/* Edit Modal */}
       {showEditModal && editingLog && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 overflow-y-auto print:hidden">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl my-8 flex flex-col max-h-[90vh]">
@@ -610,16 +612,16 @@ const Reports: React.FC = () => {
         )}
       </div>
 
-      {/* Resumo Compacto & Minimalista para Impressão */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-2 print:flex print:flex-row print:justify-between print:gap-4 print:border-b print:border-slate-200 print:pb-1 print:mb-2 relative z-0">
+      {/* Resumo Compacto & Minimalista para Impressão - UPDATED CSS */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-2 print:w-full print:flex print:flex-row print:gap-6 print:justify-start print:border-b print:border-slate-200 print:pb-2 print:mb-2 relative z-0">
             {/* Time */}
             <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 hover:border-blue-300 transition-all group print:border-none print:shadow-none print:p-0 print:bg-transparent print:block">
                 <div className="p-3 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors print:hidden">
                     <Clock size={20} strokeWidth={2} />
                 </div>
                 <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider print:text-slate-600 print:text-[9px]">Tempo Operação</p>
-                    <p className="text-xl font-black text-slate-800 leading-none mt-1 print:text-xs print:mt-0">{summary.formattedTime}</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider print:text-slate-600 print:text-[9px] print:inline-block print:mr-1">Tempo Operação:</p>
+                    <p className="text-xl font-black text-slate-800 leading-none mt-1 print:text-xs print:mt-0 print:inline-block">{summary.formattedTime}</p>
                 </div>
             </div>
 
@@ -629,8 +631,8 @@ const Reports: React.FC = () => {
                     <MapPin size={20} strokeWidth={2} />
                 </div>
                 <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider print:text-slate-600 print:text-[9px]">KM Total</p>
-                    <p className="text-xl font-black text-slate-800 leading-none mt-1 print:text-xs print:mt-0">{summary.totalKm} <span className="text-xs font-bold text-slate-400 print:hidden">km</span></p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider print:text-slate-600 print:text-[9px] print:inline-block print:mr-1">KM Total:</p>
+                    <p className="text-xl font-black text-slate-800 leading-none mt-1 print:text-xs print:mt-0 print:inline-block">{summary.totalKm} <span className="text-xs font-bold text-slate-400 print:hidden">km</span></p>
                 </div>
             </div>
 
@@ -640,8 +642,8 @@ const Reports: React.FC = () => {
                     <WifiOff size={20} strokeWidth={2} />
                 </div>
                 <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider print:text-slate-600 print:text-[9px]">Sem Sinal</p>
-                    <p className="text-xl font-black text-slate-800 leading-none mt-1 print:text-xs print:mt-0">{summary.daysNoSignal} <span className="text-xs font-bold text-slate-400 print:hidden">dias</span></p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider print:text-slate-600 print:text-[9px] print:inline-block print:mr-1">Sem Sinal:</p>
+                    <p className="text-xl font-black text-slate-800 leading-none mt-1 print:text-xs print:mt-0 print:inline-block">{summary.daysNoSignal} <span className="text-xs font-bold text-slate-400 print:hidden">dias</span></p>
                 </div>
             </div>
 
@@ -651,8 +653,8 @@ const Reports: React.FC = () => {
                     <Ban size={20} strokeWidth={2} />
                 </div>
                 <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider print:text-slate-600 print:text-[9px]">Parado</p>
-                    <p className="text-xl font-black text-slate-800 leading-none mt-1 print:text-xs print:mt-0">{summary.daysStopped} <span className="text-xs font-bold text-slate-400 print:hidden">dias</span></p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider print:text-slate-600 print:text-[9px] print:inline-block print:mr-1">Parado:</p>
+                    <p className="text-xl font-black text-slate-800 leading-none mt-1 print:text-xs print:mt-0 print:inline-block">{summary.daysStopped} <span className="text-xs font-bold text-slate-400 print:hidden">dias</span></p>
                 </div>
             </div>
         </div>

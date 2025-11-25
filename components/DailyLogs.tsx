@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Vehicle, DailyLog, RefuelingLog, UserRole } from '../types';
+import { Vehicle, DailyLog, RefuelingLog, UserRole, VehicleType } from '../types';
 import { storageService } from '../services/storage';
 import { ClipboardList, Save, AlertTriangle, AlertCircle, CheckCircle, Loader2, Clock, MapPin, Gauge } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -65,6 +65,22 @@ const DailyLogs: React.FC = () => {
       }
   }
 
+  // Determine speed limit based on vehicle type
+  const getSpeedLimit = (vehicleId?: string) => {
+    if (!vehicleId) return 100; // Default safe fallback
+    const v = vehicles.find(veh => veh.id === vehicleId);
+    if (!v) return 100;
+
+    // Caminhões e Linha Viva: 90km/h
+    if (v.type === VehicleType.CAMINHAO || v.type === VehicleType.LINHA_VIVA) {
+        return 90;
+    }
+    // Carros/Outros: 100km/h
+    return 100;
+  };
+
+  const currentSpeedLimit = getSpeedLimit(formData.vehicleId);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
     
@@ -77,9 +93,11 @@ const DailyLogs: React.FC = () => {
     setFormData(prev => {
       const newData = { ...prev, [name]: val };
 
-      // Logic: If maxSpeed changes and is <= 90, reset speedingCount to 0 (or undefined if empty preference)
+      // Logic: If maxSpeed changes and is <= limit, reset speedingCount to 0
       if (name === 'maxSpeed' && typeof val === 'number') {
-        if (val <= 90) {
+        // We need to check the vehicle ID from the *current* state (prev) or new value if it was changing (but vehicle change is handled separately)
+        const limit = getSpeedLimit(prev.vehicleId);
+        if (val <= limit) {
           newData.speedingCount = 0;
         }
       }
@@ -417,17 +435,18 @@ const DailyLogs: React.FC = () => {
                           min="0"
                           placeholder=""
                           className={`${inputClass} pr-8 ${
-                              (formData.maxSpeed || 0) > 90 ? 'text-red-600 font-bold border-red-300 bg-red-50' : ''
+                              (formData.maxSpeed || 0) > currentSpeedLimit ? 'text-red-600 font-bold border-red-300 bg-red-50' : ''
                           }`}
                           />
                           <span className="absolute right-3 top-2.5 text-gray-400 text-xs font-medium">Km/h</span>
                       </div>
+                      <p className="text-[10px] text-slate-400 mt-1">Limite: {currentSpeedLimit} km/h</p>
                     </div>
 
                     <div className="lg:col-span-2">
                       <label className="block text-xs font-bold text-slate-500 uppercase mb-1 flex items-center gap-2">
-                          Ocorrências de Excesso {'>'} 90km/h
-                          {(formData.maxSpeed || 0) > 90 && <AlertTriangle size={14} className="text-red-500" />}
+                          Ocorrências de Excesso {'>'} {currentSpeedLimit}km/h
+                          {(formData.maxSpeed || 0) > currentSpeedLimit && <AlertTriangle size={14} className="text-red-500" />}
                       </label>
                       <input
                           type="number"
@@ -436,8 +455,8 @@ const DailyLogs: React.FC = () => {
                           onChange={handleChange}
                           min="0"
                           placeholder=""
-                          disabled={(formData.maxSpeed || 0) <= 90}
-                          className={`${inputClass} ${(formData.maxSpeed || 0) <= 90 ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : ''}`}
+                          disabled={(formData.maxSpeed || 0) <= currentSpeedLimit}
+                          className={`${inputClass} ${(formData.maxSpeed || 0) <= currentSpeedLimit ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : ''}`}
                       />
                     </div>
                 </>
