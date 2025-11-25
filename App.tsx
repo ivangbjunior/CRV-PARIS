@@ -26,9 +26,9 @@ const DashboardRankings: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'KM' | 'FUEL' | 'SPEED'>('KM');
   const [loading, setLoading] = useState(true);
   const [rankings, setRankings] = useState({
-    km: [] as { id: string; value: number; contract: string; municipality: string; driver: string }[],
-    fuel: [] as { id: string; value: number; contract: string; municipality: string; driver: string }[],
-    speed: [] as { id: string; value: number; contract: string; municipality: string; driver: string }[]
+    km: [] as { id: string; value: number; plate: string; municipality: string; driver: string }[],
+    fuel: [] as { id: string; value: number; plate: string; municipality: string; driver: string }[],
+    speed: [] as { id: string; value: number; plate: string; municipality: string; driver: string }[]
   });
   const [financials, setFinancials] = useState({
     currentMonthCost: 0,
@@ -93,15 +93,15 @@ const DashboardRankings: React.FC = () => {
         const fuelMap: Record<string, number> = {};
         const speedMap: Record<string, number> = {};
 
-        // Helper to get vehicle details
+        // Helper to get vehicle details - UPDATED TO PLATE/MUNICIPALITY/DRIVER
         const getVDetails = (id: string) => {
              const v = vehicles.find(v => v.id === id);
              return v ? { 
-               contract: v.contract, 
+               plate: v.plate, 
                municipality: v.municipality, 
                driver: v.driverName 
              } : { 
-               contract: '?', 
+               plate: '?', 
                municipality: '?', 
                driver: '?' 
              };
@@ -167,7 +167,7 @@ const DashboardRankings: React.FC = () => {
   return (
     <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-stretch">
        {/* Financial Widget - Blue Theme */}
-       <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 min-w-[200px] flex flex-col justify-between h-full shadow-sm hover:border-blue-300 transition-colors">
+       <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 min-w-[200px] w-[240px] flex flex-col justify-between h-full shadow-sm hover:border-blue-300 transition-colors">
           <div className="flex items-center gap-2 text-blue-700 mb-1">
              <div className="p-1.5 bg-white rounded-lg shadow-sm text-blue-600">
                <Fuel size={14} />
@@ -180,16 +180,21 @@ const DashboardRankings: React.FC = () => {
                {formatCurrency(financials.currentMonthCost)}
             </div>
             
-            <div className={`flex items-center gap-1 text-xs font-bold mt-1 ${financials.isIncrease ? 'text-red-600' : 'text-emerald-600'}`}>
-               {financials.isIncrease ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-               <span>{financials.diffPercent.toFixed(1)}%</span>
-               <span className="text-blue-400 font-normal">vs. mês anterior</span>
+            <div className="mt-2 pt-2 border-t border-blue-200/60">
+               <span className="text-xs font-bold text-blue-800 block mb-0.5">Mês Anterior (Mesmo Período)</span>
+               <div className="flex items-baseline gap-2">
+                   <span className="text-lg font-bold text-blue-900">{formatCurrency(financials.lastMonthCost)}</span>
+                   <div className={`flex items-center gap-0.5 text-xs font-bold ${financials.isIncrease ? 'text-red-600' : 'text-emerald-600'}`}>
+                        {financials.isIncrease ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+                        <span>{financials.diffPercent.toFixed(1)}%</span>
+                   </div>
+               </div>
             </div>
           </div>
        </div>
 
        {/* Rankings Widget - Compact Card with Dynamic Background */}
-       <div className={`rounded-xl shadow-sm border overflow-hidden w-full sm:w-[350px] flex flex-col h-[260px] transition-colors duration-300 ${getCardStyle()}`}>
+       <div className={`rounded-xl shadow-sm border overflow-hidden w-full sm:w-[320px] flex flex-col h-[260px] transition-colors duration-300 ${getCardStyle()}`}>
           {/* Tabs Header */}
           <div className="flex border-b border-slate-200/60 bg-white/50 backdrop-blur-sm">
              <button 
@@ -235,7 +240,7 @@ const DashboardRankings: React.FC = () => {
                    return list.map((item, idx) => (
                       <div key={idx} className="flex items-center justify-between text-sm border-b border-slate-200/50 pb-2 last:border-0 mb-2 last:mb-0">
                          <div className="flex items-start gap-3 w-full overflow-hidden">
-                            <span className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center font-bold text-sm mt-0.5 bg-white shadow-sm ${
+                            <span className={`w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center font-bold text-base mt-0.5 bg-white shadow-sm ${
                                 activeTab === 'FUEL' ? 'text-orange-700 ring-1 ring-orange-200' : 
                                 activeTab === 'SPEED' ? 'text-red-700 ring-1 ring-red-200' : 
                                 'text-blue-700 ring-1 ring-blue-200'
@@ -244,7 +249,8 @@ const DashboardRankings: React.FC = () => {
                             </span>
                             <div className="flex flex-col w-full min-w-0 justify-center min-h-[32px]">
                                <div className="flex items-center justify-between gap-1">
-                                 <span className="font-bold text-slate-800 truncate text-sm" title={item.contract}>{item.contract}</span>
+                                 {/* SHOW PLATE */}
+                                 <span className="font-bold text-slate-800 truncate text-sm" title={item.plate}>{item.plate}</span>
                                  <span className="font-mono font-bold text-slate-700 ml-auto whitespace-nowrap text-sm">
                                     {activeTab === 'KM' ? `${item.value}km` : 
                                      activeTab === 'FUEL' ? `${item.value.toFixed(0)}L` : 
@@ -255,7 +261,7 @@ const DashboardRankings: React.FC = () => {
                                    <div className="text-slate-600 text-xs truncate leading-tight" title={item.municipality}>
                                      {item.municipality}
                                    </div>
-                                   <div className="text-slate-500 text-xs font-medium truncate leading-tight" title={item.driver}>
+                                   <div className="text-slate-500 text-xs font-bold truncate leading-tight" title={item.driver}>
                                      {(item.driver || '?').split(' ')[0]}
                                    </div>
                                </div>
@@ -626,11 +632,6 @@ const HomeMenu: React.FC<HomeMenuProps> = ({ onNavigate, role, userName }) => {
                 )}
 
                 <div>
-                    <div className="inline-flex items-center gap-2 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-100 mb-2 w-fit">
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
-                        <span className="text-[9px] font-bold text-emerald-700 uppercase tracking-widest">System Online</span>
-                    </div>
-
                     <div className="flex items-center gap-2 text-slate-500 mb-1">
                         <CalendarDays size={14} />
                         <span className="text-xl font-bold uppercase tracking-wide text-blue-900">

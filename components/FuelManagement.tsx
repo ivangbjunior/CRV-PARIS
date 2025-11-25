@@ -7,6 +7,7 @@ import {
   Fuel, Plus, Save, Trash2, Edit2, Droplet, Filter, X, Calendar, Printer, AlertCircle, Users, ChevronDown, ChevronUp, MapPin, Clock, ClipboardList, ChevronLeft, ChevronRight, Loader2
 } from 'lucide-react';
 import { PrintHeader } from './PrintHeader';
+import MultiSelect, { MultiSelectOption } from './MultiSelect';
 
 type TabType = 'REFUELING' | 'STATIONS';
 
@@ -39,12 +40,13 @@ const FuelManagement: React.FC = () => {
 
   const [filterDateStart, setFilterDateStart] = useState('');
   const [filterDateEnd, setFilterDateEnd] = useState('');
-  const [filterPlate, setFilterPlate] = useState('');
-  const [filterStation, setFilterStation] = useState('');
-  const [filterContract, setFilterContract] = useState('');
-  const [filterMunicipality, setFilterMunicipality] = useState('');
-  const [filterFuel, setFilterFuel] = useState('');
-  const [filterForeman, setFilterForeman] = useState('');
+  // Converted to arrays for MultiSelect
+  const [filterPlate, setFilterPlate] = useState<string[]>([]);
+  const [filterStation, setFilterStation] = useState<string[]>([]);
+  const [filterContract, setFilterContract] = useState<string[]>([]);
+  const [filterMunicipality, setFilterMunicipality] = useState<string[]>([]);
+  const [filterFuel, setFilterFuel] = useState<string[]>([]);
+  const [filterForeman, setFilterForeman] = useState<string[]>([]);
 
   const [showFilters, setShowFilters] = useState(false);
 
@@ -193,7 +195,8 @@ const FuelManagement: React.FC = () => {
     e.preventDefault();
     if (isReadOnly) return;
     
-    if (!currentRefueling.gasStationId || !currentRefueling.liters || !currentRefueling.fuelType) return;
+    // Removed check for liters/totalCost to allow saving pending records (R$ 0)
+    if (!currentRefueling.gasStationId || !currentRefueling.fuelType) return;
     
     let snapshotData = {
         plate: '',
@@ -236,8 +239,8 @@ const FuelManagement: React.FC = () => {
       vehicleId: vehicleIdToSave,
       gasStationId: currentRefueling.gasStationId,
       fuelType: currentRefueling.fuelType as FuelType,
-      liters: Number(currentRefueling.liters),
-      totalCost: Number(currentRefueling.totalCost || 0),
+      liters: Number(currentRefueling.liters || 0), // Default to 0 if empty
+      totalCost: Number(currentRefueling.totalCost || 0), // Default to 0 if empty
       invoiceNumber: currentRefueling.invoiceNumber ? currentRefueling.invoiceNumber.toUpperCase() : '',
       requisitionNumber: currentRefueling.requisitionNumber ? currentRefueling.requisitionNumber.toUpperCase() : '',
       time: currentRefueling.time || '', 
@@ -309,12 +312,12 @@ const FuelManagement: React.FC = () => {
   const resetFilters = () => {
     setFilterDateStart('');
     setFilterDateEnd('');
-    setFilterPlate('');
-    setFilterStation('');
-    setFilterContract('');
-    setFilterMunicipality('');
-    setFilterFuel('');
-    setFilterForeman('');
+    setFilterPlate([]);
+    setFilterStation([]);
+    setFilterContract([]);
+    setFilterMunicipality([]);
+    setFilterFuel([]);
+    setFilterForeman([]);
   };
 
   const confirmDelete = (id: string) => {
@@ -361,12 +364,12 @@ const FuelManagement: React.FC = () => {
       const end = filterDateEnd ? new Date(filterDateEnd).getTime() : null;
       const matchesDate = (!start || rDate >= start) && (!end || rDate <= end);
 
-      const matchesPlate = !filterPlate || r.plateSnapshot === filterPlate;
-      const matchesStation = !filterStation || r.gasStationId === filterStation;
-      const matchesContract = !filterContract || r.contractSnapshot === filterContract;
-      const matchesCity = !filterMunicipality || r.municipalitySnapshot === filterMunicipality;
-      const matchesFuel = !filterFuel || r.fuelType === filterFuel;
-      const matchesForeman = !filterForeman || r.foremanSnapshot === filterForeman;
+      const matchesPlate = filterPlate.length === 0 || filterPlate.includes(r.plateSnapshot);
+      const matchesStation = filterStation.length === 0 || filterStation.includes(r.gasStationId);
+      const matchesContract = filterContract.length === 0 || filterContract.includes(r.contractSnapshot);
+      const matchesCity = filterMunicipality.length === 0 || filterMunicipality.includes(r.municipalitySnapshot);
+      const matchesFuel = filterFuel.length === 0 || filterFuel.includes(r.fuelType);
+      const matchesForeman = filterForeman.length === 0 || filterForeman.includes(r.foremanSnapshot);
 
       return matchesDate && matchesPlate && matchesStation && matchesContract && matchesCity && matchesFuel && matchesForeman;
   }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -378,22 +381,29 @@ const FuelManagement: React.FC = () => {
   );
 
   // Totals Calculation
-  // Regra: Somar litros APENAS se for Combustível.
   const totalLiters = filteredRefuelings
     .filter(r => FUEL_TYPES_LIST.includes(r.fuelType))
     .reduce((acc, curr) => acc + curr.liters, 0);
 
-  // Regra: Somar CUSTO de TUDO (Combustível + Insumos).
   const totalCost = filteredRefuelings
     .reduce((acc, curr) => acc + curr.totalCost, 0);
 
   const activeFiltersCount = [
-    filterDateStart, filterDateEnd, filterPlate, filterStation, 
-    filterContract, filterMunicipality, filterFuel, filterForeman
-  ].filter(Boolean).length;
+    filterDateStart, filterDateEnd, 
+    filterPlate.length, filterStation.length, 
+    filterContract.length, filterMunicipality.length, filterFuel.length, filterForeman.length
+  ].filter(Boolean).reduce((a, b) => a + (typeof b === 'number' ? b : 1), 0);
 
   const inputClass = "w-full rounded-lg border border-slate-300 bg-slate-50 p-2.5 text-slate-800 focus:border-blue-600 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition-all";
   const selectClass = "w-full rounded-lg border border-slate-300 bg-white p-2 text-slate-700 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none transition-all h-[42px] shadow-sm";
+
+  // Options for MultiSelect
+  const plateOptions: MultiSelectOption[] = uniquePlates.map(p => ({ value: p, label: p }));
+  const stationOptions: MultiSelectOption[] = stations.map(s => ({ value: s.id, label: s.name }));
+  const contractOptions: MultiSelectOption[] = uniqueContracts.map(c => ({ value: c, label: c }));
+  const municipalityOptions: MultiSelectOption[] = uniqueMunicipalities.map(m => ({ value: m, label: m }));
+  const foremanOptions: MultiSelectOption[] = uniqueForemen.map(f => ({ value: f, label: f }));
+  const fuelOptions: MultiSelectOption[] = Object.values(FuelType).map(f => ({ value: f, label: f }));
 
   if (loading && activeTab === 'REFUELING' && refuelings.length === 0) {
       return <div className="flex justify-center items-center h-64"><Loader2 className="animate-spin text-blue-600" size={48} /></div>;
@@ -527,48 +537,13 @@ const FuelManagement: React.FC = () => {
                                     <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none"><Calendar size={16} className="text-slate-400" /></div>
                                 </div>
                             </div>
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 mb-1">Placa / Identificação</label>
-                                <select className={selectClass} value={filterPlate} onChange={(e) => setFilterPlate(e.target.value)}>
-                                    <option value="">Todas</option>
-                                    {uniquePlates.map(p => <option key={p} value={p}>{p}</option>)}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 mb-1">Encarregado</label>
-                                <select className={selectClass} value={filterForeman} onChange={(e) => setFilterForeman(e.target.value)}>
-                                    <option value="">Todos</option>
-                                    {uniqueForemen.map(f => <option key={f} value={f}>{f}</option>)}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 mb-1">Posto</label>
-                                <select className={selectClass} value={filterStation} onChange={(e) => setFilterStation(e.target.value)}>
-                                    <option value="">Todos</option>
-                                    {stations.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 mb-1">Contrato</label>
-                                <select className={selectClass} value={filterContract} onChange={(e) => setFilterContract(e.target.value)}>
-                                    <option value="">Todos</option>
-                                    {uniqueContracts.map(c => <option key={c} value={c}>{c}</option>)}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 mb-1">Município</label>
-                                <select className={selectClass} value={filterMunicipality} onChange={(e) => setFilterMunicipality(e.target.value)}>
-                                    <option value="">Todos</option>
-                                    {uniqueMunicipalities.map(m => <option key={m} value={m}>{m}</option>)}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 mb-1">Combustível</label>
-                                <select className={selectClass} value={filterFuel} onChange={(e) => setFilterFuel(e.target.value)}>
-                                    <option value="">Todos</option>
-                                    {Object.values(FuelType).map(f => <option key={f} value={f}>{f}</option>)}
-                                </select>
-                            </div>
+                            
+                            <div><MultiSelect label="Placa / Identificação" options={plateOptions} selected={filterPlate} onChange={setFilterPlate} placeholder="Todas" /></div>
+                            <div><MultiSelect label="Encarregado" options={foremanOptions} selected={filterForeman} onChange={setFilterForeman} placeholder="Todos" /></div>
+                            <div><MultiSelect label="Posto" options={stationOptions} selected={filterStation} onChange={setFilterStation} placeholder="Todos" /></div>
+                            <div><MultiSelect label="Contrato" options={contractOptions} selected={filterContract} onChange={setFilterContract} placeholder="Todos" /></div>
+                            <div><MultiSelect label="Município" options={municipalityOptions} selected={filterMunicipality} onChange={setFilterMunicipality} placeholder="Todos" /></div>
+                            <div><MultiSelect label="Combustível" options={fuelOptions} selected={filterFuel} onChange={setFilterFuel} placeholder="Todos" /></div>
                         </div>
                     </div>
                 )}
@@ -683,12 +658,12 @@ const FuelManagement: React.FC = () => {
 
                         <div>
                             <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Litros / Quantidade</label>
-                            <input type="number" step="0.01" required placeholder="0.00" value={currentRefueling.liters || ''} onChange={e => setCurrentRefueling({...currentRefueling, liters: Number(e.target.value)})} className={inputClass} />
+                            <input type="number" step="0.01" placeholder="0.00" value={currentRefueling.liters || ''} onChange={e => setCurrentRefueling({...currentRefueling, liters: Number(e.target.value)})} className={inputClass} />
                         </div>
 
                         <div>
                             <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Valor Total (R$)</label>
-                            <input type="number" step="0.01" required placeholder="0.00" value={currentRefueling.totalCost || ''} onChange={e => setCurrentRefueling({...currentRefueling, totalCost: Number(e.target.value)})} className={inputClass} />
+                            <input type="number" step="0.01" placeholder="0.00" value={currentRefueling.totalCost || ''} onChange={e => setCurrentRefueling({...currentRefueling, totalCost: Number(e.target.value)})} className={inputClass} />
                         </div>
 
                         <div>

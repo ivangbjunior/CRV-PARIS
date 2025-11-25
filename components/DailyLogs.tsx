@@ -3,6 +3,7 @@ import { Vehicle, DailyLog, RefuelingLog, UserRole } from '../types';
 import { storageService } from '../services/storage';
 import { ClipboardList, Save, AlertTriangle, AlertCircle, CheckCircle, Loader2, Clock, MapPin, Gauge } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import SelectWithSearch from './SelectWithSearch';
 
 const NON_OPERATING_OPTIONS = [
   'OFICINA',
@@ -88,6 +89,12 @@ const DailyLogs: React.FC = () => {
     
     // Limpar erro ao mexer no formulário
     if (errorMsg) setErrorMsg('');
+  };
+
+  // Custom handler for SelectWithSearch
+  const handleVehicleChange = (value: string) => {
+      setFormData(prev => ({ ...prev, vehicleId: value }));
+      if (errorMsg) setErrorMsg('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -193,6 +200,11 @@ const DailyLogs: React.FC = () => {
   
   const isOperating = !formData.nonOperatingReason;
 
+  const vehicleOptions = vehicles.map(v => ({
+      value: v.id,
+      label: `${v.plate} - ${v.driverName} (${v.type})`
+  }));
+
   if (loading && vehicles.length === 0) {
     return <div className="flex justify-center items-center h-64"><Loader2 className="animate-spin text-blue-600" size={48} /></div>;
   }
@@ -261,22 +273,16 @@ const DailyLogs: React.FC = () => {
                   />
                 </div>
 
-                <div className="lg:col-span-3">
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Veículo / Motorista</label>
-                  <select
-                      name="vehicleId"
-                      value={formData.vehicleId || ''}
-                      onChange={handleChange}
-                      required
-                      className={inputClass}
-                  >
-                      <option value="">Selecione o Veículo...</option>
-                      {vehicles.map(v => (
-                      <option key={v.id} value={v.id}>
-                          {v.plate} - {v.driverName} ({v.type})
-                      </option>
-                      ))}
-                  </select>
+                <div className="lg:col-span-3 relative">
+                  {/* REPLACED STANDARD SELECT WITH SEARCHABLE COMPONENT */}
+                  <SelectWithSearch 
+                    label="Veículo / Motorista"
+                    options={vehicleOptions}
+                    value={formData.vehicleId || ''}
+                    onChange={handleVehicleChange}
+                    placeholder="Selecione ou digite para buscar..."
+                    required
+                  />
                 </div>
 
                 {/* --- STATUS OPERACIONAL --- */}
@@ -393,7 +399,7 @@ const DailyLogs: React.FC = () => {
                           value={formData.kmDriven === undefined ? '' : formData.kmDriven}
                           onChange={handleChange}
                           min="0"
-                          placeholder="0"
+                          placeholder=""
                           className={`${inputClass} pr-8`}
                           />
                           <span className="absolute right-3 top-2.5 text-gray-400 text-xs font-medium">KM</span>
@@ -409,7 +415,7 @@ const DailyLogs: React.FC = () => {
                           value={formData.maxSpeed === undefined ? '' : formData.maxSpeed}
                           onChange={handleChange}
                           min="0"
-                          placeholder="0"
+                          placeholder=""
                           className={`${inputClass} pr-8 ${
                               (formData.maxSpeed || 0) > 90 ? 'text-red-600 font-bold border-red-300 bg-red-50' : ''
                           }`}

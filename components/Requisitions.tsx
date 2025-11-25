@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect } from 'react';
 import { Requisition, RequisitionStatus, Vehicle, FuelType, ContractType, UserRole, UserVehicle, UserProfile, GasStation, RefuelingLog, FUEL_TYPES_LIST, SUPPLY_TYPES_LIST } from '../types';
 import { storageService } from '../services/storage';
@@ -55,13 +53,15 @@ const Requisitions: React.FC = () => {
   // Manage Users View State
   const [manageViewMode, setManageViewMode] = useState<'LIST' | 'EDIT'>('LIST');
 
-  // Forms
-  
   // CART STATE
   const [selectedVehicleForCart, setSelectedVehicleForCart] = useState<string>('');
   const [selectedExternalType, setSelectedExternalType] = useState<string>('');
   const [selectedExternalPlate, setSelectedExternalPlate] = useState<string>('');
   const [selectedMunicipality, setSelectedMunicipality] = useState<string>('');
+  
+  // New: Alternative Municipality Logic
+  const [isAlternativeMunicipality, setIsAlternativeMunicipality] = useState(false);
+  const [manualMunicipality, setManualMunicipality] = useState('');
   
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [currentItem, setCurrentItem] = useState<Partial<CartItem>>({
@@ -89,7 +89,6 @@ const Requisitions: React.FC = () => {
   const isFinanceiro = user?.role === UserRole.FINANCEIRO;
   const isGerencia = user?.role === UserRole.GERENCIA;
   const isAdmin = user?.role === UserRole.ADMIN;
-  const isGestorOrAdmin = user?.role === UserRole.ADMIN || user?.role === UserRole.GESTOR;
   
   // Helper for date
   const getTodayLocal = () => {
@@ -223,16 +222,19 @@ const Requisitions: React.FC = () => {
     let isExternal = selectedVehicleForCart === 'EXTERNAL';
 
     if (!isExternal) {
+        // Se for veiculo registrado
         const v = vehicles.find(vh => vh.id === selectedVehicleForCart);
-        if (v) municipality = v.municipality;
+        // Lógica: Se marcou "Outro Município", usa o manual. Senão, usa o do veículo.
+        if (isAlternativeMunicipality && manualMunicipality) {
+            municipality = manualMunicipality.toUpperCase();
+        } else if (v) {
+            municipality = v.municipality;
+        }
     } else {
         municipality = selectedMunicipality ? selectedMunicipality.toUpperCase() : '';
     }
 
-    // --- MUDANÇA: AGORA SALVAMOS TODOS OS ITENS, INCLUSIVE INSUMOS ---
     const itemsToSave = cartItems; 
-    // Antes filtravamos apenas combustiveis, agora permitimos tudo.
-
     const internalIds: number[] = [];
 
     // Save Requisitions for ALL Items
@@ -283,6 +285,8 @@ const Requisitions: React.FC = () => {
     setSelectedExternalType('');
     setSelectedExternalPlate('');
     setSelectedMunicipality('');
+    setIsAlternativeMunicipality(false);
+    setManualMunicipality('');
     
     window.open(waLink, '_blank');
   };
@@ -315,7 +319,6 @@ const Requisitions: React.FC = () => {
         return;
     }
 
-    // Se for Tanque Cheio, valida se a litragem foi informada
     if (selectedRequisition.isFullTank && approvalData.confirmedLiters <= 0) {
         alert("Para requisições de 'Completar Tanque', você deve informar a quantidade exata de litros abastecidos conforme a nota/cupom.");
         return;
@@ -331,14 +334,12 @@ const Requisitions: React.FC = () => {
       approvalDate: getTodayLocal(),
       gasStationId: approvalData.gasStationId,
       externalId: approvalData.externalId ? approvalData.externalId.toUpperCase() : '', 
-      // Atualizamos os litros com o valor real abastecido, mesmo se originalmente foi 0
       liters: Number(approvalData.confirmedLiters) 
     };
     
     await storageService.saveRequisition(updatedReq);
 
-    // 2. Create Refueling Log (Abastecimento)
-    // Need to reconstruct snapshot data based on requisition
+    // 2. Create Refueling Log
     let vehicleData = { plate: '', model: '', contract: '', foreman: '' };
     
     if (updatedReq.vehicleId === 'EXTERNAL') {
@@ -358,15 +359,15 @@ const Requisitions: React.FC = () => {
        vehicleId: updatedReq.vehicleId,
        gasStationId: approvalData.gasStationId,
        fuelType: updatedReq.fuelType,
-       liters: Number(approvalData.confirmedLiters), // Usa o valor confirmado
-       totalCost: 0, // O financeiro pode ajustar isso depois na tela de Abastecimentos
+       liters: Number(approvalData.confirmedLiters),
+       totalCost: 0, 
        requisitionNumber: approvalData.externalId ? approvalData.externalId.toUpperCase() : '',
-       invoiceNumber: approvalData.invoiceNumber ? approvalData.invoiceNumber.toUpperCase() : '', // Salva Nota Fiscal Uppercase
+       invoiceNumber: approvalData.invoiceNumber ? approvalData.invoiceNumber.toUpperCase() : '', 
        
        plateSnapshot: vehicleData.plate,
        modelSnapshot: vehicleData.model,
        foremanSnapshot: vehicleData.foreman,
-       contractSnapshot: approvalData.selectedContract || vehicleData.contract, // Usa o contrato confirmado na aprovação
+       contractSnapshot: approvalData.selectedContract || vehicleData.contract, 
        municipalitySnapshot: updatedReq.municipality,
        observation: `REQ INT #${updatedReq.internalId} - ${updatedReq.observation || ''}`
     };
@@ -400,11 +401,10 @@ const Requisitions: React.FC = () => {
 
   const handleUserSelectionChange = (userId: string) => {
     setManageUserSelection(userId);
-    // Find vehicles assigned to this user based on current loaded data
     const assigned = userVehicles.filter(uv => uv.userId === userId).map(uv => uv.vehicleId);
     setSelectedVehiclesForUser(assigned);
-    setVehicleSearchTerm(''); // Reset search when changing user
-    setManageViewMode('EDIT'); // Switch to edit mode
+    setVehicleSearchTerm('');
+    setManageViewMode('EDIT');
   };
 
   const handleSaveUserVehicles = async () => {
@@ -412,25 +412,17 @@ const Requisitions: React.FC = () => {
     setLoading(true);
 
     try {
-        // 1. Fetch fresh data to avoid race conditions
         const freshUserVehicles = await storageService.getUserVehicles();
-        
-        // 2. Determine assignments for THIS user based on FRESH data
         const currentAssignments = freshUserVehicles.filter(uv => uv.userId === manageUserSelection);
         const currentVehicleIds = currentAssignments.map(uv => uv.vehicleId);
 
-        // 3. Calculate what to Remove (In DB but NOT in current Selection)
         const toRemove = currentAssignments.filter(uv => !selectedVehiclesForUser.includes(uv.vehicleId));
-        
-        // 4. Calculate what to Add (In Selection but NOT in DB)
         const toAddIds = selectedVehiclesForUser.filter(vid => !currentVehicleIds.includes(vid));
         
-        // 5. Execute Removals
         for (const item of toRemove) {
             await storageService.deleteUserVehicle(item.id);
         }
 
-        // 6. Execute Additions
         for (const vid of toAddIds) {
             await storageService.saveUserVehicle({
                 id: crypto.randomUUID(),
@@ -441,7 +433,7 @@ const Requisitions: React.FC = () => {
 
         await loadData();
         alert("Vínculos atualizados com sucesso!");
-        setManageViewMode('LIST'); // Return to list on success
+        setManageViewMode('LIST');
     } catch (err) {
         console.error(err);
         alert("Erro ao salvar vínculos. Tente novamente.");
@@ -452,7 +444,6 @@ const Requisitions: React.FC = () => {
 
   // --- WHATSAPP GENERATOR ---
   const generateWhatsAppLink = (req: Requisition) => {
-      // Wrapper for single item backward compatibility
       return generateConsolidatedWhatsAppLink(
           req.vehicleId, 
           req.requesterName || '', 
@@ -487,7 +478,8 @@ const Requisitions: React.FC = () => {
          if (vRefuelings.length > 0) {
              const last = vRefuelings[0];
              const [y,m,d] = last.date.split('-');
-             lastRefuelingText = `${d}/${m}/${y} (${last.liters} L)`;
+             // Added Municipality to last refueling text
+             lastRefuelingText = `${d}/${m}/${y} (${last.liters} L) - ${last.municipalitySnapshot}`;
          }
      }
 
@@ -503,9 +495,7 @@ const Requisitions: React.FC = () => {
 
      let messageBody = '';
 
-     // Lógica para formatar a mensagem baseada na quantidade de itens
      if (items.length === 1) {
-        // TEXTO 01 - Item Único
         const item = items[0];
         const qtyText = item.isFullTank ? "TANQUE CHEIO" : `${item.liters} Litros`;
         const obsText = item.observation ? item.observation : '-';
@@ -522,7 +512,6 @@ Observação: ${obsText}
 ℹ️ Último Abastecimento: ${lastRefuelingText}`;
 
      } else {
-        // TEXTO 02 - Múltiplos Itens
         const itemsList = items.map((item, i) => {
             const qtyText = item.isFullTank ? "TANQUE CHEIO" : `${item.liters} Litros`;
             const obsText = item.observation ? ` (${item.observation})` : '';
@@ -541,7 +530,6 @@ ${itemsList}
 ℹ️ Último Abastecimento: ${lastRefuelingText}`;
      }
 
-     // REMOVIDA A ENQUETE CONFORME SOLICITADO
      const finalMessage = `${messageBody}`;
 
      return `https://wa.me/?text=${encodeURIComponent(finalMessage)}`;
@@ -549,7 +537,7 @@ ${itemsList}
   
   // --- HELPERS ---
   const getAvailableVehicles = () => {
-      if (isFinanceiro || isGerencia || isAdmin) return vehicles; // Financeiro e Admin vêem todos
+      if (isFinanceiro || isGerencia || isAdmin) return vehicles;
       if (isEncarregado && user) {
           const myVehicleIds = userVehicles.filter(uv => uv.userId === user.id).map(uv => uv.vehicleId);
           return vehicles.filter(v => myVehicleIds.includes(v.id));
@@ -572,8 +560,6 @@ ${itemsList}
   const inputClass = "w-full rounded-lg border border-slate-300 bg-slate-50 p-3 text-slate-800 focus:border-blue-600 outline-none transition-all";
   const selectClass = "w-full rounded-lg border border-slate-300 bg-white p-2 text-slate-700 focus:border-blue-600 outline-none h-[42px] shadow-sm";
 
-  // --- RENDERS ---
-
   if (loading && requisitions.length === 0) {
       return <div className="flex justify-center items-center h-64"><Loader2 className="animate-spin text-blue-600" size={48} /></div>;
   }
@@ -587,10 +573,9 @@ ${itemsList}
                 </h1>
                 <p className="text-slate-500">Solicitação e aprovação de combustível.</p>
             </div>
-            {/* New Request Button for Encarregado/Financeiro/Admin */}
             {(isEncarregado || isFinanceiro || isAdmin) && (
                  <button 
-                    onClick={() => { setShowForm(true); setCartItems([]); setSelectedVehicleForCart(''); }}
+                    onClick={() => { setShowForm(true); setCartItems([]); setSelectedVehicleForCart(''); setIsAlternativeMunicipality(false); setManualMunicipality(''); }}
                     className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 shadow-lg transition-all"
                  >
                     <Plus size={20} /> Nova Requisição
@@ -629,7 +614,6 @@ ${itemsList}
         {/* --- TAB: MY REQUESTS (LIST) --- */}
         {activeTab === 'MY_REQS' && (
             <div className="space-y-6">
-                {/* ADMIN ACTIONS BAR */}
                 {isAdmin && (
                      <div className="flex justify-end">
                          <button 
@@ -642,7 +626,6 @@ ${itemsList}
                      </div>
                 )}
 
-                {/* FILTROS (Apenas para Admin/Financeiro) */}
                 {(isFinanceiro || isAdmin) && (
                     <div className="bg-slate-100 p-4 rounded-xl border border-slate-200">
                          <div className="flex items-center gap-2 font-bold text-slate-700 mb-3">
@@ -710,7 +693,6 @@ ${itemsList}
                                 {requisitions
                                 .filter(r => (isFinanceiro || isAdmin) ? true : r.requesterId === user?.id)
                                 .filter(r => {
-                                    // Filtro adicional para Admin/Financeiro na aba de histórico
                                     if (!(isFinanceiro || isAdmin)) return true;
                                     
                                     const rDate = new Date(r.date).getTime();
@@ -749,8 +731,6 @@ ${itemsList}
                                                 {(req.status === 'REPROVADA' || req.status === 'RECUSADA') ? 'RECUSADA' : req.status}
                                             </span>
                                         </td>
-                                        
-                                        {/* COLUNA COMBUSTÍVEL */}
                                         <td className="px-6 py-3 text-xs">
                                             {isFuel ? (
                                                 <>
@@ -767,8 +747,6 @@ ${itemsList}
                                                 <span className="text-slate-300">-</span>
                                             )}
                                         </td>
-                                        
-                                        {/* COLUNA INSUMOS */}
                                         <td className="px-6 py-3 text-xs">
                                             {!isFuel ? (
                                                 <div className="bg-orange-50 text-orange-800 border border-orange-100 px-2 py-1 rounded w-fit">
@@ -779,7 +757,6 @@ ${itemsList}
                                                  <span className="text-slate-300">-</span>
                                             )}
                                         </td>
-
                                         <td className="px-6 py-3 text-center">
                                             <div className="flex justify-center items-center gap-2">
                                                 <button 
@@ -789,8 +766,6 @@ ${itemsList}
                                                 >
                                                     <Send size={16} />
                                                 </button>
-                                                
-                                                {/* ADMIN DELETE BUTTON */}
                                                 {isAdmin && (
                                                     <button 
                                                         onClick={() => handleDelete(req.id)}
@@ -814,7 +789,7 @@ ${itemsList}
             </div>
         )}
 
-        {/* --- TAB: APPROVAL (FINANCEIRO) --- */}
+        {/* ... APPROVAL AND MANAGE USERS TABS (No changes needed there) ... */}
         {activeTab === 'APPROVAL' && (
              <div className="space-y-6">
                 {/* Filters */}
@@ -910,7 +885,6 @@ ${itemsList}
                                             })()
                                         )}
                                     </td>
-                                    
                                     <td className="px-6 py-3">
                                         {isFuel ? (
                                             <>
@@ -925,30 +899,16 @@ ${itemsList}
                                             </>
                                         ) : <span className="text-slate-300">-</span>}
                                     </td>
-
                                     <td className="px-6 py-3">
                                          {!isFuel ? (
                                              <div className="text-orange-700 font-bold text-xs">{req.fuelType} ({req.liters})</div>
                                          ) : <span className="text-slate-300">-</span>}
                                     </td>
-
                                     <td className="px-6 py-3 text-center">
                                         <div className="flex justify-center gap-2">
-                                            <button 
-                                                onClick={() => handleOpenApproval(req)}
-                                                className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs font-bold"
-                                            >
-                                                Analisar
-                                            </button>
-                                            
+                                            <button onClick={() => handleOpenApproval(req)} className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs font-bold">Analisar</button>
                                             {isAdmin && (
-                                                <button 
-                                                    onClick={() => handleDelete(req.id)}
-                                                    className="text-red-600 hover:bg-red-50 px-2 py-1 rounded text-xs"
-                                                    title="Excluir"
-                                                >
-                                                    <Trash2 size={16} />
-                                                </button>
+                                                <button onClick={() => handleDelete(req.id)} className="text-red-600 hover:bg-red-50 px-2 py-1 rounded text-xs" title="Excluir"><Trash2 size={16} /></button>
                                             )}
                                         </div>
                                     </td>
@@ -963,10 +923,11 @@ ${itemsList}
             </div>
         )}
 
-        {/* --- TAB: MANAGE USERS (GERENCIA OR ADMIN) --- */}
+        {/* ... MANAGE USERS (Existing code) ... */}
         {activeTab === 'MANAGE_USERS' && (
+            // ... (Same as previous file content for Manage Users)
             <div className="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden">
-                
+                {/* Inserted existing manage users code here for brevity, assuming it persists */}
                 {manageViewMode === 'LIST' ? (
                     <div className="p-6">
                         <div className="flex items-center gap-2 mb-6 border-b pb-4">
@@ -976,7 +937,6 @@ ${itemsList}
                                   <p className="text-sm text-slate-500">Selecione um encarregado para vincular veículos.</p>
                              </div>
                         </div>
-
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm text-left">
                                 <thead className="bg-slate-50 text-slate-600 font-bold uppercase text-xs">
@@ -988,177 +948,59 @@ ${itemsList}
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
-                                    {users
-                                        .filter(u => u.role === UserRole.ENCARREGADO)
-                                        .map(u => {
+                                    {users.filter(u => u.role === UserRole.ENCARREGADO).map(u => {
                                             const uVehs = userVehicles.filter(uv => uv.userId === u.id);
                                             const count = uVehs.length;
                                             const plates = uVehs.map(uv => {
                                                 const v = vehicles.find(veh => veh.id === uv.vehicleId);
                                                 return v ? v.plate : '?';
                                             }).join(', ');
-
                                             return (
                                                 <tr key={u.id} className="hover:bg-slate-50">
-                                                    <td className="px-6 py-3">
-                                                        {/* Only show Login Name as requested */}
-                                                        <div className="font-bold text-slate-800">{u.email.split('@')[0].toUpperCase()}</div>
-                                                    </td>
-                                                    <td className="px-6 py-3">
-                                                        <span className="bg-cyan-100 text-cyan-800 text-xs px-2 py-1 rounded font-bold">{u.role}</span>
-                                                    </td>
-                                                    <td className="px-6 py-3">
-                                                        <div className="flex flex-col">
-                                                            <span className="font-bold text-lg">{count}</span>
-                                                            <span className="text-xs text-slate-500 truncate max-w-[200px]" title={plates}>{plates || '-'}</span>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-6 py-3 text-center">
-                                                        <button 
-                                                            onClick={() => handleUserSelectionChange(u.id)}
-                                                            className="text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-lg font-bold text-xs border border-blue-200 hover:border-blue-300 transition-all"
-                                                        >
-                                                            Gerenciar Vínculos
-                                                        </button>
-                                                    </td>
+                                                    <td className="px-6 py-3"><div className="font-bold text-slate-800">{u.email.split('@')[0].toUpperCase()}</div></td>
+                                                    <td className="px-6 py-3"><span className="bg-cyan-100 text-cyan-800 text-xs px-2 py-1 rounded font-bold">{u.role}</span></td>
+                                                    <td className="px-6 py-3"><div className="flex flex-col"><span className="font-bold text-lg">{count}</span><span className="text-xs text-slate-500 truncate max-w-[200px]" title={plates}>{plates || '-'}</span></div></td>
+                                                    <td className="px-6 py-3 text-center"><button onClick={() => handleUserSelectionChange(u.id)} className="text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-lg font-bold text-xs border border-blue-200 hover:border-blue-300 transition-all">Gerenciar Vínculos</button></td>
                                                 </tr>
                                             );
                                         })}
-                                     {users.filter(u => u.role === UserRole.ENCARREGADO).length === 0 && (
-                                        <tr><td colSpan={4} className="p-8 text-center text-slate-400">Nenhum usuário com perfil ENCARREGADO encontrado.</td></tr>
-                                     )}
+                                     {users.filter(u => u.role === UserRole.ENCARREGADO).length === 0 && (<tr><td colSpan={4} className="p-8 text-center text-slate-400">Nenhum usuário com perfil ENCARREGADO encontrado.</td></tr>)}
                                 </tbody>
                             </table>
                         </div>
                     </div>
                 ) : (
-                    // EDIT MODE
                     <div className="p-6">
                         <div className="flex items-center gap-4 mb-6 border-b pb-4">
-                            <button 
-                                onClick={() => setManageViewMode('LIST')} 
-                                className="p-2 hover:bg-slate-100 rounded-full text-slate-500 transition-colors"
-                                title="Voltar para a lista"
-                            >
-                                <ArrowLeft size={24} />
-                            </button>
-                            <div>
-                                 <h2 className="text-xl font-bold text-slate-800">Vincular Veículos</h2>
-                                 <p className="text-sm text-slate-500">
-                                    Editando: <span className="font-bold text-blue-700">{users.find(u => u.id === manageUserSelection)?.email.split('@')[0].toUpperCase()}</span>
-                                 </p>
-                            </div>
+                            <button onClick={() => setManageViewMode('LIST')} className="p-2 hover:bg-slate-100 rounded-full text-slate-500 transition-colors" title="Voltar para a lista"><ArrowLeft size={24} /></button>
+                            <div><h2 className="text-xl font-bold text-slate-800">Vincular Veículos</h2><p className="text-sm text-slate-500">Editando: <span className="font-bold text-blue-700">{users.find(u => u.id === manageUserSelection)?.email.split('@')[0].toUpperCase()}</span></p></div>
                         </div>
-                        
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                            {/* Left Column: Summary */}
                             <div className="md:col-span-1">
                                 <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 sticky top-4">
-                                    <p className="text-sm text-blue-800 font-bold mb-4 flex items-center gap-2">
-                                        <Truck size={16} />
-                                        Veículos Selecionados
-                                    </p>
+                                    <p className="text-sm text-blue-800 font-bold mb-4 flex items-center gap-2"><Truck size={16} /> Veículos Selecionados</p>
                                     <div className="flex flex-col gap-2 max-h-[400px] overflow-y-auto custom-scrollbar">
-                                        {selectedVehiclesForUser.length === 0 ? (
-                                            <span className="text-sm text-slate-400 italic">Nenhum veículo selecionado.</span>
-                                        ) : (
-                                            selectedVehiclesForUser.map(vid => {
+                                        {selectedVehiclesForUser.length === 0 ? (<span className="text-sm text-slate-400 italic">Nenhum veículo selecionado.</span>) : (selectedVehiclesForUser.map(vid => {
                                                 const v = vehicles.find(veh => veh.id === vid);
-                                                return v ? (
-                                                    <div key={vid} className="bg-white text-blue-900 border border-blue-200 px-3 py-2 rounded text-xs shadow-sm flex justify-between items-center">
-                                                        <div>
-                                                            <div className="font-bold">{v.plate}</div>
-                                                            <div className="opacity-70">{v.model}</div>
-                                                        </div>
-                                                        <button 
-                                                            onClick={() => setSelectedVehiclesForUser(prev => prev.filter(id => id !== vid))}
-                                                            className="text-slate-400 hover:text-red-500 p-1"
-                                                        >
-                                                            <X size={14} />
-                                                        </button>
-                                                    </div>
-                                                ) : null;
-                                            })
-                                        )}
+                                                return v ? (<div key={vid} className="bg-white text-blue-900 border border-blue-200 px-3 py-2 rounded text-xs shadow-sm flex justify-between items-center"><div><div className="font-bold">{v.plate}</div><div className="opacity-70">{v.model}</div></div><button onClick={() => setSelectedVehiclesForUser(prev => prev.filter(id => id !== vid))} className="text-slate-400 hover:text-red-500 p-1"><X size={14} /></button></div>) : null;
+                                            }))}
                                     </div>
-                                    
                                     <div className="mt-4 pt-4 border-t border-blue-200">
-                                         <div className="flex justify-between items-center mb-4">
-                                             <span className="text-xs font-bold text-blue-900">Total:</span>
-                                             <span className="text-lg font-bold text-blue-700">{selectedVehiclesForUser.length}</span>
-                                         </div>
-                                         <button 
-                                            onClick={handleSaveUserVehicles}
-                                            disabled={loading}
-                                            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-bold flex items-center justify-center gap-2 disabled:opacity-50 shadow-sm"
-                                        >
-                                            {loading ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />} 
-                                            Salvar Alterações
-                                        </button>
+                                         <div className="flex justify-between items-center mb-4"><span className="text-xs font-bold text-blue-900">Total:</span><span className="text-lg font-bold text-blue-700">{selectedVehiclesForUser.length}</span></div>
+                                         <button onClick={handleSaveUserVehicles} disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-bold flex items-center justify-center gap-2 disabled:opacity-50 shadow-sm">{loading ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />} Salvar Alterações</button>
                                     </div>
                                 </div>
                             </div>
-
-                            {/* Right Column: Vehicle Selection List */}
                             <div className="md:col-span-2 flex flex-col h-full">
                                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-3">
                                     <label className="block text-sm font-bold text-slate-700">Catálogo de Veículos</label>
-                                    
-                                    {/* Search Filter */}
                                     <div className="relative w-full sm:w-64">
                                          <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
-                                         <input 
-                                            type="text"
-                                            placeholder="Buscar placa, modelo..."
-                                            className="w-full pl-9 pr-4 py-2 rounded-lg border border-slate-300 text-sm focus:border-blue-500 outline-none"
-                                            value={vehicleSearchTerm}
-                                            onChange={(e) => setVehicleSearchTerm(e.target.value)}
-                                         />
+                                         <input type="text" placeholder="Buscar placa, modelo..." className="w-full pl-9 pr-4 py-2 rounded-lg border border-slate-300 text-sm focus:border-blue-500 outline-none" value={vehicleSearchTerm} onChange={(e) => setVehicleSearchTerm(e.target.value)} />
                                     </div>
                                 </div>
-
                                 <div className="border border-slate-200 rounded-lg flex-1 min-h-[400px] max-h-[600px] overflow-y-auto bg-slate-50 p-2">
-                                     {vehicles
-                                        .filter(v => {
-                                            if (!vehicleSearchTerm) return true;
-                                            const term = vehicleSearchTerm.toLowerCase();
-                                            return v.plate.toLowerCase().includes(term) || 
-                                                   v.model?.toLowerCase().includes(term) ||
-                                                   v.foreman?.toLowerCase().includes(term);
-                                        })
-                                        .map(v => {
-                                            const isSelected = selectedVehiclesForUser.includes(v.id);
-                                            return (
-                                             <label key={v.id} className={`flex items-center gap-3 p-3 mb-1 rounded-lg cursor-pointer transition-all border ${isSelected ? 'bg-blue-50 border-blue-300 shadow-sm' : 'bg-white border-slate-200 hover:border-blue-200'}`}>
-                                                 <div className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 transition-colors ${isSelected ? 'bg-blue-600 border-blue-600' : 'bg-white border-slate-300'}`}>
-                                                     {isSelected && <Check size={14} className="text-white" />}
-                                                 </div>
-                                                 <input 
-                                                    type="checkbox" 
-                                                    className="hidden"
-                                                    checked={isSelected}
-                                                    onChange={(e) => {
-                                                        if (e.target.checked) {
-                                                            setSelectedVehiclesForUser(prev => [...prev, v.id]);
-                                                        } else {
-                                                            setSelectedVehiclesForUser(prev => prev.filter(id => id !== v.id));
-                                                        }
-                                                    }}
-                                                 />
-                                                 <div className="flex-1">
-                                                     <div className="flex justify-between items-center">
-                                                         <span className={`font-bold ${isSelected ? 'text-blue-900' : 'text-slate-800'}`}>{v.plate}</span>
-                                                         <span className="text-[10px] uppercase font-bold text-slate-400 border px-1 rounded bg-white">{v.contract}</span>
-                                                     </div>
-                                                     <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
-                                                         <span className="font-medium">{v.model}</span>
-                                                         <span className="text-slate-300">•</span>
-                                                         <span>{v.foreman}</span>
-                                                     </div>
-                                                 </div>
-                                             </label>
-                                         )})
-                                     }
+                                     {vehicles.filter(v => {if (!vehicleSearchTerm) return true; const term = vehicleSearchTerm.toLowerCase(); return v.plate.toLowerCase().includes(term) || v.model?.toLowerCase().includes(term) || v.foreman?.toLowerCase().includes(term);}).map(v => {const isSelected = selectedVehiclesForUser.includes(v.id); return (<label key={v.id} className={`flex items-center gap-3 p-3 mb-1 rounded-lg cursor-pointer transition-all border ${isSelected ? 'bg-blue-50 border-blue-300 shadow-sm' : 'bg-white border-slate-200 hover:border-blue-200'}`}><div className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 transition-colors ${isSelected ? 'bg-blue-600 border-blue-600' : 'bg-white border-slate-300'}`}>{isSelected && <Check size={14} className="text-white" />}</div><input type="checkbox" className="hidden" checked={isSelected} onChange={(e) => {if (e.target.checked) {setSelectedVehiclesForUser(prev => [...prev, v.id]);} else {setSelectedVehiclesForUser(prev => prev.filter(id => id !== v.id));}}} /><div className="flex-1"><div className="flex justify-between items-center"><span className={`font-bold ${isSelected ? 'text-blue-900' : 'text-slate-800'}`}>{v.plate}</span><span className="text-[10px] uppercase font-bold text-slate-400 border px-1 rounded bg-white">{v.contract}</span></div><div className="flex items-center gap-2 text-xs text-slate-500 mt-1"><span className="font-medium">{v.model}</span><span className="text-slate-300">•</span><span>{v.foreman}</span></div></div></label>)})}
                                      {vehicles.length === 0 && <div className="text-center p-8 text-slate-400">Nenhum veículo cadastrado.</div>}
                                 </div>
                             </div>
@@ -1179,7 +1021,7 @@ ${itemsList}
                     
                     <div className="p-6 overflow-y-auto flex-1">
                         
-                        {/* Vehicle Selection - GLOBAL for Cart */}
+                        {/* Vehicle Selection */}
                         <div className="mb-6 p-4 bg-slate-50 border border-slate-200 rounded-lg">
                             <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Veículo (Para todos os itens)</label>
                             <select 
@@ -1187,7 +1029,6 @@ ${itemsList}
                                 value={selectedVehicleForCart}
                                 onChange={(e) => {
                                     setSelectedVehicleForCart(e.target.value);
-                                    // Reset items if vehicle changes? No, keep items, user might correct vehicle.
                                 }}
                                 className={`${inputClass} font-bold text-lg h-14`}
                             >
@@ -1197,6 +1038,33 @@ ${itemsList}
                                 ))}
                                 <option value="EXTERNAL">-- VEÍCULO NÃO CADASTRADO / EXTERNO --</option>
                             </select>
+
+                            {/* NEW: Alternative Municipality Checkbox */}
+                            {selectedVehicleForCart && selectedVehicleForCart !== 'EXTERNAL' && (
+                                <div className="mt-2">
+                                    <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={isAlternativeMunicipality}
+                                            onChange={(e) => {
+                                                setIsAlternativeMunicipality(e.target.checked);
+                                                if(!e.target.checked) setManualMunicipality('');
+                                            }}
+                                            className="w-4 h-4 accent-orange-600"
+                                        />
+                                        Abastecimento em outro município?
+                                    </label>
+                                    {isAlternativeMunicipality && (
+                                        <input 
+                                            type="text" 
+                                            placeholder="Digite o município do abastecimento"
+                                            value={manualMunicipality}
+                                            onChange={(e) => setManualMunicipality(e.target.value.toUpperCase())}
+                                            className={`${inputClass} mt-2`}
+                                        />
+                                    )}
+                                </div>
+                            )}
 
                              {/* External Fields */}
                             {selectedVehicleForCart === 'EXTERNAL' && (
@@ -1382,7 +1250,7 @@ ${itemsList}
             </div>
         )}
 
-        {/* --- MODAL: APPROVAL --- */}
+        {/* Approval Modal Code remains the same */}
         {showApprovalModal && selectedRequisition && (
              <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-[9999] p-4 sm:p-6">
                 <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden">
@@ -1408,7 +1276,6 @@ ${itemsList}
                              </select>
                         </div>
                         
-                        {/* Confirmed Liters Field (Especially important for Full Tank) */}
                         <div className="mb-4">
                              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
                                 Qtd. Abastecida (Litros) <span className="text-red-500">*</span>
@@ -1477,7 +1344,6 @@ ${itemsList}
                             >
                                 <ThumbsUp size={18} /> Confirmar Aprovação
                             </button>
-                            {/* Botão de Reprovar Direto - Sem validar campos */}
                             <button 
                                 type="button"
                                 onClick={handleReject}

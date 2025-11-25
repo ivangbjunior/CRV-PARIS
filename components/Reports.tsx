@@ -7,6 +7,7 @@ import MultiSelect, { MultiSelectOption } from './MultiSelect';
 import { useAuth } from '../contexts/AuthContext';
 import { Filter, FileText, Trash2, Edit3, Calendar, X, Save, Clock, AlertTriangle, Search, User, MapPin, Key, Ban, Settings, HardHat, Printer, Fuel, Droplet, MessageSquareText, Loader2, WifiOff, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
 import { PrintHeader } from './PrintHeader';
+import SelectWithSearch from './SelectWithSearch';
 
 const Reports: React.FC = () => {
   const { user } = useAuth();
@@ -34,7 +35,8 @@ const Reports: React.FC = () => {
   const [logToDelete, setLogToDelete] = useState<string | null>(null);
 
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editingLog, setEditingLog] = useState<DailyLog | null>(null);
+  // Modified state to handle undefined for empty inputs (standardization)
+  const [editingLog, setEditingLog] = useState<Partial<DailyLog> | null>(null);
 
   const [obsModalData, setObsModalData] = useState<{content: string, date: string, plate: string} | null>(null);
 
@@ -221,29 +223,11 @@ const Reports: React.FC = () => {
   };
 
   const handleEditClick = (logReport: DailyLogReport) => {
-    const logToEdit: DailyLog = {
-        id: logReport.id,
-        date: logReport.date,
-        vehicleId: logReport.vehicleId,
-        firstIgnition: logReport.firstIgnition,
-        startTime: logReport.startTime,
-        lunchStart: logReport.lunchStart,
-        lunchEnd: logReport.lunchEnd,
-        endTime: logReport.endTime,
-        kmDriven: logReport.kmDriven,
-        maxSpeed: logReport.maxSpeed,
-        speedingCount: logReport.speedingCount,
-        observations: logReport.observations,
-        extraTimeStart: logReport.extraTimeStart,
-        extraTimeEnd: logReport.extraTimeEnd,
-        historicalDriver: logReport.historicalDriver || logReport.vehicle.driverName,
-        historicalMunicipality: logReport.historicalMunicipality || logReport.vehicle.municipality,
-        historicalContract: logReport.historicalContract || logReport.vehicle.contract,
-        historicalPlate: logReport.historicalPlate,
-        historicalModel: logReport.historicalModel,
-        nonOperatingReason: logReport.nonOperatingReason,
-        kmBeforeRefueling: logReport.kmBeforeRefueling 
+    // Copy and ensure 0 values are treated as they are, but keep the structure
+    const logToEdit: Partial<DailyLog> = {
+        ...logReport
     };
+    
     setEditingLog(logToEdit);
     setShowEditModal(true);
   };
@@ -251,18 +235,34 @@ const Reports: React.FC = () => {
   const handleEditChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     if (!editingLog) return;
     const { name, value, type } = e.target;
-    let val: string | number = value;
+    let val: string | number | undefined = value;
+    
     if (type === 'number') {
-      val = value === '' ? 0 : Number(value);
+      val = value === '' ? undefined : Number(value);
     }
+    
     setEditingLog({ ...editingLog, [name]: val });
+  };
+
+  const handleVehicleChange = (val: string) => {
+      if(!editingLog) return;
+      setEditingLog({ ...editingLog, vehicleId: val });
   };
 
   const saveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingLog) {
+    if (editingLog && editingLog.id && editingLog.vehicleId && editingLog.date) {
       setLoading(true);
-      await storageService.saveLog(editingLog);
+      
+      // Sanitize for saving: convert undefined to 0
+      const logToSave: DailyLog = {
+          ...editingLog as DailyLog,
+          kmDriven: editingLog.kmDriven || 0,
+          maxSpeed: editingLog.maxSpeed || 0,
+          speedingCount: editingLog.speedingCount || 0
+      };
+
+      await storageService.saveLog(logToSave);
       setShowEditModal(false);
       setEditingLog(null);
       await loadData();
@@ -356,6 +356,11 @@ const Reports: React.FC = () => {
   const driverOptions: MultiSelectOption[] = uniqueDrivers.map(d => ({ value: d, label: d }));
   const municipalityOptions: MultiSelectOption[] = uniqueMunicipalities.map(m => ({ value: m, label: m }));
 
+  const editVehicleOptions = vehicles.map(v => ({
+      value: v.id,
+      label: `${v.plate} - ${v.driverName}`
+  }));
+
   if (loading && logs.length === 0) {
       return <div className="flex justify-center items-center h-64"><Loader2 className="animate-spin text-blue-600" size={48} /></div>;
   }
@@ -443,12 +448,15 @@ const Reports: React.FC = () => {
                     <input type="date" name="date" value={editingLog.date} onChange={handleEditChange} required className={editInputClass} />
                   </div>
                   
-                  <div className="lg:col-span-2">
-                    <label className="block text-xs font-bold text-slate-500 mb-1">Veículo (Cadastro Original)</label>
-                    <select name="vehicleId" value={editingLog.vehicleId} onChange={handleEditChange} required className={editInputClass}>
-                      {vehicles.map(v => (<option key={v.id} value={v.id}>{v.plate} - {v.driverName}</option>))}
-                      {!vehicles.find(v => v.id === editingLog?.vehicleId) && editingLog?.vehicleId && (<option value={editingLog.vehicleId}>VEÍCULO EXCLUÍDO / ID: {editingLog.vehicleId}</option>)}
-                    </select>
+                  <div className="lg:col-span-2 relative">
+                    <SelectWithSearch 
+                        label="Veículo (Cadastro Original)"
+                        options={editVehicleOptions}
+                        value={editingLog.vehicleId || ''}
+                        onChange={handleVehicleChange}
+                        placeholder="Selecione..."
+                        required
+                    />
                   </div>
 
                   <div className="lg:col-span-1">
@@ -520,15 +528,15 @@ const Reports: React.FC = () => {
 
                       <div>
                         <label className="block text-xs font-bold text-slate-500 mb-1">KM Rodados</label>
-                        <input type="number" name="kmDriven" value={editingLog.kmDriven} onChange={handleEditChange} className={editInputClass} />
+                        <input type="number" name="kmDriven" value={editingLog.kmDriven === undefined ? '' : editingLog.kmDriven} onChange={handleEditChange} placeholder="" className={editInputClass} />
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-slate-500 mb-1">Velocidade Máxima</label>
-                        <input type="number" name="maxSpeed" value={editingLog.maxSpeed} onChange={handleEditChange} className={editInputClass} />
+                        <input type="number" name="maxSpeed" value={editingLog.maxSpeed === undefined ? '' : editingLog.maxSpeed} onChange={handleEditChange} placeholder="" className={editInputClass} />
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-slate-500 mb-1">Qtd. Excesso Vel.</label>
-                        <input type="number" name="speedingCount" value={editingLog.speedingCount} onChange={handleEditChange} className={editInputClass} />
+                        <input type="number" name="speedingCount" value={editingLog.speedingCount === undefined ? '' : editingLog.speedingCount} onChange={handleEditChange} placeholder="" className={editInputClass} />
                       </div>
                     </>
                   )}
@@ -550,7 +558,7 @@ const Reports: React.FC = () => {
         </div>
       )}
 
-      {/* Modernized Collapsible Filters - REMOVED OVERFLOW HIDDEN */}
+      {/* Modernized Collapsible Filters */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm print:hidden relative z-20">
         <div 
             onClick={() => setShowFilters(!showFilters)} 
@@ -602,49 +610,49 @@ const Reports: React.FC = () => {
         )}
       </div>
 
-      {/* Resumo Compacto */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-2 print:flex print:flex-row print:justify-between print:gap-4 print:border-b print:border-slate-200 print:pb-4 print:mb-6 relative z-0">
+      {/* Resumo Compacto & Minimalista para Impressão */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-2 print:flex print:flex-row print:justify-between print:gap-4 print:border-b print:border-slate-200 print:pb-1 print:mb-2 relative z-0">
             {/* Time */}
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 hover:border-blue-300 transition-all group print:border-none print:shadow-none print:p-0 print:bg-transparent">
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 hover:border-blue-300 transition-all group print:border-none print:shadow-none print:p-0 print:bg-transparent print:block">
                 <div className="p-3 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors print:hidden">
                     <Clock size={20} strokeWidth={2} />
                 </div>
                 <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider print:text-slate-600">Tempo em Operação</p>
-                    <p className="text-xl font-black text-slate-800 leading-none mt-1 print:text-sm">{summary.formattedTime}</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider print:text-slate-600 print:text-[9px]">Tempo Operação</p>
+                    <p className="text-xl font-black text-slate-800 leading-none mt-1 print:text-xs print:mt-0">{summary.formattedTime}</p>
                 </div>
             </div>
 
             {/* KM */}
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 hover:border-green-300 transition-all group print:border-none print:shadow-none print:p-0 print:bg-transparent">
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 hover:border-green-300 transition-all group print:border-none print:shadow-none print:p-0 print:bg-transparent print:block">
                 <div className="p-3 bg-green-50 text-green-600 rounded-lg group-hover:bg-green-600 group-hover:text-white transition-colors print:hidden">
                     <MapPin size={20} strokeWidth={2} />
                 </div>
                 <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider print:text-slate-600">KM Total</p>
-                    <p className="text-xl font-black text-slate-800 leading-none mt-1 print:text-sm">{summary.totalKm} <span className="text-xs font-bold text-slate-400">km</span></p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider print:text-slate-600 print:text-[9px]">KM Total</p>
+                    <p className="text-xl font-black text-slate-800 leading-none mt-1 print:text-xs print:mt-0">{summary.totalKm} <span className="text-xs font-bold text-slate-400 print:hidden">km</span></p>
                 </div>
             </div>
 
             {/* No Signal */}
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 hover:border-orange-300 transition-all group print:border-none print:shadow-none print:p-0 print:bg-transparent">
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 hover:border-orange-300 transition-all group print:border-none print:shadow-none print:p-0 print:bg-transparent print:block">
                 <div className="p-3 bg-orange-50 text-orange-600 rounded-lg group-hover:bg-orange-600 group-hover:text-white transition-colors print:hidden">
                     <WifiOff size={20} strokeWidth={2} />
                 </div>
                 <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider print:text-slate-600">Sem Sinal</p>
-                    <p className="text-xl font-black text-slate-800 leading-none mt-1 print:text-sm">{summary.daysNoSignal} <span className="text-xs font-bold text-slate-400">dias</span></p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider print:text-slate-600 print:text-[9px]">Sem Sinal</p>
+                    <p className="text-xl font-black text-slate-800 leading-none mt-1 print:text-xs print:mt-0">{summary.daysNoSignal} <span className="text-xs font-bold text-slate-400 print:hidden">dias</span></p>
                 </div>
             </div>
 
             {/* Stopped */}
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 hover:border-red-300 transition-all group print:border-none print:shadow-none print:p-0 print:bg-transparent">
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 hover:border-red-300 transition-all group print:border-none print:shadow-none print:p-0 print:bg-transparent print:block">
                 <div className="p-3 bg-red-50 text-red-600 rounded-lg group-hover:bg-red-600 group-hover:text-white transition-colors print:hidden">
                     <Ban size={20} strokeWidth={2} />
                 </div>
                 <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider print:text-slate-600">Parado / Oficina</p>
-                    <p className="text-xl font-black text-slate-800 leading-none mt-1 print:text-sm">{summary.daysStopped} <span className="text-xs font-bold text-slate-400">dias</span></p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider print:text-slate-600 print:text-[9px]">Parado</p>
+                    <p className="text-xl font-black text-slate-800 leading-none mt-1 print:text-xs print:mt-0">{summary.daysStopped} <span className="text-xs font-bold text-slate-400 print:hidden">dias</span></p>
                 </div>
             </div>
         </div>
@@ -676,7 +684,7 @@ const Reports: React.FC = () => {
              <thead className="bg-slate-100 text-slate-600 font-semibold uppercase tracking-wider text-sm print:bg-slate-200 print:text-slate-900">
                <tr>
                  <th className="px-4 py-3 border-b print:px-1 print:py-1">Data</th>
-                 <th className="px-4 py-3 border-b min-w-[200px] print:px-1 print:py-1">Veículo / Motorista</th>
+                 <th className="px-4 py-3 border-b min-w-[200px] print:px-1 print:py-1">Veículo / Motorista / Local</th>
                  <th className="px-4 py-3 border-b bg-blue-50 print:bg-transparent print:px-1 print:py-1">Expediente</th>
                  <th className="px-4 py-3 border-b bg-blue-50 print:bg-transparent print:px-1 print:py-1">Int./Extras</th>
                  <th className="px-4 py-3 border-b bg-green-50 text-green-700 print:bg-transparent print:text-black print:px-1 print:py-1">T.Ligado</th>

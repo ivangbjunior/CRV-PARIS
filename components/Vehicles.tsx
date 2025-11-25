@@ -8,6 +8,7 @@ import {
   Calendar as CalendarIcon, MapPin, User, Filter, Printer, Loader2, Eye, ArrowRightLeft
 } from 'lucide-react';
 import { PrintHeader } from './PrintHeader';
+import MultiSelect, { MultiSelectOption } from './MultiSelect';
 
 const Vehicles: React.FC = () => {
   const { user } = useAuth();
@@ -20,9 +21,10 @@ const Vehicles: React.FC = () => {
   const [logs, setLogs] = useState<DailyLog[]>([]);
   
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterContract, setFilterContract] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
-  const [filterType, setFilterType] = useState('');
+  // Changed to array for MultiSelect
+  const [filterContract, setFilterContract] = useState<string[]>([]);
+  const [filterStatus, setFilterStatus] = useState<string[]>([]);
+  const [filterType, setFilterType] = useState<string[]>([]);
   
   const [showForm, setShowForm] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -72,10 +74,12 @@ const Vehicles: React.FC = () => {
           v.driverName.toLowerCase().includes(lowerTerm) ||
           v.contract.toLowerCase().includes(lowerTerm);
        
-       const matchesContract = !filterContract || v.contract === filterContract;
+       const matchesContract = filterContract.length === 0 || filterContract.includes(v.contract);
+       
        const currentStatus = getCalculatedStatus(v, logs);
-       const matchesStatus = !filterStatus || currentStatus === filterStatus;
-       const matchesType = !filterType || v.type === filterType;
+       const matchesStatus = filterStatus.length === 0 || filterStatus.includes(currentStatus);
+       
+       const matchesType = filterType.length === 0 || filterType.includes(v.type);
 
        return matchesSearch && matchesContract && matchesStatus && matchesType;
     });
@@ -260,7 +264,16 @@ const Vehicles: React.FC = () => {
   };
 
   const inputClass = "w-full rounded-lg border border-slate-300 bg-slate-50 p-2.5 text-slate-800 focus:border-blue-600 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition-all";
-  const selectFilterClass = "w-full rounded-lg border border-slate-200 bg-white p-3 text-slate-700 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none transition-all text-sm shadow-sm";
+  
+  const contractOptions: MultiSelectOption[] = Object.values(ContractType).map(t => ({ value: t, label: t }));
+  const typeOptions: MultiSelectOption[] = Object.values(VehicleType).map(t => ({ value: t, label: t }));
+  const statusOptions: MultiSelectOption[] = [
+      { value: "ATIVO", label: "ATIVO" },
+      { value: "OFICINA", label: "OFICINA" },
+      { value: "EM MANUTENÇÃO", label: "EM MANUTENÇÃO" },
+      { value: "GARAGEM", label: "GARAGEM" },
+      { value: "INATIVO", label: "INATIVO" },
+  ];
 
   if (loading && vehicles.length === 0) {
       return <div className="flex justify-center items-center h-64"><Loader2 className="animate-spin text-blue-600" size={48} /></div>;
@@ -360,7 +373,6 @@ const Vehicles: React.FC = () => {
                     <div className="relative border-l-2 border-slate-200 ml-3 space-y-8 pl-8 py-2">
                     {filteredHistoryLogs.map((log, index) => {
                         // Determine differences
-                        // The array is reversed (newest first). So 'next' item in array is the 'previous' chronological log.
                         const previousLog = filteredHistoryLogs[index + 1];
                         
                         const isDriverChanged = previousLog && log.historicalDriver !== previousLog.historicalDriver;
@@ -487,29 +499,16 @@ const Vehicles: React.FC = () => {
           />
         </div>
         
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full lg:w-auto">
-           <select value={filterContract} onChange={(e) => setFilterContract(e.target.value)} className={selectFilterClass}>
-             <option value="">Contrato: Todos</option>
-             {Object.values(ContractType).map(type => (
-               <option key={type} value={type}>{type}</option>
-             ))}
-           </select>
-
-           <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className={selectFilterClass}>
-             <option value="">Tipo: Todos</option>
-             {Object.values(VehicleType).map(type => (
-               <option key={type} value={type}>{type}</option>
-             ))}
-           </select>
-
-           <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className={selectFilterClass}>
-             <option value="">Status Atual: Todos</option>
-             <option value="ATIVO">ATIVO</option>
-             <option value="OFICINA">OFICINA</option>
-             <option value="EM MANUTENÇÃO">EM MANUTENÇÃO</option>
-             <option value="GARAGEM">GARAGEM</option>
-             <option value="INATIVO">INATIVO</option>
-           </select>
+        <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
+           <div className="w-full sm:w-48">
+               <MultiSelect label="" options={contractOptions} selected={filterContract} onChange={setFilterContract} placeholder="Contratos" />
+           </div>
+           <div className="w-full sm:w-48">
+               <MultiSelect label="" options={typeOptions} selected={filterType} onChange={setFilterType} placeholder="Tipos" />
+           </div>
+           <div className="w-full sm:w-48">
+               <MultiSelect label="" options={statusOptions} selected={filterStatus} onChange={setFilterStatus} placeholder="Status" />
+           </div>
         </div>
       </div>
       
