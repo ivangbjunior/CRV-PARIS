@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="pt-BR">
   <head>
@@ -47,6 +48,7 @@
         }
 
         /* Reset Layout containers */
+        /* CORREÇÃO: Removido 'div' e 'display: block' para permitir Flexbox */
         #root, main {
           height: auto !important;
           width: 100% !important;
@@ -112,6 +114,12 @@
         .print\:hidden {
           display: none !important;
         }
+        .print\:flex {
+          display: flex !important;
+        }
+        .print\:flex-row {
+          flex-direction: row !important;
+        }
         
         /* Remove Shadows and Radius for sharp print */
         .shadow-sm, .shadow-md, .shadow-lg, .shadow-xl {
@@ -126,11 +134,11 @@
 <script type="importmap">
 {
   "imports": {
-    "@supabase/supabase-js": "https://aistudiocdn.com/@supabase/supabase-js@^2.84.0",
     "react/": "https://aistudiocdn.com/react@^19.2.0/",
     "react": "https://aistudiocdn.com/react@^19.2.0",
-    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/"
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.555.0",
+    "@supabase/supabase-js": "https://aistudiocdn.com/@supabase/supabase-js@^2.86.0"
   }
 }
 </script>

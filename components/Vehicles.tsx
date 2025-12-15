@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Vehicle, ContractType, VehicleType, DailyLog, UserRole, UserProfile } from '../types';
 import { storageService } from '../services/storage';
@@ -5,7 +6,7 @@ import PasswordModal from './PasswordModal';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   Plus, Edit2, Trash2, Save, X, Car, Truck, Search, History, 
-  Calendar as CalendarIcon, MapPin, User, Filter, Printer, Loader2, Eye, ArrowRightLeft
+  Calendar as CalendarIcon, MapPin, User, Filter, Printer, Loader2, Eye, ArrowRightLeft, AlertTriangle
 } from 'lucide-react';
 import { PrintHeader } from './PrintHeader';
 import MultiSelect, { MultiSelectOption } from './MultiSelect';
@@ -127,9 +128,16 @@ const Vehicles: React.FC = () => {
     };
 
     setLoading(true);
-    await storageService.saveVehicle(newVehicle);
-    await loadData();
-    resetForm();
+    try {
+      await storageService.saveVehicle(newVehicle);
+      await loadData();
+      resetForm();
+    } catch (err: any) {
+      console.error(err);
+      alert(`Erro ao salvar veículo: ${err.message || 'Erro desconhecido no banco de dados'}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleEdit = (vehicle: Vehicle) => {
@@ -149,10 +157,17 @@ const Vehicles: React.FC = () => {
   const executeDelete = async () => {
     if (vehicleToDelete) {
       setLoading(true);
-      await storageService.deleteVehicle(vehicleToDelete);
-      await loadData();
-      setVehicleToDelete(null);
-      setShowDeleteModal(false);
+      try {
+        await storageService.deleteVehicle(vehicleToDelete);
+        await loadData();
+        setVehicleToDelete(null);
+        setShowDeleteModal(false);
+      } catch (err: any) {
+        console.error(err);
+        alert(`Erro ao excluir veículo: ${err.message || 'Verifique se existem logs vinculados.'}`);
+      } finally {
+        setLoading(false);
+      }
     }
   };
 

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Requisition, RequisitionStatus, Vehicle, FuelType, ContractType, UserRole, UserVehicle, UserProfile, GasStation, RefuelingLog, FUEL_TYPES_LIST, SUPPLY_TYPES_LIST } from '../types';
 import { storageService } from '../services/storage';
@@ -147,8 +148,15 @@ const Requisitions: React.FC = () => {
     if (!isAdmin) return;
     if (confirm("ATENÇÃO ADMIN: Tem certeza que deseja excluir permanentemente esta requisição? Esta ação não pode ser desfeita.")) {
         setLoading(true);
-        await storageService.deleteRequisition(id);
-        await loadData();
+        try {
+            await storageService.deleteRequisition(id);
+            await loadData();
+        } catch (err: any) {
+            console.error(err);
+            alert(`Erro ao excluir: ${err.message}`);
+        } finally {
+            setLoading(false);
+        }
     }
   };
 
@@ -157,13 +165,20 @@ const Requisitions: React.FC = () => {
      if (!isAdmin || !user) return;
      if (confirm("ATENÇÃO ADMIN: Isso excluirá TODAS as requisições criadas pelo seu usuário. Confirma?")) {
          setLoading(true);
-         // Filter requests made by current admin
-         const myReqs = requisitions.filter(r => r.requesterId === user.id);
-         for (const req of myReqs) {
-             await storageService.deleteRequisition(req.id);
+         try {
+             // Filter requests made by current admin
+             const myReqs = requisitions.filter(r => r.requesterId === user.id);
+             for (const req of myReqs) {
+                 await storageService.deleteRequisition(req.id);
+             }
+             await loadData();
+             alert("Suas requisições foram limpas.");
+         } catch (err: any) {
+             console.error(err);
+             alert(`Erro ao limpar requisições: ${err.message}`);
+         } finally {
+             setLoading(false);
          }
-         await loadData();
-         alert("Suas requisições foram limpas.");
      }
   };
 
@@ -214,81 +229,88 @@ const Requisitions: React.FC = () => {
     
     setLoading(true);
 
-    const now = new Date();
-    
-    // Snapshot data
-    let municipality = '';
-    let requesterName = user.email.split('@')[0].toUpperCase();
-    let isExternal = selectedVehicleForCart === 'EXTERNAL';
+    try {
+        const now = new Date();
+        
+        // Snapshot data
+        let municipality = '';
+        let requesterName = user.email.split('@')[0].toUpperCase();
+        let isExternal = selectedVehicleForCart === 'EXTERNAL';
 
-    if (!isExternal) {
-        // Se for veiculo registrado
-        const v = vehicles.find(vh => vh.id === selectedVehicleForCart);
-        // Lógica: Se marcou "Outro Município", usa o manual. Senão, usa o do veículo.
-        if (isAlternativeMunicipality && manualMunicipality) {
-            municipality = manualMunicipality.toUpperCase();
-        } else if (v) {
-            municipality = v.municipality;
+        if (!isExternal) {
+            // Se for veiculo registrado
+            const v = vehicles.find(vh => vh.id === selectedVehicleForCart);
+            // Lógica: Se marcou "Outro Município", usa o manual. Senão, usa o do veículo.
+            if (isAlternativeMunicipality && manualMunicipality) {
+                municipality = manualMunicipality.toUpperCase();
+            } else if (v) {
+                municipality = v.municipality;
+            }
+        } else {
+            municipality = selectedMunicipality ? selectedMunicipality.toUpperCase() : '';
         }
-    } else {
-        municipality = selectedMunicipality ? selectedMunicipality.toUpperCase() : '';
+
+        const itemsToSave = cartItems; 
+        const internalIds: number[] = [];
+
+        // Save Requisitions for ALL Items
+        for (const item of itemsToSave) {
+            const nextId = await storageService.getNextInternalId();
+            internalIds.push(nextId);
+
+            const requisition: Requisition = {
+                id: crypto.randomUUID(),
+                internalId: nextId,
+                date: getTodayLocal(),
+                requestTime: now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+                requesterId: user.id,
+                requesterName: requesterName,
+                vehicleId: selectedVehicleForCart,
+                externalType: isExternal ? selectedExternalType : undefined,
+                externalPlate: isExternal && selectedExternalPlate ? selectedExternalPlate.toUpperCase() : undefined,
+                fuelType: item.fuelType,
+                liters: item.liters,
+                isFullTank: item.isFullTank,
+                observation: item.observation ? item.observation.toUpperCase() : '',
+                municipality: municipality,
+                status: RequisitionStatus.PENDING
+            };
+
+            await storageService.saveRequisition(requisition);
+        }
+        
+        await loadData();
+        
+        // Generate WhatsApp Link automatically with ALL items
+        const waLink = generateConsolidatedWhatsAppLink(
+            selectedVehicleForCart, 
+            requesterName, 
+            municipality, 
+            cartItems, 
+            internalIds,
+            isExternal,
+            selectedExternalType,
+            selectedExternalPlate
+        );
+        
+        setShowForm(false);
+        
+        // Reset Cart
+        setCartItems([]);
+        setSelectedVehicleForCart('');
+        setSelectedExternalType('');
+        setSelectedExternalPlate('');
+        setSelectedMunicipality('');
+        setIsAlternativeMunicipality(false);
+        setManualMunicipality('');
+        
+        window.open(waLink, '_blank');
+    } catch (err: any) {
+        console.error(err);
+        alert(`Erro ao salvar requisição: ${err.message}`);
+    } finally {
+        setLoading(false);
     }
-
-    const itemsToSave = cartItems; 
-    const internalIds: number[] = [];
-
-    // Save Requisitions for ALL Items
-    for (const item of itemsToSave) {
-        const nextId = await storageService.getNextInternalId();
-        internalIds.push(nextId);
-
-        const requisition: Requisition = {
-            id: crypto.randomUUID(),
-            internalId: nextId,
-            date: getTodayLocal(),
-            requestTime: now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-            requesterId: user.id,
-            requesterName: requesterName,
-            vehicleId: selectedVehicleForCart,
-            externalType: isExternal ? selectedExternalType : undefined,
-            externalPlate: isExternal && selectedExternalPlate ? selectedExternalPlate.toUpperCase() : undefined,
-            fuelType: item.fuelType,
-            liters: item.liters,
-            isFullTank: item.isFullTank,
-            observation: item.observation ? item.observation.toUpperCase() : '',
-            municipality: municipality,
-            status: RequisitionStatus.PENDING
-        };
-
-        await storageService.saveRequisition(requisition);
-    }
-    
-    await loadData();
-    
-    // Generate WhatsApp Link automatically with ALL items
-    const waLink = generateConsolidatedWhatsAppLink(
-        selectedVehicleForCart, 
-        requesterName, 
-        municipality, 
-        cartItems, 
-        internalIds,
-        isExternal,
-        selectedExternalType,
-        selectedExternalPlate
-    );
-    
-    setShowForm(false);
-    
-    // Reset Cart
-    setCartItems([]);
-    setSelectedVehicleForCart('');
-    setSelectedExternalType('');
-    setSelectedExternalPlate('');
-    setSelectedMunicipality('');
-    setIsAlternativeMunicipality(false);
-    setManualMunicipality('');
-    
-    window.open(waLink, '_blank');
   };
 
   // --- APPROVAL LOGIC ---
@@ -326,75 +348,89 @@ const Requisitions: React.FC = () => {
 
     setLoading(true);
     
-    // 1. Update Requisition Status
-    const updatedReq: Requisition = {
-      ...selectedRequisition,
-      status: RequisitionStatus.APPROVED,
-      approvedBy: user.id,
-      approvalDate: getTodayLocal(),
-      gasStationId: approvalData.gasStationId,
-      externalId: approvalData.externalId ? approvalData.externalId.toUpperCase() : '', 
-      liters: Number(approvalData.confirmedLiters) 
-    };
-    
-    await storageService.saveRequisition(updatedReq);
+    try {
+        // 1. Update Requisition Status
+        const updatedReq: Requisition = {
+        ...selectedRequisition,
+        status: RequisitionStatus.APPROVED,
+        approvedBy: user.id,
+        approvalDate: getTodayLocal(),
+        gasStationId: approvalData.gasStationId,
+        externalId: approvalData.externalId ? approvalData.externalId.toUpperCase() : '', 
+        liters: Number(approvalData.confirmedLiters) 
+        };
+        
+        await storageService.saveRequisition(updatedReq);
 
-    // 2. Create Refueling Log
-    let vehicleData = { plate: '', model: '', contract: '', foreman: '' };
-    
-    if (updatedReq.vehicleId === 'EXTERNAL') {
-        vehicleData.plate = updatedReq.externalPlate || updatedReq.externalType || 'EXTERNO';
-        vehicleData.contract = 'EXTERNO'; 
-    } else {
-        const v = vehicles.find(vh => vh.id === updatedReq.vehicleId);
-        if (v) {
-            vehicleData = { plate: v.plate, model: v.model || '', contract: v.contract, foreman: v.foreman };
+        // 2. Create Refueling Log
+        let vehicleData = { plate: '', model: '', contract: '', foreman: '' };
+        
+        if (updatedReq.vehicleId === 'EXTERNAL') {
+            vehicleData.plate = updatedReq.externalPlate || updatedReq.externalType || 'EXTERNO';
+            vehicleData.contract = 'EXTERNO'; 
+        } else {
+            const v = vehicles.find(vh => vh.id === updatedReq.vehicleId);
+            if (v) {
+                vehicleData = { plate: v.plate, model: v.model || '', contract: v.contract, foreman: v.foreman };
+            }
         }
-    }
 
-    const newRefueling: RefuelingLog = {
-       id: crypto.randomUUID(),
-       date: updatedReq.date, 
-       time: updatedReq.requestTime,
-       vehicleId: updatedReq.vehicleId,
-       gasStationId: approvalData.gasStationId,
-       fuelType: updatedReq.fuelType,
-       liters: Number(approvalData.confirmedLiters),
-       totalCost: 0, 
-       requisitionNumber: approvalData.externalId ? approvalData.externalId.toUpperCase() : '',
-       invoiceNumber: approvalData.invoiceNumber ? approvalData.invoiceNumber.toUpperCase() : '', 
-       
-       plateSnapshot: vehicleData.plate,
-       modelSnapshot: vehicleData.model,
-       foremanSnapshot: vehicleData.foreman,
-       contractSnapshot: approvalData.selectedContract || vehicleData.contract, 
-       municipalitySnapshot: updatedReq.municipality,
-       observation: `REQ INT #${updatedReq.internalId} - ${updatedReq.observation || ''}`
-    };
-    
-    await storageService.saveRefueling(newRefueling);
-    
-    await loadData();
-    setShowApprovalModal(false);
-    setSelectedRequisition(null);
+        const newRefueling: RefuelingLog = {
+        id: crypto.randomUUID(),
+        date: updatedReq.date, 
+        time: updatedReq.requestTime,
+        vehicleId: updatedReq.vehicleId,
+        gasStationId: approvalData.gasStationId,
+        fuelType: updatedReq.fuelType,
+        liters: Number(approvalData.confirmedLiters),
+        totalCost: 0, 
+        requisitionNumber: approvalData.externalId ? approvalData.externalId.toUpperCase() : '',
+        invoiceNumber: approvalData.invoiceNumber ? approvalData.invoiceNumber.toUpperCase() : '', 
+        
+        plateSnapshot: vehicleData.plate,
+        modelSnapshot: vehicleData.model,
+        foremanSnapshot: vehicleData.foreman,
+        contractSnapshot: approvalData.selectedContract || vehicleData.contract, 
+        municipalitySnapshot: updatedReq.municipality,
+        observation: `REQ INT #${updatedReq.internalId} - ${updatedReq.observation || ''}`
+        };
+        
+        await storageService.saveRefueling(newRefueling);
+        
+        await loadData();
+        setShowApprovalModal(false);
+        setSelectedRequisition(null);
+    } catch (err: any) {
+        console.error(err);
+        alert(`Erro ao aprovar: ${err.message}`);
+    } finally {
+        setLoading(false);
+    }
   };
 
   const handleReject = async () => {
      if (!selectedRequisition) return;
      if (!confirm("Tem certeza que deseja recusar esta requisição?")) return;
      
-     const updatedReq: Requisition = {
-       ...selectedRequisition,
-       status: RequisitionStatus.REJECTED,
-       approvedBy: user?.id, 
-       approvalDate: getTodayLocal()
-     };
-     
      setLoading(true);
-     await storageService.saveRequisition(updatedReq);
-     await loadData();
-     setShowApprovalModal(false);
-     setSelectedRequisition(null);
+     try {
+        const updatedReq: Requisition = {
+        ...selectedRequisition,
+        status: RequisitionStatus.REJECTED,
+        approvedBy: user?.id, 
+        approvalDate: getTodayLocal()
+        };
+        
+        await storageService.saveRequisition(updatedReq);
+        await loadData();
+        setShowApprovalModal(false);
+        setSelectedRequisition(null);
+     } catch (err: any) {
+        console.error(err);
+        alert(`Erro ao rejeitar: ${err.message}`);
+     } finally {
+        setLoading(false);
+     }
   };
 
   // --- MANAGE USERS LOGIC ---

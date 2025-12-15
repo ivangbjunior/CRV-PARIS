@@ -19,7 +19,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   
   // Ref para rastrear o ID do usuário carregado e evitar chamadas repetidas ao banco
-  // quando o navegador recupera o foco (evento onAuthStateChange)
   const loadedUserId = useRef<string | null>(null);
 
   // Helper to safe parse role
@@ -33,38 +32,63 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const fetchUserProfile = async (userId: string, email: string) => {
-    try {
-      // Timeout de segurança para não travar tela de loading
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Timeout')), 10000)
-      );
+    let attempts = 0;
+    let success = false;
+    const maxRetries = 3;
 
-      const fetchPromise = supabase
-        .from('user_roles')
-        .select('*')
-        .eq('id', userId)
-        .single();
+    // Loop de tentativas para robustez contra falhas de rede ou cold start do DB
+    while (attempts < maxRetries && !success) {
+      attempts++;
+      try {
+        // Timeout de segurança aumentado para 15s
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Timeout')), 15000)
+        );
 
-      // Corrida entre fetch e timeout
-      const response: any = await Promise.race([fetchPromise, timeoutPromise]);
+        const fetchPromise = supabase
+          .from('user_roles')
+          .select('*')
+          .eq('id', userId)
+          .single();
 
-      if (response.error || !response.data) {
-        console.error('Perfil não encontrado ou erro de conexão:', response.error);
-        setUser(null);
-        loadedUserId.current = null;
-      } else {
-        const safeRole = parseRole(response.data.role);
-        setUser({ id: userId, email, role: safeRole });
-        loadedUserId.current = userId; // Marca este ID como carregado com sucesso
+        // Corrida entre fetch e timeout
+        const response: any = await Promise.race([fetchPromise, timeoutPromise]);
+
+        if (response.error) {
+          // Se o erro for "Row not found" (PGRST116), pode ser que o trigger de criação ainda não tenha rodado.
+          // Lançamos erro para cair no catch e tentar novamente após delay.
+          if (response.error.code === 'PGRST116') {
+             console.warn(`Perfil não encontrado na tentativa ${attempts}. Retentando...`);
+             throw new Error("Profile not yet created");
+          }
+          console.error('Erro ao buscar perfil:', response.error);
+          throw response.error;
+        } 
+        
+        if (response.data) {
+          const safeRole = parseRole(response.data.role);
+          setUser({ id: userId, email, role: safeRole });
+          loadedUserId.current = userId; // Marca este ID como carregado com sucesso
+          success = true;
+        }
+      } catch (e) {
+        console.warn(`Erro na tentativa ${attempts} de ${maxRetries} ao buscar perfil:`, e);
+        
+        if (attempts < maxRetries) {
+          // Espera exponencial: 1s, 2s... antes de tentar de novo
+          await new Promise(resolve => setTimeout(resolve, attempts * 1000));
+        }
       }
-    } catch (e) {
-      console.error('Erro crítico ou timeout ao buscar perfil', e);
-      // Em caso de erro crítico, não assumimos nenhum papel.
+    }
+
+    if (!success) {
+      console.error('Falha crítica: Não foi possível carregar o perfil após múltiplas tentativas.');
+      // Em caso de falha total, invalidamos o usuário para evitar estado inconsistente
       setUser(null);
       loadedUserId.current = null;
-    } finally {
-      setLoading(false);
     }
+    
+    setLoading(false);
   };
 
   useEffect(() => {

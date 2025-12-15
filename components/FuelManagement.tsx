@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { GasStation, RefuelingLog, Vehicle, FuelType, ContractType, UserRole, UserProfile, FUEL_TYPES_LIST, SUPPLY_TYPES_LIST } from '../types';
 import { storageService } from '../services/storage';
@@ -8,6 +9,7 @@ import {
 } from 'lucide-react';
 import { PrintHeader } from './PrintHeader';
 import MultiSelect, { MultiSelectOption } from './MultiSelect';
+import SelectWithSearch from './SelectWithSearch';
 
 type TabType = 'REFUELING' | 'STATIONS';
 
@@ -164,9 +166,16 @@ const FuelManagement: React.FC = () => {
     };
 
     setLoading(true);
-    await storageService.saveGasStation(newStation);
-    await loadData();
-    resetForms();
+    try {
+        await storageService.saveGasStation(newStation);
+        await loadData();
+        resetForms();
+    } catch (err: any) {
+        console.error(err);
+        alert(`Erro ao salvar posto: ${err.message}`);
+    } finally {
+        setLoading(false);
+    }
   };
 
   const handleEditStation = (station: GasStation) => {
@@ -185,10 +194,17 @@ const FuelManagement: React.FC = () => {
         return;
     }
     setLoading(true);
-    await storageService.deleteGasStation(id);
-    await loadData();
-    setShowDeleteModal(false);
-    setItemToDelete(null);
+    try {
+        await storageService.deleteGasStation(id);
+        await loadData();
+        setShowDeleteModal(false);
+        setItemToDelete(null);
+    } catch (err: any) {
+        console.error(err);
+        alert(`Erro ao excluir posto: ${err.message}`);
+    } finally {
+        setLoading(false);
+    }
   };
 
   const handleSaveRefueling = async (e: React.FormEvent) => {
@@ -254,9 +270,16 @@ const FuelManagement: React.FC = () => {
     };
 
     setLoading(true);
-    await storageService.saveRefueling(newRefueling);
-    await loadData();
-    resetForms();
+    try {
+        await storageService.saveRefueling(newRefueling);
+        await loadData();
+        resetForms();
+    } catch (err: any) {
+        console.error(err);
+        alert(`Erro ao salvar abastecimento: ${err.message}`);
+    } finally {
+        setLoading(false);
+    }
   };
 
   const handleEditRefueling = (refueling: RefuelingLog) => {
@@ -288,10 +311,17 @@ const FuelManagement: React.FC = () => {
   const deleteRefueling = async (id: string) => {
     if (isReadOnly) return;
     setLoading(true);
-    await storageService.deleteRefueling(id);
-    await loadData();
-    setShowDeleteModal(false);
-    setItemToDelete(null);
+    try {
+        await storageService.deleteRefueling(id);
+        await loadData();
+        setShowDeleteModal(false);
+        setItemToDelete(null);
+    } catch (err: any) {
+        console.error(err);
+        alert(`Erro ao excluir abastecimento: ${err.message}`);
+    } finally {
+        setLoading(false);
+    }
   };
 
   const resetForms = () => {
@@ -404,6 +434,16 @@ const FuelManagement: React.FC = () => {
   const municipalityOptions: MultiSelectOption[] = uniqueMunicipalities.map(m => ({ value: m, label: m }));
   const foremanOptions: MultiSelectOption[] = uniqueForemen.map(f => ({ value: f, label: f }));
   const fuelOptions: MultiSelectOption[] = Object.values(FuelType).map(f => ({ value: f, label: f }));
+
+  const vehicleOptions = vehicles.map(v => ({
+      value: v.id,
+      label: `${v.plate} - ${v.driverName} (${v.type})`
+  }));
+
+  const stationSelectOptions = stations.map(s => ({
+      value: s.id,
+      label: `${s.name} - ${s.municipality}`
+  }));
 
   if (loading && activeTab === 'REFUELING' && refuelings.length === 0) {
       return <div className="flex justify-center items-center h-64"><Loader2 className="animate-spin text-blue-600" size={48} /></div>;
@@ -606,12 +646,17 @@ const FuelManagement: React.FC = () => {
                                 </div>
                             </>
                         ) : (
-                            <div className="lg:col-span-2">
-                                <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Veículo Cadastrado</label>
-                                <select required value={currentRefueling.vehicleId || ''} onChange={e => handleVehicleChange(e.target.value)} className={inputClass}>
-                                    <option value="">Selecione o veículo...</option>
-                                    {vehicles.map(v => (<option key={v.id} value={v.id}>{v.plate} - {v.foreman} ({v.model})</option>))}
-                                </select>
+                            <div className="lg:col-span-2 relative">
+                                {/* SUBSTITUIÇÃO POR SELECTWITHSEARCH */}
+                                <SelectWithSearch 
+                                    label="VEÍCULO CADASTRADO"
+                                    options={vehicleOptions}
+                                    value={currentRefueling.vehicleId || ''}
+                                    onChange={handleVehicleChange}
+                                    required
+                                    placeholder="Selecione ou digite..."
+                                />
+                                
                                 {currentRefueling.vehicleId && (() => {
                                     const v = vehicles.find(veh => veh.id === currentRefueling.vehicleId);
                                     if(v) return (
@@ -634,12 +679,16 @@ const FuelManagement: React.FC = () => {
                              </div>
                         </div>
 
-                         <div>
-                            <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Posto</label>
-                            <select required value={currentRefueling.gasStationId || ''} onChange={e => setCurrentRefueling({...currentRefueling, gasStationId: e.target.value})} className={inputClass}>
-                                <option value="">Selecione o posto...</option>
-                                {stations.map(s => (<option key={s.id} value={s.id}>{s.name} - {s.municipality}</option>))}
-                            </select>
+                         <div className="relative">
+                            {/* SUBSTITUIÇÃO POR SELECTWITHSEARCH */}
+                            <SelectWithSearch 
+                                label="POSTO"
+                                options={stationSelectOptions}
+                                value={currentRefueling.gasStationId || ''}
+                                onChange={(val) => setCurrentRefueling({...currentRefueling, gasStationId: val})}
+                                required
+                                placeholder="Selecione o posto..."
+                            />
                             {stations.length === 0 && <p className="text-red-500 text-xs mt-1">Nenhum posto cadastrado.</p>}
                         </div>
 
@@ -835,98 +884,6 @@ const FuelManagement: React.FC = () => {
                   </div>
                 )}
             </div>
-        </div>
-      )}
-
-      {activeTab === 'STATIONS' && (
-        <div className="space-y-6">
-             {showForm && !isReadOnly && (
-                <div className="bg-white rounded-xl shadow-lg border border-slate-200 p-6 animate-in fade-in slide-in-from-top-2 print:hidden">
-                     <h3 className="font-bold text-lg text-slate-800 mb-4 flex items-center gap-2">
-                        <Fuel className="text-blue-500" />
-                        {isEditing ? 'Editar Posto' : 'Cadastrar Novo Posto'}
-                    </h3>
-                    <form onSubmit={handleSaveStation} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        <div className="lg:col-span-2">
-                            <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Nome do Posto</label>
-                            <input type="text" required placeholder="Ex: Posto Ipiranga Centro" value={currentStation.name || ''} onChange={e => setCurrentStation({...currentStation, name: e.target.value.toUpperCase()})} className={inputClass} />
-                        </div>
-                         <div>
-                            <label className="block text-xs font-bold uppercase text-slate-500 mb-1">CNPJ</label>
-                            <input type="text" placeholder="00.000.000/0000-00" value={currentStation.cnpj || ''} onChange={e => setCurrentStation({...currentStation, cnpj: e.target.value.toUpperCase()})} className={inputClass} />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Município</label>
-                            <input type="text" required value={currentStation.municipality || ''} onChange={e => setCurrentStation({...currentStation, municipality: e.target.value.toUpperCase()})} className={inputClass} />
-                        </div>
-                         <div className="lg:col-span-2">
-                            <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Endereço</label>
-                            <input type="text" placeholder="Rua, Número, Bairro..." value={currentStation.address || ''} onChange={e => setCurrentStation({...currentStation, address: e.target.value.toUpperCase()})} className={inputClass} />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Telefone (Opcional)</label>
-                            <input type="text" value={currentStation.phone || ''} onChange={e => setCurrentStation({...currentStation, phone: e.target.value})} className={inputClass} />
-                        </div>
-                         <div className="lg:col-span-3 flex justify-end pt-4 gap-3">
-                             <button type="button" onClick={resetForms} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium">Cancelar</button>
-                            <button type="submit" disabled={loading} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50">
-                                {loading ? <Loader2 className="animate-spin"/> : <Save size={18} />}
-                                Salvar Posto
-                            </button>
-                        </div>
-                    </form>
-                </div>
-             )}
-
-             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden print:overflow-visible">
-                 <div className="overflow-x-auto print:overflow-visible">
-                    <table className="w-full text-sm text-left">
-                        <thead className="bg-slate-100 text-slate-600 font-bold uppercase text-xs border-b border-slate-200">
-                            <tr>
-                                <th className="px-6 py-3">Nome do Posto</th>
-                                <th className="px-6 py-3">Município / Endereço</th>
-                                <th className="px-6 py-3">CNPJ</th>
-                                <th className="px-6 py-3">Telefone</th>
-                                <th className="px-6 py-3 text-center print:hidden">Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                             {loading ? (
-                                <tr><td colSpan={5} className="px-6 py-12 text-center"><Loader2 className="animate-spin mx-auto text-blue-500" size={24} /><p className="text-slate-400 mt-2">Carregando postos...</p></td></tr>
-                             ) : stations.length === 0 ? (
-                                <tr><td colSpan={5} className="px-6 py-12 text-center text-slate-400">Nenhum posto cadastrado.</td></tr>
-                            ) : (
-                                stations.map(s => (
-                                    <tr key={s.id} className="hover:bg-slate-50 transition-colors">
-                                        <td className="px-6 py-3 font-bold text-slate-800">
-                                            <div className="flex items-center gap-2">
-                                                <Fuel size={16} className="text-slate-400" />
-                                                {s.name}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-3">
-                                            <div className="flex flex-col">
-                                                <span className="font-medium">{s.municipality}</span>
-                                                {s.address && (<span className="text-xs text-slate-500 flex items-center gap-1"><MapPin size={10} /> {s.address}</span>)}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-3 font-mono text-slate-600">{s.cnpj || '-'}</td>
-                                        <td className="px-6 py-3 text-slate-600">{s.phone || '-'}</td>
-                                        <td className="px-6 py-3 text-center print:hidden">
-                                            {!isReadOnly && (
-                                                <div className="flex justify-center gap-2">
-                                                    <button onClick={() => handleEditStation(s)} className="p-2 text-blue-600 hover:bg-blue-50 rounded"><Edit2 size={16} /></button>
-                                                    <button onClick={() => confirmDelete(s.id)} className="p-2 text-red-600 hover:bg-red-50 rounded"><Trash2 size={16} /></button>
-                                                </div>
-                                            )}
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                 </div>
-             </div>
         </div>
       )}
     </div>

@@ -184,34 +184,41 @@ const DailyLogs: React.FC = () => {
     };
 
     setLoading(true);
-    await storageService.saveLog(newLog);
-    
-    setExistingLogs(prev => [...prev, newLog]);
-    await loadData(); 
-    
-    setLoading(false);
-    setSuccessMsg('Lançamento salvo com sucesso!');
-    
-    // Reset form but keep date
-    setFormData({
-      date: formData.date,
-      vehicleId: '',
-      firstIgnition: '',
-      startTime: '',
-      lunchStart: '',
-      lunchEnd: '',
-      endTime: '',
-      kmDriven: undefined,
-      maxSpeed: undefined,
-      speedingCount: undefined,
-      observations: '',
-      extraTimeStart: '',
-      extraTimeEnd: '',
-      nonOperatingReason: ''
-    });
+    try {
+        await storageService.saveLog(newLog);
+        
+        setExistingLogs(prev => [...prev, newLog]);
+        await loadData(); 
+        
+        setLoading(false);
+        setSuccessMsg('Lançamento salvo com sucesso!');
+        
+        // Reset form but keep date
+        setFormData({
+        date: formData.date,
+        vehicleId: '',
+        firstIgnition: '',
+        startTime: '',
+        lunchStart: '',
+        lunchEnd: '',
+        endTime: '',
+        kmDriven: undefined,
+        maxSpeed: undefined,
+        speedingCount: undefined,
+        observations: '',
+        extraTimeStart: '',
+        extraTimeEnd: '',
+        nonOperatingReason: ''
+        });
 
-    setTimeout(() => setSuccessMsg(''), 3000);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+        setTimeout(() => setSuccessMsg(''), 3000);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (err: any) {
+        setLoading(false);
+        console.error(err);
+        setErrorMsg(`Erro ao salvar: ${err.message || 'Falha na comunicação com o banco'}`);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
 
   const inputClass = "w-full rounded-lg border border-slate-300 bg-slate-50 p-2.5 text-slate-800 focus:border-blue-600 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition-all";

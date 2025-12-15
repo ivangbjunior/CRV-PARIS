@@ -33,7 +33,10 @@ export const storageService = {
       .from(TABLES.VEHICLES)
       .upsert(vehicle);
       
-    if (error) console.error('Error saving vehicle:', error);
+    if (error) {
+        console.error('Error saving vehicle:', error);
+        throw error;
+    }
   },
 
   deleteVehicle: async (id: string): Promise<void> => {
@@ -42,7 +45,10 @@ export const storageService = {
       .delete()
       .eq('id', id);
       
-    if (error) console.error('Error deleting vehicle:', error);
+    if (error) {
+        console.error('Error deleting vehicle:', error);
+        throw error;
+    }
   },
 
   // --- Log Operations ---
@@ -64,7 +70,10 @@ export const storageService = {
       .from(TABLES.LOGS)
       .upsert(log);
 
-    if (error) console.error('Error saving log:', error);
+    if (error) {
+        console.error('Error saving log:', error);
+        throw error;
+    }
   },
 
   deleteLog: async (id: string): Promise<void> => {
@@ -73,7 +82,10 @@ export const storageService = {
       .delete()
       .eq('id', id);
       
-    if (error) console.error('Error deleting log:', error);
+    if (error) {
+        console.error('Error deleting log:', error);
+        throw error;
+    }
   },
 
   // --- Gas Station Operations ---
@@ -94,7 +106,10 @@ export const storageService = {
       .from(TABLES.STATIONS)
       .upsert(station);
 
-    if (error) console.error('Error saving station:', error);
+    if (error) {
+        console.error('Error saving station:', error);
+        throw error;
+    }
   },
 
   deleteGasStation: async (id: string): Promise<void> => {
@@ -103,7 +118,10 @@ export const storageService = {
       .delete()
       .eq('id', id);
 
-    if (error) console.error('Error deleting station:', error);
+    if (error) {
+        console.error('Error deleting station:', error);
+        throw error;
+    }
   },
 
   // --- Refueling Operations ---
@@ -124,7 +142,10 @@ export const storageService = {
       .from(TABLES.REFUELING)
       .upsert(log);
 
-    if (error) console.error('Error saving refueling:', error);
+    if (error) {
+        console.error('Error saving refueling:', error);
+        throw error;
+    }
   },
 
   deleteRefueling: async (id: string): Promise<void> => {
@@ -133,7 +154,10 @@ export const storageService = {
       .delete()
       .eq('id', id);
 
-    if (error) console.error('Error deleting refueling:', error);
+    if (error) {
+        console.error('Error deleting refueling:', error);
+        throw error;
+    }
   },
 
   // --- Requisition Operations ---
@@ -160,6 +184,7 @@ export const storageService = {
 
     if (error) {
        console.error("Error getting next ID", error);
+       // Em caso de erro de permissão aqui, retornamos 1, mas o save subsequente falhará
        return 1;
     }
 
@@ -174,7 +199,10 @@ export const storageService = {
       .from(TABLES.REQUISITIONS)
       .upsert(requisition);
 
-    if (error) console.error('Error saving requisition:', error);
+    if (error) {
+        console.error('Error saving requisition:', error);
+        throw error;
+    }
   },
 
   deleteRequisition: async (id: string): Promise<void> => {
@@ -183,7 +211,10 @@ export const storageService = {
         .delete()
         .eq('id', id);
     
-    if (error) console.error('Error deleting requisition:', error);
+    if (error) {
+        console.error('Error deleting requisition:', error);
+        throw error;
+    }
   },
 
   // --- User Vehicles Association ---
@@ -204,7 +235,10 @@ export const storageService = {
       .from(TABLES.USER_VEHICLES)
       .upsert(link);
       
-    if (error) console.error('Error saving user vehicle:', error);
+    if (error) {
+        console.error('Error saving user vehicle:', error);
+        throw error;
+    }
   },
 
   deleteUserVehicle: async (id: string): Promise<void> => {
@@ -213,12 +247,14 @@ export const storageService = {
       .delete()
       .eq('id', id);
       
-    if (error) console.error('Error deleting user vehicle:', error);
+    if (error) {
+        console.error('Error deleting user vehicle:', error);
+        throw error;
+    }
   },
   
   // --- User Profiles Helper (For Gerencia) ---
   getAllUsers: async (): Promise<UserProfile[]> => {
-      // Note: This depends on RLS policies allowing read access to user_roles
       const { data, error } = await supabase
           .from(TABLES.USER_ROLES)
           .select('*');
@@ -227,10 +263,6 @@ export const storageService = {
           console.error('Error fetching users:', error);
           return [];
       }
-      // Map raw data to UserProfile, assuming email might be separate or included depending on backend view
-      // For this implementation we assume user_roles contains email or we fetch it
-      // If email is not in user_roles, this might be tricky client-side without Admin API.
-      // We assume the table has 'email' column for simplicity based on AuthContext logic.
       return data?.map((u: any) => ({
           id: u.id,
           email: u.email || 'No Email',

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { DailyLog, DailyLogReport, Vehicle, ContractType, VehicleType, UserRole } from '../types';
 import { storageService } from '../services/storage';
@@ -171,6 +170,18 @@ const Reports: React.FC = () => {
     }
   };
 
+  // Helper to determine speed limit based on vehicle type
+  const getSpeedLimit = (vehicleId?: string) => {
+    if (!vehicleId) return 100; 
+    const v = vehicles.find(veh => veh.id === vehicleId);
+    if (!v) return 100;
+
+    if (v.type === VehicleType.CAMINHAO || v.type === VehicleType.LINHA_VIVA) {
+        return 90;
+    }
+    return 100;
+  };
+
   const handleFilter = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
 
@@ -239,7 +250,19 @@ const Reports: React.FC = () => {
       val = value === '' ? undefined : Number(value);
     }
     
-    setEditingLog({ ...editingLog, [name]: val });
+    setEditingLog(prev => {
+        if (!prev) return null;
+        const newData = { ...prev, [name]: val };
+        
+        // Logic to reset speedingCount if maxSpeed is within limit (Mirroring DailyLogs)
+        if (name === 'maxSpeed' && typeof val === 'number') {
+            const limit = getSpeedLimit(prev.vehicleId);
+            if (val <= limit) {
+                newData.speedingCount = 0;
+            }
+        }
+        return newData;
+    });
   };
 
   const handleVehicleChange = (val: string) => {
@@ -391,6 +414,9 @@ const Reports: React.FC = () => {
       value: v.id,
       label: `${v.plate} - ${v.driverName}`
   }));
+
+  // Calculate dynamic speed limit based on vehicle type
+  const currentSpeedLimit = editingLog?.vehicleId ? getSpeedLimit(editingLog.vehicleId) : 100;
 
   if (loading && logs.length === 0) {
       return <div className="flex justify-center items-center h-64"><Loader2 className="animate-spin text-blue-600" size={48} /></div>;
@@ -609,13 +635,34 @@ const Reports: React.FC = () => {
                       <div className="lg:col-span-1">
                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Velocidade Máx</label>
                         <div className="relative">
-                            <input type="number" name="maxSpeed" value={editingLog.maxSpeed === undefined ? '' : editingLog.maxSpeed} onChange={handleEditChange} className={`${editInputClass} pr-8`} placeholder="" />
+                            <input 
+                                type="number" 
+                                name="maxSpeed" 
+                                value={editingLog.maxSpeed === undefined ? '' : editingLog.maxSpeed} 
+                                onChange={handleEditChange} 
+                                className={`${editInputClass} pr-8 ${
+                                    (editingLog.maxSpeed || 0) > currentSpeedLimit ? 'text-red-600 font-bold border-red-300 bg-red-50' : ''
+                                }`}
+                                placeholder="" 
+                            />
                             <span className="absolute right-3 top-2.5 text-gray-400 text-xs font-medium">Km/h</span>
                         </div>
+                        <p className="text-[10px] text-slate-400 mt-1">Limite: {currentSpeedLimit} km/h</p>
                       </div>
                       <div className="lg:col-span-2">
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Qtd. Excesso Vel.</label>
-                        <input type="number" name="speedingCount" value={editingLog.speedingCount === undefined ? '' : editingLog.speedingCount} onChange={handleEditChange} className={editInputClass} placeholder="" />
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1 flex items-center gap-2">
+                            Ocorrências de Excesso {'>'} {currentSpeedLimit}km/h
+                            {(editingLog.maxSpeed || 0) > currentSpeedLimit && <AlertTriangle size={14} className="text-red-500" />}
+                        </label>
+                        <input 
+                            type="number" 
+                            name="speedingCount" 
+                            value={editingLog.speedingCount === undefined ? '' : editingLog.speedingCount} 
+                            onChange={handleEditChange} 
+                            disabled={(editingLog.maxSpeed || 0) <= currentSpeedLimit}
+                            className={`${editInputClass} ${(editingLog.maxSpeed || 0) <= currentSpeedLimit ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : ''}`}
+                            placeholder="" 
+                        />
                       </div>
                     </>
                   )}
