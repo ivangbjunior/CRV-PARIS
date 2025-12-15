@@ -19,7 +19,8 @@ const EXTERNAL_EQUIPMENT_TYPES = [
   'MOTO', 
   'CARRO',
   'LANCHA', 
-  'MOTOR DE POUPA', 
+  'MOTOR DE POUPA',
+  'MOTOPODA', 
   'GERADOR', 
   'GALÃO', 
   'TAMBOR'
@@ -121,15 +122,13 @@ const FuelManagement: React.FC = () => {
       const contracts = Array.from(new Set(rData.map(r => r.contractSnapshot))).sort();
       const cities = Array.from(new Set(rData.map(r => r.municipalitySnapshot))).sort();
       
-      const encarregados = uData
-        .filter(u => u.role === UserRole.ENCARREGADO)
-        .map(u => u.name || u.email.split('@')[0])
-        .sort();
+      // ALTERAÇÃO: Buscar Equipes (foreman) dos VEÍCULOS cadastrados, não dos usuários
+      const vehicleTeams = Array.from(new Set(vData.map(v => v.foreman).filter(f => f && f.trim() !== ''))).sort();
 
       setUniquePlates(plates);
       setUniqueContracts(contracts);
       setUniqueMunicipalities(cities);
-      setUniqueForemen(encarregados);
+      setUniqueForemen(vehicleTeams);
     } catch (e) {
         console.error(e);
     } finally {
@@ -579,7 +578,7 @@ const FuelManagement: React.FC = () => {
                             </div>
                             
                             <div><MultiSelect label="Placa / Identificação" options={plateOptions} selected={filterPlate} onChange={setFilterPlate} placeholder="Todas" /></div>
-                            <div><MultiSelect label="Encarregado" options={foremanOptions} selected={filterForeman} onChange={setFilterForeman} placeholder="Todos" /></div>
+                            <div><MultiSelect label="Equipe" options={foremanOptions} selected={filterForeman} onChange={setFilterForeman} placeholder="Todos" /></div>
                             <div><MultiSelect label="Posto" options={stationOptions} selected={filterStation} onChange={setFilterStation} placeholder="Todos" /></div>
                             <div><MultiSelect label="Contrato" options={contractOptions} selected={filterContract} onChange={setFilterContract} placeholder="Todos" /></div>
                             <div><MultiSelect label="Município" options={municipalityOptions} selected={filterMunicipality} onChange={setFilterMunicipality} placeholder="Todos" /></div>
@@ -670,7 +669,7 @@ const FuelManagement: React.FC = () => {
                         )}
 
                         <div>
-                            <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Encarregado / Equipe</label>
+                            <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Equipe</label>
                              <div className="relative">
                                 <select value={currentRefueling.foremanSnapshot || ''} onChange={e => setCurrentRefueling({...currentRefueling, foremanSnapshot: e.target.value})} className={inputClass}>
                                     <option value="">Selecione...</option>
@@ -884,6 +883,95 @@ const FuelManagement: React.FC = () => {
                   </div>
                 )}
             </div>
+        </div>
+      )}
+
+      {activeTab === 'STATIONS' && (
+        <div className="space-y-6">
+           {showForm && !isReadOnly && (
+             <div className="bg-white rounded-xl shadow-lg border border-slate-200 p-6 animate-in fade-in slide-in-from-top-2">
+                <h3 className="font-bold text-lg text-slate-800 mb-4 flex items-center gap-2">
+                    <Fuel className="text-blue-500" />
+                    {isEditing ? 'Editar Posto' : 'Cadastrar Novo Posto'}
+                </h3>
+                <form onSubmit={handleSaveStation} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="md:col-span-2">
+                        <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Nome Fantasia</label>
+                        <input type="text" required value={currentStation.name || ''} onChange={e => setCurrentStation({...currentStation, name: e.target.value.toUpperCase()})} className={inputClass} placeholder="EX: POSTO IPIRANGA..." />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Município</label>
+                        <input type="text" required value={currentStation.municipality || ''} onChange={e => setCurrentStation({...currentStation, municipality: e.target.value.toUpperCase()})} className={inputClass} />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold uppercase text-slate-500 mb-1">CNPJ (Opcional)</label>
+                        <input type="text" value={currentStation.cnpj || ''} onChange={e => setCurrentStation({...currentStation, cnpj: e.target.value.toUpperCase()})} className={inputClass} />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Telefone (Opcional)</label>
+                        <input type="text" value={currentStation.phone || ''} onChange={e => setCurrentStation({...currentStation, phone: e.target.value})} className={inputClass} />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Endereço (Opcional)</label>
+                        <input type="text" value={currentStation.address || ''} onChange={e => setCurrentStation({...currentStation, address: e.target.value.toUpperCase()})} className={inputClass} />
+                    </div>
+                    <div className="md:col-span-2 flex justify-end gap-3 pt-4 border-t border-slate-100">
+                        <button type="button" onClick={resetForms} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium">Cancelar</button>
+                        <button type="submit" disabled={loading} className="bg-blue-800 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-900 transition-colors flex items-center gap-2">
+                            {loading ? <Loader2 className="animate-spin"/> : <Save size={18} />}
+                            Salvar Posto
+                        </button>
+                    </div>
+                </form>
+             </div>
+           )}
+
+           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                    <h3 className="font-bold text-slate-700 flex items-center gap-2">
+                        <Fuel size={18} /> Postos Conveniados
+                    </h3>
+                    <span className="text-xs font-bold bg-white px-2 py-1 rounded border border-slate-200 text-slate-500">{stations.length} Cadastrados</span>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left">
+                        <thead className="bg-slate-100 text-slate-600 font-bold uppercase text-xs border-b border-slate-200">
+                            <tr>
+                                <th className="px-6 py-3">Nome</th>
+                                <th className="px-6 py-3">Município</th>
+                                <th className="px-6 py-3">Contato/Info</th>
+                                {!isReadOnly && <th className="px-6 py-3 text-center">Ações</th>}
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {stations.length === 0 ? (
+                                <tr><td colSpan={4} className="px-6 py-12 text-center text-slate-400">Nenhum posto cadastrado.</td></tr>
+                            ) : (
+                                stations.map(station => (
+                                    <tr key={station.id} className="hover:bg-slate-50">
+                                        <td className="px-6 py-3 font-bold text-slate-800">{station.name}</td>
+                                        <td className="px-6 py-3 text-slate-600 flex items-center gap-1">
+                                            <MapPin size={14} className="text-slate-400"/> {station.municipality}
+                                        </td>
+                                        <td className="px-6 py-3 text-slate-500 text-xs">
+                                            {station.phone && <div>Tel: {station.phone}</div>}
+                                            {station.cnpj && <div>CNPJ: {station.cnpj}</div>}
+                                        </td>
+                                        {!isReadOnly && (
+                                            <td className="px-6 py-3 text-center">
+                                                <div className="flex justify-center gap-2">
+                                                    <button onClick={() => handleEditStation(station)} className="p-2 text-blue-600 hover:bg-blue-50 rounded"><Edit2 size={16} /></button>
+                                                    <button onClick={() => confirmDelete(station.id)} className="p-2 text-red-600 hover:bg-red-50 rounded"><Trash2 size={16} /></button>
+                                                </div>
+                                            </td>
+                                        )}
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+           </div>
         </div>
       )}
     </div>
