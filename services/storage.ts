@@ -18,7 +18,8 @@ export const storageService = {
   getVehicles: async (): Promise<Vehicle[]> => {
     const { data, error } = await supabase
       .from(TABLES.VEHICLES)
-      .select('*');
+      .select('*')
+      .order('plate', { ascending: true });
     
     if (error) {
       console.error('Error fetching vehicles:', error);
@@ -53,9 +54,11 @@ export const storageService = {
 
   // --- Log Operations ---
   getLogs: async (): Promise<DailyLog[]> => {
+    // UPDATED: Order by date descending directly from DB
     const { data, error } = await supabase
       .from(TABLES.LOGS)
-      .select('*');
+      .select('*')
+      .order('date', { ascending: false });
 
     if (error) {
       console.error('Error fetching logs:', error);
@@ -91,7 +94,8 @@ export const storageService = {
   getGasStations: async (): Promise<GasStation[]> => {
     const { data, error } = await supabase
       .from(TABLES.STATIONS)
-      .select('*');
+      .select('*')
+      .order('name', { ascending: true });
 
     if (error) {
       console.error('Error fetching stations:', error);
@@ -127,7 +131,8 @@ export const storageService = {
   getRefuelings: async (): Promise<RefuelingLog[]> => {
     const { data, error } = await supabase
       .from(TABLES.REFUELING)
-      .select('*');
+      .select('*')
+      .order('date', { ascending: false });
 
     if (error) {
       console.error('Error fetching refuelings:', error);
