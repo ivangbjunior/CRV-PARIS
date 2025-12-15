@@ -22,7 +22,7 @@ export const storageService = {
     
     if (error) {
       console.error('Error fetching vehicles:', error);
-      return [];
+      throw error;
     }
     return data || [];
   },
@@ -53,14 +53,13 @@ export const storageService = {
 
   // --- Log Operations ---
   getLogs: async (): Promise<DailyLog[]> => {
-    // Em produção, idealmente adicionaríamos paginação ou filtro de data aqui
     const { data, error } = await supabase
       .from(TABLES.LOGS)
       .select('*');
 
     if (error) {
       console.error('Error fetching logs:', error);
-      return [];
+      throw error;
     }
     return data || [];
   },
@@ -96,7 +95,7 @@ export const storageService = {
 
     if (error) {
       console.error('Error fetching stations:', error);
-      return [];
+      throw error;
     }
     return data || [];
   },
@@ -132,7 +131,7 @@ export const storageService = {
 
     if (error) {
       console.error('Error fetching refuelings:', error);
-      return [];
+      throw error;
     }
     return data || [];
   },
@@ -165,17 +164,16 @@ export const storageService = {
     const { data, error } = await supabase
       .from(TABLES.REQUISITIONS)
       .select('*')
-      .order('internalId', { ascending: false }); // Order by most recent ID
+      .order('internalId', { ascending: false });
 
     if (error) {
       console.error('Error fetching requisitions:', error);
-      return [];
+      throw error;
     }
     return data || [];
   },
 
   getNextInternalId: async (): Promise<number> => {
-    // Simula auto-increment global buscando o maior ID atual
     const { data, error } = await supabase
       .from(TABLES.REQUISITIONS)
       .select('internalId')
@@ -184,8 +182,8 @@ export const storageService = {
 
     if (error) {
        console.error("Error getting next ID", error);
-       // Em caso de erro de permissão aqui, retornamos 1, mas o save subsequente falhará
-       return 1;
+       // We'll throw here to prevent duplicate IDs if read fails
+       throw error;
     }
 
     if (data && data.length > 0) {
@@ -225,7 +223,7 @@ export const storageService = {
 
     if (error) {
         console.error('Error fetching user vehicles:', error);
-        return [];
+        throw error;
     }
     return data || [];
   },
@@ -253,7 +251,7 @@ export const storageService = {
     }
   },
   
-  // --- User Profiles Helper (For Gerencia) ---
+  // --- User Profiles Helper ---
   getAllUsers: async (): Promise<UserProfile[]> => {
       const { data, error } = await supabase
           .from(TABLES.USER_ROLES)
@@ -261,7 +259,7 @@ export const storageService = {
           
       if (error) {
           console.error('Error fetching users:', error);
-          return [];
+          throw error;
       }
       return data?.map((u: any) => ({
           id: u.id,

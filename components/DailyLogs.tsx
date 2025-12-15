@@ -59,8 +59,9 @@ const DailyLogs: React.FC = () => {
           setVehicles(vData);
           setRefuelings(rData);
           setExistingLogs(lData);
-      } catch (e) {
+      } catch (e: any) {
           console.error(e);
+          setErrorMsg("Erro ao carregar dados: " + (e.message || "Falha de conexão"));
       } finally {
           setLoading(false);
       }
@@ -132,14 +133,21 @@ const DailyLogs: React.FC = () => {
     }
 
     // --- REFORÇO DA VERIFICAÇÃO DE DUPLICIDADE ---
-    const freshLogs = await storageService.getLogs();
-    const duplicateLog = freshLogs.find(l => 
-      l.vehicleId === formData.vehicleId && 
-      l.date === formData.date
-    );
+    try {
+      const freshLogs = await storageService.getLogs();
+      const duplicateLog = freshLogs.find(l => 
+        l.vehicleId === formData.vehicleId && 
+        l.date === formData.date
+      );
 
-    if (duplicateLog) {
-      setErrorMsg("BLOQUEADO: Já existe um registro para este veículo nesta data. Não é permitido duplicidade.");
+      if (duplicateLog) {
+        setErrorMsg("BLOQUEADO: Já existe um registro para este veículo nesta data. Não é permitido duplicidade.");
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+    } catch (e: any) {
+      console.error(e);
+      setErrorMsg("Erro ao verificar duplicidade: " + e.message + ". Verifique sua conexão e permissões.");
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }

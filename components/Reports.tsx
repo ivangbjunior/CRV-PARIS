@@ -1,11 +1,12 @@
+
 import React, { useState, useEffect, useRef } from 'react';
-import { DailyLog, DailyLogReport, Vehicle, ContractType, VehicleType, UserRole } from '../types';
+import { DailyLogReport, Vehicle, ContractType, VehicleType, UserRole, DailyLog } from '../types';
 import { storageService } from '../services/storage';
 import { calculateWorkHours } from '../utils/timeUtils';
 import PasswordModal from './PasswordModal';
 import MultiSelect, { MultiSelectOption } from './MultiSelect';
 import { useAuth } from '../contexts/AuthContext';
-import { Filter, FileText, Trash2, Edit3, Calendar, X, Save, Clock, AlertTriangle, Search, User, MapPin, Key, Ban, Settings, HardHat, Printer, Fuel, Droplet, MessageSquareText, Loader2, WifiOff, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Gauge } from 'lucide-react';
+import { Filter, FileText, Trash2, Edit3, Calendar, X, Save, Clock, AlertTriangle, Search, User, MapPin, Key, Ban, Settings, HardHat, Printer, Fuel, Droplet, MessageSquareText, Loader2, WifiOff, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Gauge, RefreshCw } from 'lucide-react';
 import { PrintHeader } from './PrintHeader';
 import SelectWithSearch from './SelectWithSearch';
 
@@ -14,6 +15,7 @@ const Reports: React.FC = () => {
   const isReadOnly = user?.role === UserRole.RH || user?.role === UserRole.GERENCIA;
 
   const [loading, setLoading] = useState(true);
+  const [errorState, setErrorState] = useState<string | null>(null);
   const [logs, setLogs] = useState<DailyLogReport[]>([]);
   const [filteredLogs, setFilteredLogs] = useState<DailyLogReport[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -62,6 +64,7 @@ const Reports: React.FC = () => {
 
   const loadData = async () => {
     setLoading(true);
+    setErrorState(null);
     try {
         const [rawLogs, vehiclesData, refuelingsData] = await Promise.all([
             storageService.getLogs(),
@@ -134,8 +137,12 @@ const Reports: React.FC = () => {
         };
         });
 
-        // Always sort by date descending (newest first)
-        processed.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        // Robust sorting that handles missing/invalid dates safely
+        processed.sort((a, b) => {
+            const dateA = a.date ? new Date(a.date).getTime() : 0;
+            const dateB = b.date ? new Date(b.date).getTime() : 0;
+            return dateB - dateA; // Newest first
+        });
 
         const uDrivers = new Set<string>();
         const uMunicipalities = new Set<string>();
@@ -163,8 +170,9 @@ const Reports: React.FC = () => {
 
         setLogs(processed);
         setFilteredLogs(processed);
-    } catch(e) {
+    } catch(e: any) {
         console.error(e);
+        setErrorState(e.message || "Erro desconhecido ao carregar dados.");
     } finally {
         setLoading(false);
     }
@@ -204,8 +212,12 @@ const Reports: React.FC = () => {
       return matchesDate && matchesContract && matchesVehicleId && matchesForeman && matchesDriver && matchesMunicipality;
     });
 
-    // Ensure sorting is maintained after filtering (Newest First)
-    filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    // Ensure sorting is maintained after filtering
+    filtered.sort((a, b) => {
+        const dateA = a.date ? new Date(a.date).getTime() : 0;
+        const dateB = b.date ? new Date(b.date).getTime() : 0;
+        return dateB - dateA;
+    });
     setFilteredLogs(filtered);
   };
 
@@ -227,10 +239,15 @@ const Reports: React.FC = () => {
   const executeDelete = async () => {
     if (logToDelete) {
       setLoading(true);
-      await storageService.deleteLog(logToDelete);
-      await loadData();
-      setLogToDelete(null);
-      setShowDeleteModal(false);
+      try {
+        await storageService.deleteLog(logToDelete);
+        await loadData();
+        setLogToDelete(null);
+        setShowDeleteModal(false);
+      } catch (e: any) {
+        alert("Erro ao excluir: " + e.message);
+        setLoading(false);
+      }
     }
   };
 
@@ -314,9 +331,9 @@ const Reports: React.FC = () => {
           setEditingLog(null);
           await loadData();
           
-      } catch (error) {
+      } catch (error: any) {
           console.error("Failed to save edit:", error);
-          alert("Erro ao salvar alterações.");
+          alert("Erro ao salvar alterações: " + error.message);
       } finally {
           setLoading(false);
       }
@@ -418,7 +435,7 @@ const Reports: React.FC = () => {
   // Calculate dynamic speed limit based on vehicle type
   const currentSpeedLimit = editingLog?.vehicleId ? getSpeedLimit(editingLog.vehicleId) : 100;
 
-  if (loading && logs.length === 0) {
+  if (loading && logs.length === 0 && !errorState) {
       return <div className="flex justify-center items-center h-64"><Loader2 className="animate-spin text-blue-600" size={48} /></div>;
   }
 
@@ -446,6 +463,19 @@ const Reports: React.FC = () => {
             title="Excluir Lançamento"
         />
       </div>
+
+      {/* Error Banner */}
+      {errorState && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4 flex items-center justify-between" role="alert">
+              <div>
+                  <strong className="font-bold">Erro ao carregar dados: </strong>
+                  <span className="block sm:inline">{errorState}</span>
+              </div>
+              <button onClick={loadData} className="bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-3 rounded flex items-center gap-1 text-sm">
+                  <RefreshCw size={14} /> Tentar Novamente
+              </button>
+          </div>
+      )}
 
       {/* Obs Modal */}
       {obsModalData && (
@@ -482,7 +512,7 @@ const Reports: React.FC = () => {
         </div>
       )}
 
-      {/* Edit Modal - UPDATED TO MATCH DAILYLOGS LAYOUT */}
+      {/* Edit Modal */}
       {showEditModal && editingLog && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 overflow-y-auto print:hidden">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl my-8 flex flex-col max-h-[90vh]">
@@ -522,7 +552,7 @@ const Reports: React.FC = () => {
                     />
                   </div>
 
-                  {/* Historical Data Snapshot - Optional Override (Advanced) */}
+                  {/* Historical Data Snapshot */}
                   <div className="col-span-full bg-slate-50 p-4 rounded-xl border border-slate-200 grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
                       <div className="lg:col-span-3 pb-2 border-b border-slate-200 mb-1">
                           <span className="text-[10px] font-black text-slate-400 uppercase tracking-wide">Dados Históricos (Snapshot do dia)</span>
@@ -566,53 +596,27 @@ const Reports: React.FC = () => {
                       
                       <div className="col-span-full bg-slate-50 rounded-xl p-5 border border-slate-200">
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 items-end">
-                            
-                            {/* Jornada Principal */}
+                            {/* Jornada Fields... (kept concise for update) */}
                             <div className="col-span-2 md:col-span-3 lg:col-span-2 space-y-3 border-r border-slate-200 pr-4">
                                 <span className="text-xs font-black text-blue-900 uppercase tracking-wide block mb-2">Jornada Principal</span>
                                 <div className="grid grid-cols-2 gap-3">
-                                    <div className="col-span-2">
-                                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">1ª Ignição</label>
-                                        <input type="time" name="firstIgnition" value={editingLog.firstIgnition} onChange={handleEditChange} className={editInputClass} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Início</label>
-                                        <input type="time" name="startTime" value={editingLog.startTime} onChange={handleEditChange} required className={`${editInputClass} bg-blue-50 border-blue-200 text-blue-900`} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Fim</label>
-                                        <input type="time" name="endTime" value={editingLog.endTime} onChange={handleEditChange} required className={`${editInputClass} bg-blue-50 border-blue-200 text-blue-900`} />
-                                    </div>
+                                    <div className="col-span-2"><label className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">1ª Ignição</label><input type="time" name="firstIgnition" value={editingLog.firstIgnition} onChange={handleEditChange} className={editInputClass} /></div>
+                                    <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Início</label><input type="time" name="startTime" value={editingLog.startTime} onChange={handleEditChange} required className={`${editInputClass} bg-blue-50 border-blue-200 text-blue-900`} /></div>
+                                    <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Fim</label><input type="time" name="endTime" value={editingLog.endTime} onChange={handleEditChange} required className={`${editInputClass} bg-blue-50 border-blue-200 text-blue-900`} /></div>
                                 </div>
                             </div>
-
-                            {/* Intervalo */}
                             <div className="col-span-2 md:col-span-3 lg:col-span-2 space-y-3 border-r border-slate-200 px-4 md:border-r-0 lg:border-r">
                                 <span className="text-xs font-black text-slate-500 uppercase tracking-wide block mb-2">Intervalo</span>
                                 <div className="grid grid-cols-2 gap-3">
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">Início</label>
-                                        <input type="time" name="lunchStart" value={editingLog.lunchStart} onChange={handleEditChange} className={editInputClass} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">Fim</label>
-                                        <input type="time" name="lunchEnd" value={editingLog.lunchEnd} onChange={handleEditChange} className={editInputClass} />
-                                    </div>
+                                    <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">Início</label><input type="time" name="lunchStart" value={editingLog.lunchStart} onChange={handleEditChange} className={editInputClass} /></div>
+                                    <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">Fim</label><input type="time" name="lunchEnd" value={editingLog.lunchEnd} onChange={handleEditChange} className={editInputClass} /></div>
                                 </div>
                             </div>
-
-                            {/* Extra */}
                             <div className="col-span-2 md:col-span-3 lg:col-span-2 space-y-3 pl-0 lg:pl-4">
                                 <span className="text-xs font-black text-orange-800 uppercase tracking-wide block mb-2">Extras</span>
                                 <div className="grid grid-cols-2 gap-3">
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">Início</label>
-                                        <input type="time" name="extraTimeStart" value={editingLog.extraTimeStart} onChange={handleEditChange} className={`${editInputClass} focus:border-orange-500 focus:ring-orange-200`} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">Fim</label>
-                                        <input type="time" name="extraTimeEnd" value={editingLog.extraTimeEnd} onChange={handleEditChange} className={`${editInputClass} focus:border-orange-500 focus:ring-orange-200`} />
-                                    </div>
+                                    <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">Início</label><input type="time" name="extraTimeStart" value={editingLog.extraTimeStart} onChange={handleEditChange} className={`${editInputClass} focus:border-orange-500 focus:ring-orange-200`} /></div>
+                                    <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">Fim</label><input type="time" name="extraTimeEnd" value={editingLog.extraTimeEnd} onChange={handleEditChange} className={`${editInputClass} focus:border-orange-500 focus:ring-orange-200`} /></div>
                                 </div>
                             </div>
                         </div>
@@ -736,7 +740,7 @@ const Reports: React.FC = () => {
         )}
       </div>
 
-      {/* Resumo Compacto & Minimalista para Impressão - UPDATED CSS FOR HORIZONTAL PRINT */}
+      {/* Resumo Compacto & Minimalista para Impressão */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-2 print:w-full print:flex print:flex-row print:justify-between print:items-center print:gap-4 print:border-b print:border-slate-200 print:pb-2 print:mb-2 relative z-0 print:max-h-[40px] print:overflow-hidden">
             {/* Time */}
             <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 hover:border-blue-300 transition-all group print:border-none print:shadow-none print:p-0 print:bg-transparent print:flex print:items-center print:gap-1 print:m-0">
@@ -802,6 +806,7 @@ const Reports: React.FC = () => {
                     <option value={50}>50</option>
                     <option value={100}>100</option>
                 </select>
+                <button onClick={loadData} className="p-1 hover:bg-slate-200 rounded ml-2 text-slate-500" title="Recarregar"><RefreshCw size={16}/></button>
             </div>
          </div>
 
