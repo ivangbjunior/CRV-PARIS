@@ -13,13 +13,17 @@ const TABLES = {
   USER_ROLES: 'user_roles'
 };
 
+// Limite alto para garantir que traga "tudo" (Supabase padrão é 1000)
+const QUERY_LIMIT = 100000;
+
 export const storageService = {
   // --- Vehicle Operations ---
   getVehicles: async (): Promise<Vehicle[]> => {
     const { data, error } = await supabase
       .from(TABLES.VEHICLES)
       .select('*')
-      .order('plate', { ascending: true });
+      .order('plate', { ascending: true })
+      .limit(QUERY_LIMIT);
     
     if (error) {
       console.error('Error fetching vehicles:', error);
@@ -54,11 +58,12 @@ export const storageService = {
 
   // --- Log Operations ---
   getLogs: async (): Promise<DailyLog[]> => {
-    // UPDATED: Order by date descending directly from DB
+    // UPDATED: Order by date descending directly from DB + Increased Limit
     const { data, error } = await supabase
       .from(TABLES.LOGS)
       .select('*')
-      .order('date', { ascending: false });
+      .order('date', { ascending: false })
+      .limit(QUERY_LIMIT);
 
     if (error) {
       console.error('Error fetching logs:', error);
@@ -95,7 +100,8 @@ export const storageService = {
     const { data, error } = await supabase
       .from(TABLES.STATIONS)
       .select('*')
-      .order('name', { ascending: true });
+      .order('name', { ascending: true })
+      .limit(QUERY_LIMIT);
 
     if (error) {
       console.error('Error fetching stations:', error);
@@ -132,7 +138,8 @@ export const storageService = {
     const { data, error } = await supabase
       .from(TABLES.REFUELING)
       .select('*')
-      .order('date', { ascending: false });
+      .order('date', { ascending: false })
+      .limit(QUERY_LIMIT);
 
     if (error) {
       console.error('Error fetching refuelings:', error);
@@ -169,7 +176,8 @@ export const storageService = {
     const { data, error } = await supabase
       .from(TABLES.REQUISITIONS)
       .select('*')
-      .order('internalId', { ascending: false });
+      .order('internalId', { ascending: false })
+      .limit(QUERY_LIMIT);
 
     if (error) {
       console.error('Error fetching requisitions:', error);
@@ -224,7 +232,8 @@ export const storageService = {
   getUserVehicles: async (): Promise<UserVehicle[]> => {
     const { data, error } = await supabase
       .from(TABLES.USER_VEHICLES)
-      .select('*');
+      .select('*')
+      .limit(QUERY_LIMIT);
 
     if (error) {
         console.error('Error fetching user vehicles:', error);
@@ -260,7 +269,8 @@ export const storageService = {
   getAllUsers: async (): Promise<UserProfile[]> => {
       const { data, error } = await supabase
           .from(TABLES.USER_ROLES)
-          .select('*');
+          .select('*')
+          .limit(QUERY_LIMIT);
           
       if (error) {
           console.error('Error fetching users:', error);
