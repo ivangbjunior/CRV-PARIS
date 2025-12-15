@@ -13,27 +13,60 @@ const TABLES = {
   USER_ROLES: 'user_roles'
 };
 
-// Limite alto para garantir que traga "tudo" (Supabase padrão é 1000)
-const QUERY_LIMIT = 100000;
+/**
+ * Função auxiliar para buscar TODOS os registros de uma tabela,
+ * contornando o limite de 1000 linhas da API do Supabase.
+ * Ela busca em lotes (chunks) até que não haja mais dados.
+ */
+const fetchAll = async <T>(
+  table: string, 
+  orderBy: string = 'id', 
+  ascending: boolean = false
+): Promise<T[]> => {
+  let allData: T[] = [];
+  let page = 0;
+  const pageSize = 1000; // Limite padrão seguro do Supabase
+  let hasMore = true;
+
+  while (hasMore) {
+    const from = page * pageSize;
+    const to = (page + 1) * pageSize - 1;
+
+    const { data, error } = await supabase
+      .from(table)
+      .select('*')
+      .order(orderBy, { ascending })
+      .range(from, to);
+
+    if (error) {
+      console.error(`Erro ao buscar dados da tabela ${table}:`, error);
+      throw error;
+    }
+
+    if (data && data.length > 0) {
+      allData = [...allData, ...data] as T[];
+      
+      // Se vieram menos registros que o tamanho da página, chegamos ao fim
+      if (data.length < pageSize) {
+        hasMore = false;
+      } else {
+        page++;
+      }
+    } else {
+      hasMore = false;
+    }
+  }
+
+  return allData;
+};
 
 export const storageService = {
   // --- Vehicle Operations ---
   getVehicles: async (): Promise<Vehicle[]> => {
-    const { data, error } = await supabase
-      .from(TABLES.VEHICLES)
-      .select('*')
-      .order('plate', { ascending: true })
-      .limit(QUERY_LIMIT);
-    
-    if (error) {
-      console.error('Error fetching vehicles:', error);
-      throw error;
-    }
-    return data || [];
+    return fetchAll<Vehicle>(TABLES.VEHICLES, 'plate', true);
   },
 
   saveVehicle: async (vehicle: Vehicle): Promise<void> => {
-    // Supabase aceita upsert baseando-se na Primary Key (id)
     const { error } = await supabase
       .from(TABLES.VEHICLES)
       .upsert(vehicle);
@@ -58,18 +91,7 @@ export const storageService = {
 
   // --- Log Operations ---
   getLogs: async (): Promise<DailyLog[]> => {
-    // UPDATED: Order by date descending directly from DB + Increased Limit
-    const { data, error } = await supabase
-      .from(TABLES.LOGS)
-      .select('*')
-      .order('date', { ascending: false })
-      .limit(QUERY_LIMIT);
-
-    if (error) {
-      console.error('Error fetching logs:', error);
-      throw error;
-    }
-    return data || [];
+    return fetchAll<DailyLog>(TABLES.LOGS, 'date', false);
   },
 
   saveLog: async (log: DailyLog): Promise<void> => {
@@ -97,17 +119,7 @@ export const storageService = {
 
   // --- Gas Station Operations ---
   getGasStations: async (): Promise<GasStation[]> => {
-    const { data, error } = await supabase
-      .from(TABLES.STATIONS)
-      .select('*')
-      .order('name', { ascending: true })
-      .limit(QUERY_LIMIT);
-
-    if (error) {
-      console.error('Error fetching stations:', error);
-      throw error;
-    }
-    return data || [];
+    return fetchAll<GasStation>(TABLES.STATIONS, 'name', true);
   },
 
   saveGasStation: async (station: GasStation): Promise<void> => {
@@ -135,17 +147,7 @@ export const storageService = {
 
   // --- Refueling Operations ---
   getRefuelings: async (): Promise<RefuelingLog[]> => {
-    const { data, error } = await supabase
-      .from(TABLES.REFUELING)
-      .select('*')
-      .order('date', { ascending: false })
-      .limit(QUERY_LIMIT);
-
-    if (error) {
-      console.error('Error fetching refuelings:', error);
-      throw error;
-    }
-    return data || [];
+    return fetchAll<RefuelingLog>(TABLES.REFUELING, 'date', false);
   },
 
   saveRefueling: async (log: RefuelingLog): Promise<void> => {
@@ -173,20 +175,11 @@ export const storageService = {
 
   // --- Requisition Operations ---
   getRequisitions: async (): Promise<Requisition[]> => {
-    const { data, error } = await supabase
-      .from(TABLES.REQUISITIONS)
-      .select('*')
-      .order('internalId', { ascending: false })
-      .limit(QUERY_LIMIT);
-
-    if (error) {
-      console.error('Error fetching requisitions:', error);
-      throw error;
-    }
-    return data || [];
+    return fetchAll<Requisition>(TABLES.REQUISITIONS, 'internalId', false);
   },
 
   getNextInternalId: async (): Promise<number> => {
+    // Para pegar o ID, não precisamos de fetchAll, apenas do último
     const { data, error } = await supabase
       .from(TABLES.REQUISITIONS)
       .select('internalId')
@@ -195,7 +188,6 @@ export const storageService = {
 
     if (error) {
        console.error("Error getting next ID", error);
-       // We'll throw here to prevent duplicate IDs if read fails
        throw error;
     }
 
@@ -230,16 +222,7 @@ export const storageService = {
 
   // --- User Vehicles Association ---
   getUserVehicles: async (): Promise<UserVehicle[]> => {
-    const { data, error } = await supabase
-      .from(TABLES.USER_VEHICLES)
-      .select('*')
-      .limit(QUERY_LIMIT);
-
-    if (error) {
-        console.error('Error fetching user vehicles:', error);
-        throw error;
-    }
-    return data || [];
+    return fetchAll<UserVehicle>(TABLES.USER_VEHICLES, 'id', true);
   },
 
   saveUserVehicle: async (link: UserVehicle): Promise<void> => {
@@ -267,19 +250,13 @@ export const storageService = {
   
   // --- User Profiles Helper ---
   getAllUsers: async (): Promise<UserProfile[]> => {
-      const { data, error } = await supabase
-          .from(TABLES.USER_ROLES)
-          .select('*')
-          .limit(QUERY_LIMIT);
-          
-      if (error) {
-          console.error('Error fetching users:', error);
-          throw error;
-      }
-      return data?.map((u: any) => ({
+      // User roles não costuma ser gigante, mas aplicamos a lógica por segurança
+      const allRoles = await fetchAll<any>(TABLES.USER_ROLES, 'id', true);
+      
+      return allRoles.map((u: any) => ({
           id: u.id,
           email: u.email || 'No Email',
           role: u.role
-      })) || [];
+      }));
   }
 };

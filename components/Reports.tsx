@@ -42,7 +42,7 @@ const Reports: React.FC = () => {
 
   const [obsModalData, setObsModalData] = useState<{content: string, date: string, plate: string} | null>(null);
 
-  // Pagination State
+  // Pagination State - Default 25
   const [itemsPerPage, setItemsPerPage] = useState(25);
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -56,7 +56,7 @@ const Reports: React.FC = () => {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [dateRange, filterForeman, filterContract, filterVehicleId, filterDriver, filterMunicipality]);
+  }, [dateRange, filterForeman, filterContract, filterVehicleId, filterDriver, filterMunicipality, itemsPerPage]);
 
   const handlePrint = () => {
     window.print();
@@ -805,6 +805,7 @@ const Reports: React.FC = () => {
                     <option value={25}>25</option>
                     <option value={50}>50</option>
                     <option value={100}>100</option>
+                    <option value={1000000}>Todos</option>
                 </select>
                 <button onClick={loadData} className="p-1 hover:bg-slate-200 rounded ml-2 text-slate-500" title="Recarregar"><RefreshCw size={16}/></button>
             </div>
