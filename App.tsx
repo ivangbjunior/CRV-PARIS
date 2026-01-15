@@ -182,11 +182,11 @@ const DashboardRankings: React.FC = () => {
   ];
 
   return (
-    <div className="flex flex-col sm:flex-row gap-6 items-end sm:items-stretch">
-      {/* Financial Widget - Blue Theme */}
-      <div className="flex flex-col gap-3">
-        {/* Team Filter - Positioned specifically for the Fuel Card with standard alignment */}
-        <div className="w-[240px] relative z-[110]">
+    <div className="flex flex-col sm:flex-row gap-4 items-end sm:items-stretch">
+      {/* Financial Widget - Compacted height */}
+      <div className="flex flex-col gap-2">
+        {/* Team Filter */}
+        <div className="w-[220px] relative z-[110]">
           <SelectWithSearch 
             label="EQUIPE (FILTRO)"
             options={foremanOptions}
@@ -196,91 +196,91 @@ const DashboardRankings: React.FC = () => {
           />
         </div>
 
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-5 min-w-[200px] w-[240px] flex flex-col justify-between h-[300px] shadow-sm hover:border-blue-300 transition-colors">
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 min-w-[200px] w-[220px] flex flex-col justify-between h-[290px] shadow-sm hover:border-blue-300 transition-colors">
             <div className="flex items-center gap-2 text-blue-700 mb-1">
               <div className="p-1.5 bg-white rounded-lg shadow-sm text-blue-600">
                 <Fuel size={14} />
               </div>
-              <span className="text-xs font-bold uppercase tracking-wider">Abastecimento</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider">Abastecimento</span>
             </div>
             
-            <div className="flex-1 flex flex-col justify-center py-4">
-              <div className="text-4xl font-black text-blue-900 tracking-tight">
+            <div className="flex-1 flex flex-col justify-center">
+              <div className="text-3xl font-black text-blue-900 tracking-tight">
                 {formatCurrency(financials.currentMonthCost)}
               </div>
               <p className="text-[10px] font-bold text-blue-400 uppercase mt-1">Acumulado do Mês</p>
             </div>
             
-            <div className="mt-auto pt-4 border-t border-blue-200/60">
-              <span className="text-[10px] font-bold text-blue-800/60 uppercase tracking-widest block mb-1">Mês Ant. (Mesmo Período)</span>
+            <div className="mt-auto pt-3 border-t border-blue-200/60">
+              <span className="text-[9px] font-bold text-blue-800/60 uppercase tracking-widest block mb-1">Mês Ant. (Período)</span>
               <div className="flex items-baseline gap-2">
-                  <span className="text-xl font-bold text-blue-900">{formatCurrency(financials.lastMonthCost)}</span>
-                  <div className={`flex items-center gap-0.5 text-xs font-bold ${financials.isIncrease ? 'text-red-600' : 'text-emerald-600'}`}>
+                  <span className="text-lg font-bold text-blue-900">{formatCurrency(financials.lastMonthCost)}</span>
+                  <div className={`flex items-center gap-0.5 text-[10px] font-bold ${financials.isIncrease ? 'text-red-600' : 'text-emerald-600'}`}>
                         {financials.isIncrease ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
-                        <span>{financials.diffPercent.toFixed(1)}%</span>
+                        <span>{financials.diffPercent.toFixed(0)}%</span>
                   </div>
               </div>
             </div>
         </div>
       </div>
 
-      {/* Rankings Widget - Expanded Card to 300px to avoid scrollbars */}
+      {/* Rankings Widget - Compacted to 290px height */}
       <div className="flex flex-col justify-end">
-        <div className={`rounded-xl shadow-md border overflow-hidden w-full sm:w-[420px] flex flex-col h-[300px] transition-all duration-300 ${getCardStyle()}`}>
-            {/* Tabs Header - Professional Dark Variant */}
+        <div className={`rounded-xl shadow-md border overflow-hidden w-full sm:w-[400px] flex flex-col h-[290px] transition-all duration-300 ${getCardStyle()}`}>
+            {/* Tabs Header */}
             <div className="flex border-b border-slate-200/60 bg-white/70 backdrop-blur-sm">
               <button 
                   onClick={() => setActiveTab('KM')}
-                  className={`flex-1 py-3.5 flex justify-center items-center gap-2 transition-all ${activeTab === 'KM' ? 'bg-blue-600 text-white shadow-inner' : 'text-slate-400 hover:bg-white/50'}`}
-                  title="Maior Rodagem (KM)"
+                  className={`flex-1 py-2.5 flex justify-center items-center gap-2 transition-all ${activeTab === 'KM' ? 'bg-blue-600 text-white shadow-inner' : 'text-slate-400 hover:bg-white/50'}`}
+                  title="Rodagem (KM)"
               >
-                  <Gauge size={18} />
+                  <Gauge size={16} />
                   <span className="text-[10px] font-black uppercase hidden sm:inline">KM</span>
               </button>
               <button 
                   onClick={() => setActiveTab('FUEL')}
-                  className={`flex-1 py-3.5 flex justify-center items-center gap-2 transition-all ${activeTab === 'FUEL' ? 'bg-orange-600 text-white shadow-inner' : 'text-slate-400 hover:bg-white/50'}`}
-                  title="Maior Abastecimento (Litros)"
+                  className={`flex-1 py-2.5 flex justify-center items-center gap-2 transition-all ${activeTab === 'FUEL' ? 'bg-orange-600 text-white shadow-inner' : 'text-slate-400 hover:bg-white/50'}`}
+                  title="Consumo (Litros)"
               >
-                  <Droplet size={18} />
+                  <Droplet size={16} />
                   <span className="text-[10px] font-black uppercase hidden sm:inline">Consumo</span>
               </button>
               <button 
                   onClick={() => setActiveTab('SPEED')}
-                  className={`flex-1 py-3.5 flex justify-center items-center gap-2 transition-all ${activeTab === 'SPEED' ? 'bg-red-600 text-white shadow-inner' : 'text-slate-400 hover:bg-white/50'}`}
-                  title="Infrações (>90km/h)"
+                  className={`flex-1 py-2.5 flex justify-center items-center gap-2 transition-all ${activeTab === 'SPEED' ? 'bg-red-600 text-white shadow-inner' : 'text-slate-400 hover:bg-white/50'}`}
+                  title="Infrações"
               >
-                  <AlertTriangle size={18} />
+                  <AlertTriangle size={16} />
                   <span className="text-[10px] font-black uppercase hidden sm:inline">Veloc.</span>
               </button>
             </div>
 
-            {/* List Content - overflow-hidden since size is now calibrated */}
-            <div className="p-4 flex-1 overflow-hidden">
-              <div className="flex justify-between items-center mb-3">
-                  <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest">
-                      {activeTab === 'KM' ? 'Top 3 Rodagem (Mensal Global)' : 
-                      activeTab === 'FUEL' ? 'Top 3 Consumo (Mensal Global)' : 
-                      'Top 3 Infrações (Mensal Global)'}
+            {/* List Content - Compacted paddings and gaps */}
+            <div className="p-3 flex-1 overflow-hidden">
+              <div className="flex justify-between items-center mb-2">
+                  <span className="text-[9px] font-black uppercase text-slate-500 tracking-widest">
+                      {activeTab === 'KM' ? 'Top 3 Rodagem (Mensal)' : 
+                      activeTab === 'FUEL' ? 'Top 3 Consumo (Mensal)' : 
+                      'Top 3 Infrações (Mensal)'}
                   </span>
-                  <Trophy size={14} className={activeTab === 'FUEL' ? "text-orange-500" : activeTab === 'SPEED' ? "text-red-500" : "text-blue-500"} />
+                  <Trophy size={12} className={activeTab === 'FUEL' ? "text-orange-500" : activeTab === 'SPEED' ? "text-red-500" : "text-blue-500"} />
               </div>
               
-              <div className="space-y-3">
+              <div className="space-y-1.5">
                   {(() => {
                     const list = activeTab === 'KM' ? rankings.km : activeTab === 'FUEL' ? rankings.fuel : rankings.speed;
                     
                     if (list.length === 0) return (
-                      <div className="flex flex-col items-center justify-center py-10 text-slate-400">
-                        <Activity size={40} className="opacity-20 mb-3" />
-                        <span className="text-xs italic">Sem dados registrados neste mês.</span>
+                      <div className="flex flex-col items-center justify-center py-8 text-slate-400">
+                        <Activity size={32} className="opacity-20 mb-2" />
+                        <span className="text-[10px] italic">Sem registros no mês.</span>
                       </div>
                     );
 
                     return list.map((item, idx) => (
-                        <div key={idx} className="flex items-center gap-4 bg-white/40 p-3 rounded-lg border border-white/60 shadow-sm transition-transform hover:scale-[1.01]">
+                        <div key={idx} className="flex items-center gap-3 bg-white/40 p-2 rounded-lg border border-white/60 shadow-sm transition-transform hover:scale-[1.01]">
                             {/* Rank Indicator */}
-                            <div className={`w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center font-black text-lg shadow-sm border-2 ${
+                            <div className={`w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center font-black text-base shadow-sm border-2 ${
                                 activeTab === 'FUEL' ? 'bg-orange-50 text-orange-600 border-orange-100' : 
                                 activeTab === 'SPEED' ? 'bg-red-50 text-red-600 border-red-100' : 
                                 'bg-blue-50 text-blue-600 border-blue-100'
@@ -291,10 +291,10 @@ const DashboardRankings: React.FC = () => {
                             {/* Main Info */}
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-center justify-between">
-                                  <span className="font-black text-slate-900 text-sm tracking-tight truncate" title={item.plate}>
+                                  <span className="font-black text-slate-900 text-[13px] tracking-tight truncate" title={item.plate}>
                                     {item.plate}
                                   </span>
-                                  <span className={`font-mono font-black px-2 py-0.5 rounded text-xs ${
+                                  <span className={`font-mono font-black px-1.5 py-0.5 rounded text-[10px] ${
                                       activeTab === 'FUEL' ? 'text-orange-700 bg-orange-100/50' : 
                                       activeTab === 'SPEED' ? 'text-red-700 bg-red-100/50' : 
                                       'text-blue-700 bg-blue-100/50'
@@ -304,12 +304,12 @@ const DashboardRankings: React.FC = () => {
                                       `${item.value}x`}
                                   </span>
                                 </div>
-                                <div className="flex items-center gap-2 mt-0.5">
-                                    <span className="text-[10px] font-bold text-slate-500 uppercase truncate" title={item.driver}>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                    <span className="text-[9px] font-bold text-slate-500 uppercase truncate" title={item.driver}>
                                       {item.driver || '?'}
                                     </span>
                                     <span className="text-slate-300">•</span>
-                                    <span className="text-[10px] font-medium text-slate-400 truncate" title={item.municipality}>
+                                    <span className="text-[9px] font-medium text-slate-400 truncate" title={item.municipality}>
                                       {item.municipality}
                                     </span>
                                 </div>
@@ -636,7 +636,7 @@ const HomeMenu: React.FC<HomeMenuProps> = ({ onNavigate, role, userName }) => {
 
       <div className="relative z-10 max-w-7xl mx-auto w-full flex-1 print:max-w-none print:w-full">
         
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 mb-10 animate-in slide-in-from-top-4 duration-700 print:hidden">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 mb-8 animate-in slide-in-from-top-4 duration-700 print:hidden">
             
             <div className="flex items-start gap-4">
                 {canSeeNotifications && (
@@ -666,10 +666,10 @@ const HomeMenu: React.FC<HomeMenuProps> = ({ onNavigate, role, userName }) => {
                             {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
                         </span>
                     </div>
-                    <h1 className="text-5xl font-bold text-slate-900 tracking-tight">
+                    <h1 className="text-4xl font-bold text-slate-900 tracking-tight">
                         Olá, <span className="text-indigo-600">{userName}</span>
                     </h1>
-                    <p className="text-slate-500 text-lg mt-1 font-medium">Bem-vindo ao seu painel.</p>
+                    <p className="text-slate-500 text-base mt-1 font-medium">Bem-vindo ao seu painel.</p>
                 </div>
             </div>
 
@@ -682,16 +682,16 @@ const HomeMenu: React.FC<HomeMenuProps> = ({ onNavigate, role, userName }) => {
 
         <div className="w-full animate-in slide-in-from-bottom-8 fade-in duration-1000 delay-200 print:animate-none">
             
-            <div className="mb-6 flex items-center gap-3 print:hidden">
+            <div className="mb-4 flex items-center gap-3 print:hidden">
                 <div className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-300 to-transparent"></div>
                 <div className="flex items-center gap-2 text-slate-400 bg-white/50 px-3 py-1 rounded-full backdrop-blur-sm border border-white/20 shadow-sm">
                     <Zap size={14} className="text-yellow-500" fill="currentColor" />
-                    <h2 className="text-xs font-bold uppercase tracking-widest">Acesso Rápido</h2>
+                    <h2 className="text-[10px] font-bold uppercase tracking-widest">Acesso Rápido</h2>
                 </div>
                 <div className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-300 to-transparent"></div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-10 print:hidden">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-8 print:hidden">
                 
                 {showLogs && (
                     <HomeCard 
@@ -810,29 +810,29 @@ const HomeCard: React.FC<HomeCardProps> = ({ icon: Icon, title, subtitle, theme,
   return (
     <button 
       onClick={onClick}
-      className={`group relative bg-white overflow-hidden rounded-2xl border transition-all duration-500 text-left h-[220px] hover:-translate-y-2 hover:shadow-xl ${t.border} ${t.shadow}`}
+      className={`group relative bg-white overflow-hidden rounded-2xl border transition-all duration-500 text-left h-[200px] hover:-translate-y-2 hover:shadow-xl ${t.border} ${t.shadow}`}
     >
       <div className={`absolute -right-10 -top-10 w-40 h-40 bg-gradient-to-br ${t.gradient} opacity-10 rounded-full blur-3xl group-hover:opacity-20 transition-opacity duration-500`}></div>
       
       <Icon 
         className={`absolute -right-6 -bottom-6 text-slate-100 transform -rotate-12 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-0 opacity-50`} 
-        size={140} 
+        size={130} 
         strokeWidth={1} 
       />
 
-      <div className="absolute inset-0 p-6 flex flex-col justify-between h-full z-10">
-          <div className={`w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg bg-gradient-to-br ${t.gradient} text-white transform group-hover:scale-110 transition-transform duration-300`}>
-            <Icon size={32} strokeWidth={1.5} />
+      <div className="absolute inset-0 p-5 flex flex-col justify-between h-full z-10">
+          <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg bg-gradient-to-br ${t.gradient} text-white transform group-hover:scale-110 transition-transform duration-300`}>
+            <Icon size={28} strokeWidth={1.5} />
           </div>
           
           <div className="w-full relative">
              <div className="flex justify-between items-end">
                 <div>
-                   <h3 className={`text-2xl font-bold ${t.text} mb-1 tracking-tight`}>{title}</h3>
-                   <p className="text-sm text-slate-500 font-medium leading-snug">{subtitle}</p>
+                   <h3 className={`text-xl font-bold ${t.text} mb-0.5 tracking-tight`}>{title}</h3>
+                   <p className="text-xs text-slate-500 font-medium leading-snug">{subtitle}</p>
                 </div>
-                <div className={`p-2.5 rounded-full bg-white text-slate-300 border border-slate-100 shadow-sm group-hover:text-white group-hover:bg-gradient-to-r ${t.gradient} transition-all duration-300`}>
-                   <ChevronRight size={20} />
+                <div className={`p-2 rounded-full bg-white text-slate-300 border border-slate-100 shadow-sm group-hover:text-white group-hover:bg-gradient-to-r ${t.gradient} transition-all duration-300`}>
+                   <ChevronRight size={18} />
                 </div>
              </div>
           </div>
