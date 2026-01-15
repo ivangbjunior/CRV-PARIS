@@ -1,29 +1,20 @@
-
 import React, { useState, useEffect } from 'react';
-import { GasStation, RefuelingLog, Vehicle, FuelType, ContractType, UserRole, UserProfile, FUEL_TYPES_LIST, SUPPLY_TYPES_LIST } from '../types';
+import { GasStation, RefuelingLog, Vehicle, FuelType, ContractType, UserRole, UserProfile, FUEL_TYPES_LIST, SUPPLY_TYPES_LIST, RefuelingItem } from '../types';
 import { storageService } from '../services/storage';
 import PasswordModal from './PasswordModal';
 import { useAuth } from '../contexts/AuthContext';
 import { 
-  Fuel, Plus, Save, Trash2, Edit2, Droplet, Filter, X, Calendar, Printer, AlertCircle, Users, ChevronDown, ChevronUp, MapPin, Clock, ClipboardList, ChevronLeft, ChevronRight, Loader2
+  Fuel, Plus, Save, Trash2, Edit2, Droplet, Filter, X, Calendar, Printer, AlertCircle, Users, ChevronDown, ChevronUp, MapPin, Clock, ClipboardList, ChevronLeft, ChevronRight, Loader2, DollarSign, Receipt, Package
 } from 'lucide-react';
 import { PrintHeader } from './PrintHeader';
 import MultiSelect, { MultiSelectOption } from './MultiSelect';
 import SelectWithSearch from './SelectWithSearch';
+import { ParisLogo } from './ParisLogo';
 
 type TabType = 'REFUELING' | 'STATIONS';
 
 const EXTERNAL_EQUIPMENT_TYPES = [
-  'BARCO', 
-  'BALSA', 
-  'MOTO', 
-  'CARRO',
-  'LANCHA', 
-  'MOTOR DE POUPA',
-  'MOTOPODA', 
-  'GERADOR', 
-  'GALÃO', 
-  'TAMBOR'
+  'BARCO', 'BALSA', 'MOTO', 'CARRO', 'LANCHA', 'MOTOR DE POUPA', 'MOTOPODA', 'GERADOR', 'GALÃO', 'TAMBOR'
 ];
 
 const ITEMS_PER_PAGE = 50;
@@ -43,13 +34,13 @@ const FuelManagement: React.FC = () => {
 
   const [filterDateStart, setFilterDateStart] = useState('');
   const [filterDateEnd, setFilterDateEnd] = useState('');
-  // Converted to arrays for MultiSelect
   const [filterPlate, setFilterPlate] = useState<string[]>([]);
   const [filterStation, setFilterStation] = useState<string[]>([]);
   const [filterContract, setFilterContract] = useState<string[]>([]);
   const [filterMunicipality, setFilterMunicipality] = useState<string[]>([]);
   const [filterFuel, setFilterFuel] = useState<string[]>([]);
   const [filterForeman, setFilterForeman] = useState<string[]>([]);
+  const [filterInvoice, setFilterInvoice] = useState<string[]>([]);
 
   const [showFilters, setShowFilters] = useState(false);
 
@@ -57,11 +48,16 @@ const FuelManagement: React.FC = () => {
   const [uniqueContracts, setUniqueContracts] = useState<string[]>([]);
   const [uniqueMunicipalities, setUniqueMunicipalities] = useState<string[]>([]);
   const [uniqueForemen, setUniqueForemen] = useState<string[]>([]);
+  const [uniqueInvoices, setUniqueInvoices] = useState<string[]>([]);
 
   const [showForm, setShowForm] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
   
   const [currentStation, setCurrentStation] = useState<Partial<GasStation>>({});
+
+  // Ticket State
+  const [selectedTicket, setSelectedTicket] = useState<RefuelingLog | null>(null);
   
   const getTodayLocal = () => {
     const now = new Date();
@@ -76,12 +72,19 @@ const FuelManagement: React.FC = () => {
     return now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   };
   
-  const [currentRefueling, setCurrentRefueling] = useState<Partial<RefuelingLog>>({
-    date: getTodayLocal(),
-    time: getCurrentTime(),
-    foremanSnapshot: '', 
-    invoiceNumber: '',
-    requisitionNumber: ''
+  // Refueling Form State (Unified for Single Item)
+  const [refuelingForm, setRefuelingForm] = useState({
+      date: getTodayLocal(),
+      time: getCurrentTime(),
+      vehicleId: '',
+      gasStationId: '',
+      foremanSnapshot: '',
+      invoiceNumber: '',
+      requisitionNumber: '',
+      fuelType: '' as FuelType,
+      liters: 0,
+      totalCost: 0,
+      municipality: ''
   });
 
   const [isExternal, setIsExternal] = useState(false);
@@ -102,16 +105,15 @@ const FuelManagement: React.FC = () => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [filterDateStart, filterDateEnd, filterPlate, filterStation, filterContract, filterMunicipality, filterFuel, filterForeman]);
+  }, [filterDateStart, filterDateEnd, filterPlate, filterStation, filterContract, filterMunicipality, filterFuel, filterForeman, filterInvoice]);
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const [sData, rData, vData, uData] = await Promise.all([
+      const [sData, rData, vData] = await Promise.all([
           storageService.getGasStations(),
           storageService.getRefuelings(),
-          storageService.getVehicles(),
-          storageService.getAllUsers()
+          storageService.getVehicles()
       ]);
 
       setStations(sData);
@@ -121,14 +123,14 @@ const FuelManagement: React.FC = () => {
       const plates = Array.from(new Set(rData.map(r => r.plateSnapshot))).sort();
       const contracts = Array.from(new Set(rData.map(r => r.contractSnapshot))).sort();
       const cities = Array.from(new Set(rData.map(r => r.municipalitySnapshot))).sort();
-      
-      // ALTERAÇÃO: Buscar Equipes (foreman) dos VEÍCULOS cadastrados, não dos usuários
       const vehicleTeams = Array.from(new Set(vData.map(v => v.foreman).filter(f => f && f.trim() !== ''))).sort();
+      const invoices = Array.from(new Set(rData.map(r => r.invoiceNumber).filter(n => n && n.trim() !== ''))).sort();
 
       setUniquePlates(plates);
       setUniqueContracts(contracts);
       setUniqueMunicipalities(cities);
       setUniqueForemen(vehicleTeams);
+      setUniqueInvoices(invoices as string[]);
     } catch (e) {
         console.error(e);
     } finally {
@@ -185,97 +187,87 @@ const FuelManagement: React.FC = () => {
     setActiveTab('STATIONS');
   };
 
-  const deleteStation = async (id: string) => {
-    if (isReadOnly) return;
-    const hasUsage = refuelings.some(r => r.gasStationId === id);
-    if(hasUsage) {
-        alert("Não é possível excluir este posto pois existem abastecimentos vinculados a ele.");
-        return;
-    }
-    setLoading(true);
-    try {
-        await storageService.deleteGasStation(id);
-        await loadData();
-        setShowDeleteModal(false);
-        setItemToDelete(null);
-    } catch (err: any) {
-        console.error(err);
-        alert(`Erro ao excluir posto: ${err.message}`);
-    } finally {
-        setLoading(false);
-    }
-  };
-
   const handleSaveRefueling = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isReadOnly) return;
     
-    // Removed check for liters/totalCost to allow saving pending records (R$ 0)
-    if (!currentRefueling.gasStationId || !currentRefueling.fuelType) return;
+    if (!refuelingForm.gasStationId) {
+        alert("Selecione o posto.");
+        return;
+    }
+
+    if (!refuelingForm.fuelType) {
+        alert("Selecione o produto.");
+        return;
+    }
     
     let snapshotData = {
         plate: '',
         model: '',
         contract: '',
-        municipality: '',
-        foreman: currentRefueling.foremanSnapshot || ''
+        municipality: refuelingForm.municipality || '',
+        foreman: refuelingForm.foremanSnapshot || ''
     };
 
     let vehicleIdToSave = '';
 
     if (isExternal) {
-        if (!externalData.identifier || !externalData.contract || !externalData.municipality) {
+        if (!externalData.identifier || !externalData.contract || !refuelingForm.municipality) {
             alert("Para equipamentos externos, preencha Identificação, Contrato e Município.");
             return;
         }
         snapshotData.plate = externalData.identifier.toUpperCase();
         snapshotData.model = externalData.model ? externalData.model.toUpperCase() : '';
         snapshotData.contract = externalData.contract;
-        snapshotData.municipality = externalData.municipality.toUpperCase();
         vehicleIdToSave = 'EXTERNAL';
     } else {
-        if (!currentRefueling.vehicleId) return;
+        if (!refuelingForm.vehicleId) {
+            alert("Selecione o veículo.");
+            return;
+        }
         
-        const vehicle = vehicles.find(v => v.id === currentRefueling.vehicleId);
-        if (!vehicle) return;
+        const vehicle = vehicles.find(v => v.id === refuelingForm.vehicleId);
+        if (!vehicle) {
+            alert("Veículo não encontrado no cadastro.");
+            return;
+        }
 
         snapshotData.plate = vehicle.plate;
         snapshotData.model = vehicle.model || '';
         snapshotData.contract = vehicle.contract;
-        snapshotData.municipality = vehicle.municipality;
         if (!snapshotData.foreman) snapshotData.foreman = vehicle.foreman;
         
-        vehicleIdToSave = currentRefueling.vehicleId;
+        vehicleIdToSave = refuelingForm.vehicleId;
     }
-
-    const newRefueling: RefuelingLog = {
-      id: currentRefueling.id || crypto.randomUUID(),
-      date: currentRefueling.date!,
-      vehicleId: vehicleIdToSave,
-      gasStationId: currentRefueling.gasStationId,
-      fuelType: currentRefueling.fuelType as FuelType,
-      liters: Number(currentRefueling.liters || 0), // Default to 0 if empty
-      totalCost: Number(currentRefueling.totalCost || 0), // Default to 0 if empty
-      invoiceNumber: currentRefueling.invoiceNumber ? currentRefueling.invoiceNumber.toUpperCase() : '',
-      requisitionNumber: currentRefueling.requisitionNumber ? currentRefueling.requisitionNumber.toUpperCase() : '',
-      time: currentRefueling.time || '', 
-      
-      plateSnapshot: snapshotData.plate,
-      modelSnapshot: snapshotData.model,
-      foremanSnapshot: snapshotData.foreman, 
-      contractSnapshot: snapshotData.contract,
-      municipalitySnapshot: snapshotData.municipality,
-      observation: isExternal && externalData.description ? externalData.description.toUpperCase() : ''
-    };
 
     setLoading(true);
     try {
+        const newRefueling: RefuelingLog = {
+            id: editingRecordId || crypto.randomUUID(),
+            date: refuelingForm.date,
+            vehicleId: vehicleIdToSave,
+            gasStationId: refuelingForm.gasStationId,
+            fuelType: refuelingForm.fuelType, 
+            liters: Number(refuelingForm.liters || 0), 
+            totalCost: Number(refuelingForm.totalCost || 0), 
+            invoiceNumber: refuelingForm.invoiceNumber ? refuelingForm.invoiceNumber.toUpperCase() : '',
+            requisitionNumber: refuelingForm.requisitionNumber ? refuelingForm.requisitionNumber.toUpperCase() : '',
+            time: refuelingForm.time || '', 
+            plateSnapshot: snapshotData.plate,
+            modelSnapshot: snapshotData.model,
+            foremanSnapshot: snapshotData.foreman, 
+            contractSnapshot: snapshotData.contract,
+            municipalitySnapshot: snapshotData.municipality,
+            observation: isExternal ? externalData.description.toUpperCase() : ''
+        };
+
         await storageService.saveRefueling(newRefueling);
         await loadData();
         resetForms();
+        alert("Abastecimento registrado com sucesso!");
     } catch (err: any) {
-        console.error(err);
-        alert(`Erro ao salvar abastecimento: ${err.message}`);
+        console.error("Erro ao salvar abastecimento:", err);
+        alert(`Erro ao salvar: ${err.message}`);
     } finally {
         setLoading(false);
     }
@@ -283,7 +275,22 @@ const FuelManagement: React.FC = () => {
 
   const handleEditRefueling = (refueling: RefuelingLog) => {
     if (isReadOnly) return;
-    setCurrentRefueling(refueling);
+    
+    setRefuelingForm({
+        date: refueling.date,
+        time: refueling.time || '',
+        vehicleId: refueling.vehicleId,
+        gasStationId: refueling.gasStationId,
+        foremanSnapshot: refueling.foremanSnapshot || '',
+        invoiceNumber: refueling.invoiceNumber || '',
+        requisitionNumber: refueling.requisitionNumber || '',
+        fuelType: refueling.fuelType,
+        liters: refueling.liters,
+        totalCost: refueling.totalCost,
+        municipality: refueling.municipalitySnapshot
+    });
+
+    setEditingRecordId(refueling.id);
     
     const vehicleExists = vehicles.find(v => v.id === refueling.vehicleId);
     
@@ -307,32 +314,22 @@ const FuelManagement: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const deleteRefueling = async (id: string) => {
-    if (isReadOnly) return;
-    setLoading(true);
-    try {
-        await storageService.deleteRefueling(id);
-        await loadData();
-        setShowDeleteModal(false);
-        setItemToDelete(null);
-    } catch (err: any) {
-        console.error(err);
-        alert(`Erro ao excluir abastecimento: ${err.message}`);
-    } finally {
-        setLoading(false);
-    }
-  };
-
   const resetForms = () => {
     setShowForm(false);
     setIsEditing(false);
-    setCurrentStation({});
-    setCurrentRefueling({
+    setEditingRecordId(null);
+    setRefuelingForm({
       date: getTodayLocal(),
       time: getCurrentTime(),
+      vehicleId: '',
+      gasStationId: '',
       foremanSnapshot: '',
       invoiceNumber: '',
-      requisitionNumber: ''
+      requisitionNumber: '',
+      fuelType: '' as any,
+      liters: 0,
+      totalCost: 0,
+      municipality: ''
     });
     setIsExternal(false);
     setExternalData({ identifier: '', model: '', contract: '', municipality: '', description: '' });
@@ -347,6 +344,7 @@ const FuelManagement: React.FC = () => {
     setFilterMunicipality([]);
     setFilterFuel([]);
     setFilterForeman([]);
+    setFilterInvoice([]);
   };
 
   const confirmDelete = (id: string) => {
@@ -355,36 +353,60 @@ const FuelManagement: React.FC = () => {
     setShowDeleteModal(true);
   };
 
-  const executeDelete = () => {
+  const executeDelete = async () => {
     if (itemToDelete) {
-      if (activeTab === 'STATIONS') {
-        deleteStation(itemToDelete);
-      } else {
-        deleteRefueling(itemToDelete);
-      }
+        setLoading(true);
+        try {
+            if (activeTab === 'STATIONS') {
+                await storageService.deleteGasStation(itemToDelete);
+            } else {
+                await storageService.deleteRefueling(itemToDelete);
+            }
+            await loadData();
+            setShowDeleteModal(false);
+            setItemToDelete(null);
+        } catch (err: any) {
+            alert(`Erro ao excluir: ${err.message}`);
+        } finally {
+            setLoading(false);
+        }
     }
   };
 
   const handleVehicleChange = (vehicleId: string) => {
     const vehicle = vehicles.find(v => v.id === vehicleId);
     if (vehicle) {
-        setCurrentRefueling(prev => ({
+        setRefuelingForm(prev => ({
             ...prev,
             vehicleId: vehicleId,
-            foremanSnapshot: vehicle.foreman 
+            foremanSnapshot: vehicle.foreman || '',
+            municipality: vehicle.municipality 
         }));
     } else {
-        setCurrentRefueling(prev => ({ ...prev, vehicleId: vehicleId, foremanSnapshot: '' }));
+        setRefuelingForm(prev => ({ ...prev, vehicleId: vehicleId, foremanSnapshot: '', municipality: '' }));
+    }
+  };
+
+  const handleStationChange = (val: string) => {
+    const station = stations.find(s => s.id === val);
+    setRefuelingForm(prev => ({
+        ...prev,
+        gasStationId: val,
+        municipality: station ? station.municipality : prev.municipality
+    }));
+    if (isExternal && station) {
+        setExternalData(prev => ({ ...prev, municipality: station.municipality }));
     }
   };
 
   const formatDate = (dateStr: string) => {
+    if (!dateStr) return '-';
     const [y, m, d] = dateStr.split('-');
     return `${d}/${m}/${y}`;
   };
 
   const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
   };
 
   const filteredRefuelings = refuelings.filter(r => {
@@ -392,15 +414,15 @@ const FuelManagement: React.FC = () => {
       const start = filterDateStart ? new Date(filterDateStart).getTime() : null;
       const end = filterDateEnd ? new Date(filterDateEnd).getTime() : null;
       const matchesDate = (!start || rDate >= start) && (!end || rDate <= end);
-
       const matchesPlate = filterPlate.length === 0 || filterPlate.includes(r.plateSnapshot);
       const matchesStation = filterStation.length === 0 || filterStation.includes(r.gasStationId);
       const matchesContract = filterContract.length === 0 || filterContract.includes(r.contractSnapshot);
       const matchesCity = filterMunicipality.length === 0 || filterMunicipality.includes(r.municipalitySnapshot);
       const matchesFuel = filterFuel.length === 0 || filterFuel.includes(r.fuelType);
-      const matchesForeman = filterForeman.length === 0 || filterForeman.includes(r.foremanSnapshot);
+      const matchesForeman = filterForeman.length === 0 || (r.foremanSnapshot && filterForeman.includes(r.foremanSnapshot));
+      const matchesInvoice = filterInvoice.length === 0 || (r.invoiceNumber && filterInvoice.includes(r.invoiceNumber));
 
-      return matchesDate && matchesPlate && matchesStation && matchesContract && matchesCity && matchesFuel && matchesForeman;
+      return matchesDate && matchesPlate && matchesStation && matchesContract && matchesCity && matchesFuel && matchesForeman && matchesInvoice;
   }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   const totalPages = Math.ceil(filteredRefuelings.length / ITEMS_PER_PAGE);
@@ -409,30 +431,25 @@ const FuelManagement: React.FC = () => {
     currentPage * ITEMS_PER_PAGE
   );
 
-  // Totals Calculation
-  const totalLiters = filteredRefuelings
-    .filter(r => FUEL_TYPES_LIST.includes(r.fuelType))
-    .reduce((acc, curr) => acc + curr.liters, 0);
-
-  const totalCost = filteredRefuelings
-    .reduce((acc, curr) => acc + curr.totalCost, 0);
+  const totalLitersCalculated = filteredRefuelings.reduce((acc, curr) => acc + (curr.liters || 0), 0);
+  const totalCostCalculated = filteredRefuelings.reduce((acc, curr) => acc + (curr.totalCost || 0), 0);
 
   const activeFiltersCount = [
     filterDateStart, filterDateEnd, 
     filterPlate.length, filterStation.length, 
-    filterContract.length, filterMunicipality.length, filterFuel.length, filterForeman.length
+    filterContract.length, filterMunicipality.length, filterFuel.length, filterForeman.length, filterInvoice.length
   ].filter(Boolean).reduce((a, b) => a + (typeof b === 'number' ? b : 1), 0);
 
   const inputClass = "w-full rounded-lg border border-slate-300 bg-slate-50 p-2.5 text-slate-800 focus:border-blue-600 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition-all";
-  const selectClass = "w-full rounded-lg border border-slate-300 bg-white p-2 text-slate-700 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none transition-all h-[42px] shadow-sm";
+  const selectClass = "w-full rounded-lg border border-slate-300 bg-white p-2 text-slate-700 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none h-[42px] shadow-sm";
 
-  // Options for MultiSelect
   const plateOptions: MultiSelectOption[] = uniquePlates.map(p => ({ value: p, label: p }));
   const stationOptions: MultiSelectOption[] = stations.map(s => ({ value: s.id, label: s.name }));
   const contractOptions: MultiSelectOption[] = uniqueContracts.map(c => ({ value: c, label: c }));
   const municipalityOptions: MultiSelectOption[] = uniqueMunicipalities.map(m => ({ value: m, label: m }));
   const foremanOptions: MultiSelectOption[] = uniqueForemen.map(f => ({ value: f, label: f }));
   const fuelOptions: MultiSelectOption[] = Object.values(FuelType).map(f => ({ value: f, label: f }));
+  const invoiceOptions: MultiSelectOption[] = uniqueInvoices.map(i => ({ value: i, label: `NF: ${i}` }));
 
   const vehicleOptions = vehicles.map(v => ({
       value: v.id,
@@ -444,22 +461,17 @@ const FuelManagement: React.FC = () => {
       label: `${s.name} - ${s.municipality}`
   }));
 
-  if (loading && activeTab === 'REFUELING' && refuelings.length === 0) {
-      return <div className="flex justify-center items-center h-64"><Loader2 className="animate-spin text-blue-600" size={48} /></div>;
-  }
-
   return (
     <div className="space-y-6">
        
-      {/* PRINT HEADER */}
       <PrintHeader 
         title="Relatório de Abastecimentos"
         subtitle="Consolidado de Consumo"
         details={
             <>
                 <span>Registros: {filteredRefuelings.length}</span>
-                <span>Total Litros (Comb.): {totalLiters.toFixed(2)} L</span>
-                <span>Total Valor (Geral): {formatCurrency(totalCost)}</span>
+                <span>Total Litros: {totalLitersCalculated.toFixed(2)} L</span>
+                <span>Total Valor: {formatCurrency(totalCostCalculated)}</span>
             </>
         }
       />
@@ -473,13 +485,87 @@ const FuelManagement: React.FC = () => {
         />
       </div>
 
+      {selectedTicket && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[999] flex items-center justify-center p-4 print:hidden">
+            <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full overflow-hidden animate-in zoom-in-95 duration-200">
+                <div className="bg-slate-900 p-4 text-white flex justify-between items-center">
+                    <h3 className="font-bold flex items-center gap-2"><Receipt size={20} /> Bilhete de Lançamento</h3>
+                    <button onClick={() => setSelectedTicket(null)} className="p-1 hover:bg-slate-800 rounded transition-colors"><X size={20}/></button>
+                </div>
+                
+                <div className="p-6 bg-white font-mono text-xs text-slate-700 space-y-4" id="refueling-ticket-print">
+                    <div className="flex flex-col items-center border-b border-dashed border-slate-300 pb-4">
+                        <ParisLogo variant="dark" size="normal" />
+                        <h4 className="mt-4 font-black text-sm text-slate-900">COMPROVANTE DE ABASTECIMENTO</h4>
+                        <p className="mt-1">PARIS ENGENHARIA LTDA</p>
+                    </div>
+
+                    <div className="space-y-1.5 border-b border-dashed border-slate-300 pb-4">
+                        <div className="flex justify-between"><span>DATA:</span><span className="font-bold">{formatDate(selectedTicket.date)}</span></div>
+                        <div className="flex justify-between"><span>HORA:</span><span className="font-bold">{selectedTicket.time || '--:--'}</span></div>
+                        <div className="flex justify-between"><span>VEÍCULO:</span><span className="font-bold">{selectedTicket.plateSnapshot}</span></div>
+                        <div className="flex justify-between"><span>EQUIPE:</span><span className="font-bold truncate ml-4">{selectedTicket.foremanSnapshot || '-'}</span></div>
+                        <div className="flex justify-between"><span>CONTRATO:</span><span className="font-bold">{selectedTicket.contractSnapshot}</span></div>
+                    </div>
+
+                    <div className="space-y-1.5 border-b border-dashed border-slate-300 pb-4">
+                        <div className="text-[10px] font-bold text-slate-400 mb-1">LOCAL DE ABASTECIMENTO</div>
+                        <p className="font-bold text-slate-900">{stations.find(s => s.id === selectedTicket?.gasStationId)?.name || 'POSTO CONVENIADO'}</p>
+                        <p className="text-[10px]">{selectedTicket.municipalitySnapshot}</p>
+                        {selectedTicket.invoiceNumber && <div className="flex justify-between mt-2"><span>Nº NOTA:</span><span className="font-bold">{selectedTicket.invoiceNumber}</span></div>}
+                        {selectedTicket.requisitionNumber && <div className="flex justify-between"><span>Nº REQUISIÇÃO:</span><span className="font-bold">{selectedTicket.requisitionNumber}</span></div>}
+                    </div>
+
+                    <div className="space-y-2">
+                        <div className="flex justify-between font-bold text-slate-900 border-b border-slate-100 pb-1">
+                            <span>ITEM / QTD</span>
+                            <span>SUBTOTAL</span>
+                        </div>
+                        <div className="flex justify-between py-0.5">
+                            <span className="truncate mr-4">{selectedTicket.fuelType} x {selectedTicket.liters.toFixed(2)}{FUEL_TYPES_LIST.includes(selectedTicket.fuelType) ? 'L' : 'un'}</span>
+                            <span className="font-bold">{formatCurrency(selectedTicket.totalCost)}</span>
+                        </div>
+                    </div>
+
+                    <div className="pt-4 border-t-2 border-slate-900 mt-4">
+                        <div className="flex justify-between items-baseline">
+                            <span className="font-black text-sm">TOTAL GERAL</span>
+                            <span className="font-black text-lg text-slate-900">
+                                {formatCurrency(selectedTicket.totalCost)}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="pt-8 space-y-8 text-center opacity-40">
+                        <div className="border-t border-slate-400 pt-1">Assinatura do Responsável</div>
+                    </div>
+                </div>
+
+                <div className="p-4 bg-slate-50 border-t flex flex-col gap-2">
+                    <button 
+                        onClick={() => window.print()}
+                        className="bg-slate-900 text-white w-full py-3 rounded-lg font-bold flex items-center justify-center gap-2 shadow-lg hover:bg-slate-800 transition-colors"
+                    >
+                        <Printer size={18} /> Imprimir Bilhete
+                    </button>
+                    <button 
+                        onClick={() => setSelectedTicket(null)}
+                        className="bg-white border border-slate-300 text-slate-600 w-full py-2 rounded-lg font-bold text-xs"
+                    >
+                        FECHAR
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}
+
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 print:hidden">
         <div>
           <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-3">
             <Fuel className="text-blue-600" size={32} />
             Abastecimento
           </h1>
-          <p className="text-slate-500">Controle de combustível e cadastro de postos conveniados.</p>
+          <p className="text-slate-500">Controle consolidado de consumo e custos da frota.</p>
         </div>
         
         <div className="flex flex-col gap-2 w-full md:w-auto">
@@ -522,32 +608,21 @@ const FuelManagement: React.FC = () => {
 
         {!isReadOnly && (
           <div className="w-full sm:w-auto">
-            {activeTab === 'REFUELING' && (
-                <button
-                    onClick={() => { resetForms(); setShowForm(!showForm); }}
-                    className={`${showForm ? 'bg-slate-600 hover:bg-slate-700' : 'bg-blue-600 hover:bg-blue-700'} text-white px-6 py-2 rounded-lg font-bold flex items-center justify-center gap-2 shadow transition-colors w-full sm:w-auto whitespace-nowrap h-[40px]`}
-                >
-                    {showForm ? <X size={18} /> : <Plus size={18} />}
-                    {showForm ? 'Cancelar' : 'Novo Abastecimento'}
-                </button>
-            )}
-             {activeTab === 'STATIONS' && (
-                <button
-                    onClick={() => { resetForms(); setShowForm(!showForm); }}
-                    className={`${showForm ? 'bg-slate-600 hover:bg-slate-700' : 'bg-blue-600 hover:bg-blue-700'} text-white px-6 py-2 rounded-lg font-bold flex items-center justify-center gap-2 shadow transition-colors w-full sm:w-auto whitespace-nowrap h-[40px]`}
-                >
-                     {showForm ? <X size={18} /> : <Plus size={18} />}
-                    {showForm ? 'Cancelar' : 'Novo Posto'}
-                </button>
-            )}
+            <button
+                onClick={() => { resetForms(); setShowForm(!showForm); }}
+                className={`${showForm ? 'bg-slate-600 hover:bg-slate-700' : 'bg-blue-600 hover:bg-blue-700'} text-white px-6 py-2 rounded-lg font-bold flex items-center justify-center gap-2 shadow transition-colors w-full sm:w-auto whitespace-nowrap h-[40px]`}
+            >
+                {showForm ? <X size={18} /> : <Plus size={18} />}
+                {showForm ? 'Cancelar' : activeTab === 'REFUELING' ? 'Novo Abastecimento' : 'Novo Posto'}
+            </button>
         </div>
         )}
       </div>
       
       {activeTab === 'REFUELING' && (
         <div className="space-y-6">
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm print:hidden overflow-hidden">
-                <div onClick={() => setShowFilters(!showFilters)} className="p-4 bg-white flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors">
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm print:hidden relative z-40">
+                <div onClick={() => setShowFilters(!showFilters)} className="p-4 bg-white flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors rounded-xl overflow-visible">
                     <div className="flex items-center gap-2 text-slate-800 font-bold">
                         <Filter size={20} className="text-blue-600" />
                         Filtros Avançados
@@ -560,16 +635,16 @@ const FuelManagement: React.FC = () => {
                 </div>
                 
                 {showFilters && (
-                    <div className="p-5 border-t border-slate-100 bg-slate-50/50 animate-in slide-in-from-top-5 duration-200">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <div>
+                    <div className="p-5 border-t border-slate-100 bg-slate-50/50 animate-in slide-in-from-top-5 duration-200 rounded-b-xl overflow-visible">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 overflow-visible">
+                            <div className="relative z-[45]">
                                 <label className="block text-xs font-bold text-slate-500 mb-1">Data Início</label>
                                 <div className="relative">
                                     <input type="date" className={selectClass} value={filterDateStart} onChange={(e) => setFilterDateStart(e.target.value)} />
                                     <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none"><Calendar size={16} className="text-slate-400" /></div>
                                 </div>
                             </div>
-                            <div>
+                            <div className="relative z-[45]">
                                 <label className="block text-xs font-bold text-slate-500 mb-1">Data Final</label>
                                 <div className="relative">
                                     <input type="date" className={selectClass} value={filterDateEnd} onChange={(e) => setFilterDateEnd(e.target.value)} />
@@ -577,12 +652,13 @@ const FuelManagement: React.FC = () => {
                                 </div>
                             </div>
                             
-                            <div><MultiSelect label="Placa / Identificação" options={plateOptions} selected={filterPlate} onChange={setFilterPlate} placeholder="Todas" /></div>
-                            <div><MultiSelect label="Equipe" options={foremanOptions} selected={filterForeman} onChange={setFilterForeman} placeholder="Todos" /></div>
-                            <div><MultiSelect label="Posto" options={stationOptions} selected={filterStation} onChange={setFilterStation} placeholder="Todos" /></div>
-                            <div><MultiSelect label="Contrato" options={contractOptions} selected={filterContract} onChange={setFilterContract} placeholder="Todos" /></div>
-                            <div><MultiSelect label="Município" options={municipalityOptions} selected={filterMunicipality} onChange={setFilterMunicipality} placeholder="Todos" /></div>
-                            <div><MultiSelect label="Combustível" options={fuelOptions} selected={filterFuel} onChange={setFilterFuel} placeholder="Todos" /></div>
+                            <div className="relative z-[45]"><MultiSelect label="Placa / Identificação" options={plateOptions} selected={filterPlate} onChange={setFilterPlate} placeholder="Todas" /></div>
+                            <div className="relative z-[45]"><MultiSelect label="Equipe" options={foremanOptions} selected={filterForeman} onChange={setFilterForeman} placeholder="Todos" /></div>
+                            <div className="relative z-[45]"><MultiSelect label="Posto" options={stationOptions} selected={filterStation} onChange={setFilterStation} placeholder="Todos" /></div>
+                            <div className="relative z-[45]"><MultiSelect label="Nota Fiscal (NF)" options={invoiceOptions} selected={filterInvoice} onChange={setFilterInvoice} placeholder="Todas" /></div>
+                            <div className="relative z-[45]"><MultiSelect label="Contrato" options={contractOptions} selected={filterContract} onChange={setFilterContract} placeholder="Todos" /></div>
+                            <div className="relative z-[45]"><MultiSelect label="Município" options={municipalityOptions} selected={filterMunicipality} onChange={setFilterMunicipality} placeholder="Todos" /></div>
+                            <div className="relative z-[45]"><MultiSelect label="Combustível" options={fuelOptions} selected={filterFuel} onChange={setFilterFuel} placeholder="Todos" /></div>
                         </div>
                     </div>
                 )}
@@ -590,38 +666,38 @@ const FuelManagement: React.FC = () => {
 
             {showForm && !isReadOnly && (
                 <div className="bg-white rounded-xl shadow-lg border border-slate-200 p-6 animate-in fade-in slide-in-from-top-2 print:hidden">
-                    <h3 className="font-bold text-lg text-slate-800 mb-4 flex items-center gap-2">
+                    <h3 className="font-bold text-lg text-slate-800 mb-6 flex items-center gap-2">
                         <Droplet className="text-blue-500" />
-                        {isEditing ? 'Editar Abastecimento' : 'Registrar Novo Abastecimento'}
+                        {isEditing ? 'Editar Abastecimento' : 'Novo Registro de Abastecimento'}
                     </h3>
                     
                     <div className="mb-6 flex items-center p-3 bg-blue-50 border border-blue-200 rounded-lg">
                         <label className="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" className="sr-only peer" checked={isExternal} onChange={(e) => { setIsExternal(e.target.checked); setCurrentRefueling({ ...currentRefueling, vehicleId: '' }); }} />
+                        <input type="checkbox" className="sr-only peer" checked={isExternal} onChange={(e) => { setIsExternal(e.target.checked); setRefuelingForm({ ...refuelingForm, vehicleId: '' }); }} />
                         <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                         <span className="ml-3 text-sm font-bold text-slate-700 flex items-center gap-2">
                             <Fuel size={16} />
-                            Abastecimento de Equipamento Externo / Não Cadastrado (Balsas, Barcos, Motos...)
+                            Equipamento Externo / Não Cadastrado
                         </span>
                         </label>
                     </div>
 
-                    <form onSubmit={handleSaveRefueling} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                         <div>
                             <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Data</label>
-                            <input type="date" required value={currentRefueling.date} onChange={e => setCurrentRefueling({...currentRefueling, date: e.target.value})} className={inputClass} />
+                            <input type="date" required value={refuelingForm.date} onChange={e => setRefuelingForm({...refuelingForm, date: e.target.value})} className={inputClass} />
                         </div>
                         <div>
                             <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Hora</label>
                             <div className="relative">
-                                <input type="time" required value={currentRefueling.time} onChange={e => setCurrentRefueling({...currentRefueling, time: e.target.value})} className={inputClass} />
+                                <input type="time" required value={refuelingForm.time} onChange={e => setRefuelingForm({...refuelingForm, time: e.target.value})} className={inputClass} />
                                 <Clock size={16} className="absolute right-3 top-3 text-slate-400 pointer-events-none" />
                             </div>
                         </div>
 
                         {isExternal ? (
                             <>
-                                <div className="">
+                                <div>
                                     <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Identificação</label>
                                     <select required value={externalData.identifier} onChange={e => setExternalData({...externalData, identifier: e.target.value})} className={`${inputClass} font-bold border-blue-300 bg-blue-50`}>
                                         <option value="">Selecione o tipo...</option>
@@ -635,229 +711,211 @@ const FuelManagement: React.FC = () => {
                                         {Object.values(ContractType).map(c => (<option key={c} value={c}>{c}</option>))}
                                     </select>
                                 </div>
-                                <div>
-                                    <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Município</label>
-                                    <input type="text" required value={externalData.municipality} onChange={e => setExternalData({...externalData, municipality: e.target.value.toUpperCase()})} className={inputClass} />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Descrição / Obs.</label>
-                                    <input type="text" placeholder="Detalhes (Opcional)" value={externalData.description} onChange={e => setExternalData({...externalData, description: e.target.value.toUpperCase()})} className={inputClass} />
-                                </div>
                             </>
                         ) : (
                             <div className="lg:col-span-2 relative">
-                                {/* SUBSTITUIÇÃO POR SELECTWITHSEARCH */}
                                 <SelectWithSearch 
                                     label="VEÍCULO CADASTRADO"
                                     options={vehicleOptions}
-                                    value={currentRefueling.vehicleId || ''}
+                                    value={refuelingForm.vehicleId || ''}
                                     onChange={handleVehicleChange}
                                     required
                                     placeholder="Selecione ou digite..."
                                 />
-                                
-                                {currentRefueling.vehicleId && (() => {
-                                    const v = vehicles.find(veh => veh.id === currentRefueling.vehicleId);
-                                    if(v) return (
-                                        <div className="mt-2 text-xs text-slate-500 bg-slate-50 p-2 rounded border border-slate-200 flex flex-wrap gap-3">
-                                            <span><strong>Contrato:</strong> {v.contract}</span>
-                                            <span><strong>Município:</strong> {v.municipality}</span>
-                                        </div>
-                                    )
-                                })()}
                             </div>
                         )}
 
-                        <div>
-                            <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Equipe</label>
-                             <div className="relative">
-                                <select value={currentRefueling.foremanSnapshot || ''} onChange={e => setCurrentRefueling({...currentRefueling, foremanSnapshot: e.target.value})} className={inputClass}>
-                                    <option value="">Selecione...</option>
-                                    {uniqueForemen.map(f => (<option key={f} value={f}>{f}</option>))}
-                                </select>
-                             </div>
-                        </div>
-
-                         <div className="relative">
-                            {/* SUBSTITUIÇÃO POR SELECTWITHSEARCH */}
+                        <div className="lg:col-span-2 relative">
                             <SelectWithSearch 
-                                label="POSTO"
+                                label="POSTO CONVENIADO"
                                 options={stationSelectOptions}
-                                value={currentRefueling.gasStationId || ''}
-                                onChange={(val) => setCurrentRefueling({...currentRefueling, gasStationId: val})}
+                                value={refuelingForm.gasStationId || ''}
+                                onChange={handleStationChange}
                                 required
                                 placeholder="Selecione o posto..."
                             />
-                            {stations.length === 0 && <p className="text-red-500 text-xs mt-1">Nenhum posto cadastrado.</p>}
                         </div>
 
                         <div>
-                            <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Item / Combustível</label>
-                            <select required value={currentRefueling.fuelType || ''} onChange={e => setCurrentRefueling({...currentRefueling, fuelType: e.target.value as FuelType})} className={inputClass}>
-                                <option value="">Selecione...</option>
-                                <optgroup label="COMBUSTÍVEIS">
-                                    {FUEL_TYPES_LIST.map(f => (<option key={f} value={f}>{f}</option>))}
-                                </optgroup>
-                                <optgroup label="INSUMOS">
-                                    {SUPPLY_TYPES_LIST.map(f => (<option key={f} value={f}>{f}</option>))}
-                                </optgroup>
-                            </select>
+                            <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Equipe</label>
+                            <input type="text" value={refuelingForm.foremanSnapshot || ''} onChange={e => setRefuelingForm({...refuelingForm, foremanSnapshot: e.target.value.toUpperCase()})} className={inputClass} />
                         </div>
-
+                        
                         <div>
-                            <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Litros / Quantidade</label>
-                            <input type="number" step="0.01" placeholder="0.00" value={currentRefueling.liters || ''} onChange={e => setCurrentRefueling({...currentRefueling, liters: Number(e.target.value)})} className={inputClass} />
+                            <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Município Operação</label>
+                            <input 
+                                type="text" 
+                                value={refuelingForm.municipality} 
+                                onChange={e => {
+                                    const val = e.target.value.toUpperCase();
+                                    setRefuelingForm({...refuelingForm, municipality: val});
+                                    if (isExternal) setExternalData(prev => ({...prev, municipality: val}));
+                                }} 
+                                className={inputClass} 
+                                placeholder="O MUNICÍPIO SERÁ PREENCHIDO PELO POSTO"
+                            />
                         </div>
+                    </div>
 
+                    <div className="bg-blue-50 p-5 rounded-xl border border-blue-200 mb-8">
+                        <div className="flex items-center gap-2 mb-4 text-blue-700 font-bold">
+                            <Package size={18} />
+                            Informações do Produto
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div>
+                                <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">Produto / Combustível</label>
+                                <select 
+                                    value={refuelingForm.fuelType || ''} 
+                                    onChange={e => setRefuelingForm({...refuelingForm, fuelType: e.target.value as FuelType})} 
+                                    className={selectClass}
+                                >
+                                    <option value="">Selecione o item...</option>
+                                    <optgroup label="COMBUSTÍVEL">
+                                        {FUEL_TYPES_LIST.map(f => <option key={f} value={f}>{f}</option>)}
+                                    </optgroup>
+                                    <optgroup label="INSUMOS">
+                                        {SUPPLY_TYPES_LIST.map(f => <option key={f} value={f}>{f}</option>)}
+                                    </optgroup>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">Quantidade (L/UN)</label>
+                                <input 
+                                    type="number" 
+                                    step="0.01" 
+                                    value={refuelingForm.liters === 0 ? '' : refuelingForm.liters} 
+                                    onChange={e => setRefuelingForm({...refuelingForm, liters: Number(e.target.value)})} 
+                                    className={inputClass} 
+                                    placeholder="0.00"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">Valor Total (R$)</label>
+                                <input 
+                                    type="number" 
+                                    step="0.01" 
+                                    value={refuelingForm.totalCost === 0 ? '' : refuelingForm.totalCost} 
+                                    onChange={e => setRefuelingForm({...refuelingForm, totalCost: Number(e.target.value)})} 
+                                    className={`${inputClass} font-bold text-blue-800`} 
+                                    placeholder="0.00"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                         <div>
-                            <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Valor Total (R$)</label>
-                            <input type="number" step="0.01" placeholder="0.00" value={currentRefueling.totalCost || ''} onChange={e => setCurrentRefueling({...currentRefueling, totalCost: Number(e.target.value)})} className={inputClass} />
+                            <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Nº Nota Fiscal</label>
+                            <input type="text" placeholder="Nº da Nota" value={refuelingForm.invoiceNumber || ''} onChange={e => setRefuelingForm({...refuelingForm, invoiceNumber: e.target.value.toUpperCase()})} className={inputClass} />
                         </div>
-
                         <div>
-                            <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Nota Fiscal</label>
-                            <input type="text" placeholder="Nº da Nota" value={currentRefueling.invoiceNumber || ''} onChange={e => setCurrentRefueling({...currentRefueling, invoiceNumber: e.target.value.toUpperCase()})} className={inputClass} />
+                            <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Nº Requisição</label>
+                            <input type="text" placeholder="Nº da Requisição" value={refuelingForm.requisitionNumber || ''} onChange={e => setRefuelingForm({...refuelingForm, requisitionNumber: e.target.value.toUpperCase()})} className={inputClass} />
                         </div>
-                         <div>
-                            <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Requisição</label>
-                            <input type="text" placeholder="Nº da Requisição" value={currentRefueling.requisitionNumber || ''} onChange={e => setCurrentRefueling({...currentRefueling, requisitionNumber: e.target.value.toUpperCase()})} className={inputClass} />
-                        </div>
+                    </div>
 
-                        <div className="lg:col-span-4 flex justify-end pt-4 gap-3 border-t border-slate-100 mt-2">
-                             <button type="button" onClick={resetForms} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium">Cancelar</button>
-                            <button type="submit" disabled={loading} className="bg-blue-800 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-900 transition-colors flex items-center gap-2 disabled:opacity-50">
-                                {loading ? <Loader2 className="animate-spin"/> : <Save size={18} />}
-                                Salvar Lançamento
-                            </button>
-                        </div>
-                    </form>
+                    <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">
+                        <button type="button" onClick={resetForms} className="px-6 py-2.5 text-slate-600 hover:bg-slate-100 rounded-lg font-medium transition-colors">Cancelar</button>
+                        <button 
+                            onClick={handleSaveRefueling} 
+                            disabled={loading} 
+                            className="bg-blue-800 text-white px-10 py-3 rounded-lg font-bold hover:bg-blue-900 transition-all flex items-center gap-2 shadow-lg disabled:opacity-50 transform active:scale-95"
+                        >
+                            {loading ? <Loader2 className="animate-spin"/> : <Save size={20} />}
+                            Salvar Registro
+                        </button>
+                    </div>
                 </div>
             )}
 
-             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 print:hidden">
-                <div className="bg-white p-2 md:p-3 rounded-lg shadow-sm border border-slate-200">
-                    <p className="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Registros Listados</p>
-                    <p className="text-lg md:text-xl font-bold text-slate-800">{filteredRefuelings.length}</p>
+             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 print:hidden relative z-0">
+                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                    <p className="text-[10px] md:text-xs font-bold text-slate-500 uppercase tracking-widest">Qtd Litros (Total)</p>
+                    <p className="text-2xl font-black text-blue-800">{totalLitersCalculated.toFixed(2)} L</p>
                 </div>
-                <div className="bg-blue-50 p-2 md:p-3 rounded-lg shadow-sm border border-blue-100">
-                    <p className="text-[10px] md:text-xs font-bold text-blue-600 uppercase">Total Litros (Comb.)</p>
-                    <p className="text-lg md:text-xl font-bold text-blue-800">{totalLiters.toFixed(2)} L</p>
+                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                    <p className="text-[10px] md:text-xs font-bold text-slate-500 uppercase tracking-widest">Custo Total (Período)</p>
+                    <p className="text-2xl font-black text-green-700">{formatCurrency(totalCostCalculated)}</p>
                 </div>
-                <div className="bg-green-50 p-2 md:p-3 rounded-lg shadow-sm border border-green-100">
-                    <p className="text-[10px] md:text-xs font-bold text-green-600 uppercase">Total Valor (Geral)</p>
-                    <p className="text-lg md:text-xl font-bold text-green-800">{formatCurrency(totalCost)}</p>
+                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                    <p className="text-[10px] md:text-xs font-bold text-slate-500 uppercase tracking-widest">Operações Listadas</p>
+                    <p className="text-2xl font-black text-slate-800">{filteredRefuelings.length}</p>
                 </div>
              </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden print:border-none print:shadow-none print:overflow-visible">
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden print:border-none print:shadow-none print:overflow-visible relative z-0">
                 <div className="overflow-x-auto print:overflow-visible">
                     <table className="w-full text-sm text-left">
-                        <thead className="bg-slate-100 text-slate-600 font-bold uppercase text-xs print:bg-slate-200 print:text-slate-900 border-b border-slate-200">
+                        <thead className="bg-slate-100 text-slate-600 font-bold uppercase text-[10px] print:bg-slate-200 print:text-slate-900 border-b border-slate-200">
                             <tr>
-                                <th className="px-6 py-3 print:px-2">Data / Hora</th>
-                                <th className="px-6 py-3 print:px-2">Veículo / Encarregado</th>
-                                <th className="px-6 py-3 print:px-2">Posto</th>
-                                <th className="px-6 py-3 print:px-2">Documentos</th>
-                                <th className="px-6 py-3 print:px-2">Combustível</th>
-                                <th className="px-6 py-3 print:px-2">Insumos</th>
-                                <th className="px-6 py-3 print:px-2">Litros</th>
-                                <th className="px-6 py-3 print:px-2">Valor Total</th>
-                                <th className="px-6 py-3 print:hidden text-center">Ações</th>
+                                <th className="px-6 py-4 print:px-2">Data / Hora</th>
+                                <th className="px-6 py-4 print:px-2">Veículo / Equipe</th>
+                                <th className="px-6 py-4 print:px-2">Posto</th>
+                                <th className="px-6 py-4 print:px-2">Produto</th>
+                                <th className="px-6 py-4 print:px-2 bg-blue-50 text-blue-800">Litros</th>
+                                <th className="px-6 py-4 print:px-2 bg-green-50 text-green-800">Valor Total</th>
+                                <th className="px-6 py-4 print:hidden text-center">Ações</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {paginatedRefuelings.length === 0 ? (
-                                <tr><td colSpan={9} className="px-6 py-12 text-center text-slate-400">Nenhum abastecimento encontrado para os filtros selecionados.</td></tr>
+                                <tr><td colSpan={7} className="px-6 py-16 text-center text-slate-400 italic font-medium">Nenhum abastecimento encontrado.</td></tr>
                             ) : (
                                 paginatedRefuelings.map(item => {
                                     const station = stations.find(s => s.id === item.gasStationId);
-                                    const isExt = item.vehicleId === 'EXTERNAL' || !vehicles.find(v => v.id === item.vehicleId);
-                                    const isFuel = FUEL_TYPES_LIST.includes(item.fuelType);
+                                    // Pendência: Se faltar valor OU faltar litros
+                                    const isPending = (item.totalCost || 0) <= 0 || (item.liters || 0) <= 0;
 
                                     return (
-                                        <tr key={item.id} className="hover:bg-slate-50 transition-colors print:hover:bg-transparent">
-                                            <td className="px-6 py-3 font-medium text-slate-900 print:px-2">
+                                        <tr key={item.id} className={`hover:bg-slate-50 transition-colors print:hover:bg-transparent ${isPending ? 'bg-red-50/30' : ''}`}>
+                                            <td className="px-6 py-4 font-medium text-slate-900 print:px-2">
                                                 {formatDate(item.date)}
-                                                {item.time && <div className="text-xs text-slate-500 flex items-center gap-1"><Clock size={10}/> {item.time}</div>}
+                                                {item.time && <div className="text-[10px] text-slate-400 font-bold flex items-center gap-1 mt-1"><Clock size={10}/> {item.time}</div>}
                                             </td>
-                                            <td className="px-6 py-3 print:px-2">
-                                                <div className="flex flex-col">
-                                                    <div className="flex items-center gap-1">
-                                                        <span className="font-bold text-slate-800">{item.plateSnapshot}</span>
-                                                        {isExt && <AlertCircle size={12} className="text-orange-500" title="Externo / Não Cadastrado" />}
-                                                    </div>
-                                                    <span className="text-xs text-slate-500 flex items-center gap-1">
-                                                        <Users size={10} /> {item.foremanSnapshot}
-                                                    </span>
-                                                    {item.observation && (
-                                                        <span className="text-[10px] text-slate-400 italic mt-1 block max-w-[150px] truncate" title={item.observation}>
-                                                            {item.observation}
-                                                        </span>
+                                            <td className="px-6 py-4 print:px-2">
+                                                <div className="font-black text-slate-800 text-base">{item.plateSnapshot}</div>
+                                                <div className="text-[10px] text-slate-400 uppercase font-bold">{item.foremanSnapshot || 'Sem Equipe'}</div>
+                                            </td>
+                                            <td className="px-6 py-4 print:px-2">
+                                                <div className="text-slate-700 font-bold">{station?.name || 'N/A'}</div>
+                                                <div className="text-xs text-slate-400">{item.municipalitySnapshot}</div>
+                                            </td>
+                                            <td className="px-6 py-4 print:px-2">
+                                                <span className={`text-[10px] font-black px-2 py-1 rounded border-2 shadow-sm ${getFuelColor(item.fuelType)} print:border-none print:p-0 print:bg-transparent print:text-black`}>
+                                                    {item.fuelType}
+                                                </span>
+                                                {isPending && (
+                                                    <span className="ml-2 inline-flex items-center gap-1 bg-red-600 text-white px-1.5 py-0.5 rounded text-[8px] font-black animate-pulse">PENDENTE</span>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4 font-mono print:px-2 text-blue-900 font-black text-base bg-blue-50/20">
+                                                {item.liters?.toFixed(2)} L
+                                            </td>
+                                            <td className="px-6 py-4 font-mono font-black text-green-700 text-base bg-green-50/20 print:px-2">
+                                                {formatCurrency(item.totalCost)}
+                                            </td>
+                                            <td className="px-6 py-4 print:hidden text-center">
+                                                <div className="flex justify-center gap-1">
+                                                    <button onClick={() => setSelectedTicket(item)} className="p-2 text-slate-500 hover:bg-slate-100 rounded-full transition-all" title="Ver Bilhete"><Receipt size={20} /></button>
+                                                    {!isReadOnly && (
+                                                        <>
+                                                            <button onClick={() => handleEditRefueling(item)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-full transition-all" title="Editar"><Edit2 size={20} /></button>
+                                                            <button onClick={() => confirmDelete(item.id)} className="p-2 text-red-600 hover:bg-red-50 rounded-full transition-all" title="Excluir"><Trash2 size={20} /></button>
+                                                        </>
                                                     )}
                                                 </div>
-                                            </td>
-                                            <td className="px-6 py-3 print:px-2">
-                                                <div className="flex items-center gap-1">
-                                                    <Fuel size={14} className="text-slate-400 print:hidden" />
-                                                    <span className="font-medium">{station?.name || 'Posto Desconhecido'}</span>
-                                                </div>
-                                                <div className="text-xs text-slate-500">{item.municipalitySnapshot}</div>
-                                            </td>
-                                            <td className="px-6 py-3 print:px-2">
-                                                <div className="flex flex-col gap-1">
-                                                    {item.invoiceNumber && (<span className="text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200 w-fit">NF: {item.invoiceNumber}</span>)}
-                                                    {item.requisitionNumber && (<span className="text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200 w-fit">REQ: {item.requisitionNumber}</span>)}
-                                                    {!item.invoiceNumber && !item.requisitionNumber && <span className="text-xs text-slate-300">-</span>}
-                                                </div>
-                                            </td>
-                                            
-                                            {/* COLUNA COMBUSTÍVEL */}
-                                            <td className="px-6 py-3 print:px-2">
-                                                {isFuel ? (
-                                                    <span className={`text-xs font-bold px-2 py-1 rounded border ${getFuelColor(item.fuelType)} print:border-none print:p-0 print:bg-transparent print:text-black`}>
-                                                        {item.fuelType}
-                                                    </span>
-                                                ) : <span className="text-slate-300">-</span>}
-                                            </td>
-                                            
-                                            {/* COLUNA INSUMOS */}
-                                            <td className="px-6 py-3 print:px-2">
-                                                {!isFuel ? (
-                                                    <span className="text-xs font-bold text-orange-700 bg-orange-50 px-2 py-1 rounded border border-orange-100">
-                                                        {item.fuelType} ({item.liters})
-                                                    </span>
-                                                ) : <span className="text-slate-300">-</span>}
-                                            </td>
-
-                                            <td className="px-6 py-3 font-mono print:px-2">
-                                                {isFuel ? `${item.liters.toFixed(2)} L` : '-'}
-                                            </td>
-                                            
-                                            <td className="px-6 py-3 font-mono font-bold text-slate-700 print:px-2">
-                                                {/* Se for insumo, contabiliza o valor também */}
-                                                {(isFuel || !isFuel) && item.totalCost > 0 ? formatCurrency(item.totalCost) : (
-                                                     <span className="inline-flex items-center gap-1 bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-bold border border-red-200 animate-pulse print:animate-none print:bg-transparent print:text-red-700"><AlertCircle size={12} /> PENDÊNCIA</span>
-                                                )}
-                                            </td>
-                                            
-                                            <td className="px-6 py-3 print:hidden text-center">
-                                                {!isReadOnly && (
-                                                    <div className="flex justify-center gap-2">
-                                                        <button onClick={() => handleEditRefueling(item)} className="p-2 text-blue-600 hover:bg-blue-50 rounded"><Edit2 size={16} /></button>
-                                                        <button onClick={() => confirmDelete(item.id)} className="p-2 text-red-600 hover:bg-red-50 rounded"><Trash2 size={16} /></button>
-                                                    </div>
-                                                )}
                                             </td>
                                         </tr>
                                     );
                                 })
                             )}
                         </tbody>
-                         <tfoot className="bg-slate-100 font-bold text-slate-800 border-t border-slate-300 print:bg-slate-200">
+                         <tfoot className="bg-slate-50 font-black text-slate-800 border-t-2 border-slate-300">
                              <tr>
-                                 <td colSpan={6} className="px-6 py-3 text-right uppercase text-xs tracking-wider">Totais do Período</td>
-                                 <td className="px-6 py-3 text-blue-800">{totalLiters.toFixed(2)} L</td>
-                                 <td className="px-6 py-3 text-green-800">{formatCurrency(totalCost)}</td>
+                                 <td colSpan={4} className="px-6 py-4 text-right uppercase text-xs tracking-widest text-slate-500">Somatório Geral:</td>
+                                 <td className="px-6 py-4 text-blue-900 text-lg bg-blue-50/50">{totalLitersCalculated.toFixed(2)} L</td>
+                                 <td className="px-6 py-4 text-green-800 text-lg bg-green-50/50">{formatCurrency(totalCostCalculated)}</td>
                                  <td className="print:hidden"></td>
                              </tr>
                          </tfoot>
@@ -917,7 +975,7 @@ const FuelManagement: React.FC = () => {
                     </div>
                     <div className="md:col-span-2 flex justify-end gap-3 pt-4 border-t border-slate-100">
                         <button type="button" onClick={resetForms} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium">Cancelar</button>
-                        <button type="submit" disabled={loading} className="bg-blue-800 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-900 transition-colors flex items-center gap-2">
+                        <button type="submit" disabled={loading} className="bg-blue-800 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-900 transition-colors flex items-center gap-2 shadow-lg">
                             {loading ? <Loader2 className="animate-spin"/> : <Save size={18} />}
                             Salvar Posto
                         </button>
@@ -948,7 +1006,7 @@ const FuelManagement: React.FC = () => {
                                 <tr><td colSpan={4} className="px-6 py-12 text-center text-slate-400">Nenhum posto cadastrado.</td></tr>
                             ) : (
                                 stations.map(station => (
-                                    <tr key={station.id} className="hover:bg-slate-50">
+                                    <tr key={station.id} className="hover:bg-slate-50 transition-colors">
                                         <td className="px-6 py-3 font-bold text-slate-800">{station.name}</td>
                                         <td className="px-6 py-3 text-slate-600 flex items-center gap-1">
                                             <MapPin size={14} className="text-slate-400"/> {station.municipality}
@@ -960,8 +1018,8 @@ const FuelManagement: React.FC = () => {
                                         {!isReadOnly && (
                                             <td className="px-6 py-3 text-center">
                                                 <div className="flex justify-center gap-2">
-                                                    <button onClick={() => handleEditStation(station)} className="p-2 text-blue-600 hover:bg-blue-50 rounded"><Edit2 size={16} /></button>
-                                                    <button onClick={() => confirmDelete(station.id)} className="p-2 text-red-600 hover:bg-red-50 rounded"><Trash2 size={16} /></button>
+                                                    <button onClick={() => handleEditStation(station)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-full transition-all"><Edit2 size={16} /></button>
+                                                    <button onClick={() => confirmDelete(station.id)} className="p-2 text-red-600 hover:bg-red-50 rounded-full transition-all"><Trash2 size={16} /></button>
                                                 </div>
                                             </td>
                                         )}

@@ -101,9 +101,9 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
         <ChevronDown size={16} className="text-slate-400 flex-shrink-0 ml-1" />
       </div>
 
-      {/* Dropdown Content */}
+      {/* Dropdown Content - Ajustado para z-[100] */}
       {isOpen && (
-        <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-xl max-h-80 flex flex-col animate-in fade-in zoom-in-95 duration-100">
+        <div className="absolute z-[100] mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-xl max-h-80 flex flex-col animate-in fade-in zoom-in-95 duration-100">
            {/* Header: Search & Actions */}
            <div className="p-2 border-b border-slate-100 bg-slate-50/50 rounded-t-lg">
              <div className="relative">

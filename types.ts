@@ -1,5 +1,4 @@
 
-
 export enum ContractType {
   MANUTENCAO = 'MANUTENÇÃO',
   LINHA_VIVA = 'LINHA VIVA',
@@ -20,34 +19,32 @@ export enum VehicleType {
   PICK_UP = 'PICK-UP'
 }
 
-// --- NOVOS TIPOS DE AUTH ---
 export enum UserRole {
-  ADMIN = 'ADMIN',       // Acesso total
-  GESTOR = 'GESTOR',     // Pode editar, ver relatórios, mas não pode excluir
-  OPERADOR = 'OPERADOR', // Apenas lança dados
-  FINANCEIRO = 'FINANCEIRO', // Apenas Abastecimento (Total) e Veículos (Leitura)
-  RH = 'RH',              // Apenas Relatórios e Veículos (Leitura)
-  GERENCIA = 'GERENCIA',   // Acesso total a menus, mas SOMENTE LEITURA (sem cadastro/edição/exclusão)
-  ENCARREGADO = 'ENCARREGADO' // Acesso restrito a Requisições de seus veículos
+  ADMIN = 'ADMIN',       
+  GESTOR = 'GESTOR',     
+  OPERADOR = 'OPERADOR', 
+  FINANCEIRO = 'FINANCEIRO', 
+  RH = 'RH',              
+  GERENCIA = 'GERENCIA',   
+  ENCARREGADO = 'ENCARREGADO' 
 }
 
 export interface UserProfile {
   id: string;
   email: string;
   role: UserRole;
-  name?: string; // Nome opcional para exibição
+  name?: string; 
 }
-// ---------------------------
 
 export interface Vehicle {
   id: string;
   contract: ContractType;
   plate: string;
-  model?: string; // Novo campo: Modelo
-  year?: string;  // Novo campo: Ano
+  model?: string; 
+  year?: string;  
   driverName: string;
   municipality: string;
-  foreman: string; // Equipe
+  foreman: string; 
   type: VehicleType;
   status?: 'ATIVO' | 'INATIVO';
 }
@@ -56,37 +53,29 @@ export interface DailyLog {
   id: string;
   date: string;
   vehicleId: string;
-  firstIgnition: string; // HH:MM
-  startTime: string; // HH:MM
-  lunchStart: string; // HH:MM
-  lunchEnd: string; // HH:MM
-  endTime: string; // HH:MM
+  firstIgnition: string; 
+  startTime: string; 
+  lunchStart: string; 
+  lunchEnd: string; 
+  endTime: string; 
   kmDriven: number;
   maxSpeed: number;
-  speedingCount: number; // Quantas vezes passou de 90
+  speedingCount: number; 
   observations: string;
-  extraTimeStart: string; // HH:MM
-  extraTimeEnd: string; // HH:MM
-  
-  // Snapshots for history
-  historicalPlate?: string; // Novo: Para manter histórico se veiculo for excluido
-  historicalModel?: string; // Novo
+  extraTimeStart: string; 
+  extraTimeEnd: string; 
+  historicalPlate?: string; 
+  historicalModel?: string; 
   historicalDriver?: string;
   historicalMunicipality?: string;
   historicalContract?: string;
-
-  // New field for non-operating status
-  nonOperatingReason?: string; // 'OFICINA' | 'GARAGEM' | 'SEM SINAL' | 'EM MANUTENÇÃO' | 'NÃO LIGOU'
-  
-  // Novo campo solicitado
+  nonOperatingReason?: string; 
   kmBeforeRefueling?: number; 
 }
 
-// Helper to combine Log with Vehicle details for reporting
 export interface DailyLogReport extends DailyLog {
   vehicle: Vehicle;
   calculatedHours: string;
-  // Campo calculado para o relatório: Último Abastecimento
   lastRefuelingInfo?: {
     date: string;
     liters: number;
@@ -94,15 +83,13 @@ export interface DailyLogReport extends DailyLog {
   };
 }
 
-// --- NOVAS ENTIDADES DE ABASTECIMENTO ---
-
 export interface GasStation {
   id: string;
   name: string;
   cnpj: string;
   municipality: string;
   phone?: string;
-  address?: string; // Endereço do posto
+  address?: string; 
 }
 
 export enum FuelType {
@@ -110,7 +97,6 @@ export enum FuelType {
   DIESEL = 'DIESEL',
   DIESEL_S10 = 'DIESEL S10',
   ETANOL = 'ETANOL',
-  // Novos Itens (Não Combustíveis) - Apenas para Requisição/WhatsApp
   ARLA_32 = 'ARLA 32',
   OLEO_MOTOR = 'ÓLEO MOTOR',
   OLEO_HIDRAULICO = 'ÓLEO HIDRÁULICO',
@@ -121,7 +107,6 @@ export enum FuelType {
   OUTROS = 'OUTROS'
 }
 
-// Lista auxiliar para saber o que é combustível (para cálculos)
 export const FUEL_TYPES_LIST = [
   FuelType.GASOLINA,
   FuelType.DIESEL,
@@ -129,33 +114,33 @@ export const FUEL_TYPES_LIST = [
   FuelType.ETANOL
 ];
 
-// Lista auxiliar para Insumos
 export const SUPPLY_TYPES_LIST = Object.values(FuelType).filter(t => !FUEL_TYPES_LIST.includes(t));
+
+export interface RefuelingItem {
+    fuelType: FuelType;
+    liters: number;
+    totalCost: number;
+}
 
 export interface RefuelingLog {
   id: string;
   date: string;
   vehicleId: string;
   gasStationId: string;
-  
-  // Dados do abastecimento
   fuelType: FuelType;
   liters: number;
   totalCost: number;
-  invoiceNumber?: string; // Nota Fiscal
-  requisitionNumber?: string; // Requisição
-  
-  // Snapshots dos dados do veículo no momento do abastecimento
+  items?: RefuelingItem[];
+  invoiceNumber?: string; 
+  requisitionNumber?: string; 
   plateSnapshot: string;
   modelSnapshot: string;
-  foremanSnapshot: string; // Equipe
+  foremanSnapshot: string; 
   contractSnapshot: string;
   municipalitySnapshot: string;
-  observation?: string; // Novo campo: Observação/Descrição
-  time?: string; // Hora do abastecimento
+  observation?: string; 
+  time?: string; 
 }
-
-// --- NOVAS ENTIDADES DE REQUISIÇÃO ---
 
 export enum RequisitionStatus {
   PENDING = 'PENDENTE',
@@ -171,31 +156,22 @@ export interface UserVehicle {
 
 export interface Requisition {
   id: string;
-  internalId: number; // Sequencial Global
-  externalId?: string; // Número do Posto (Apenas na aprovação)
-  
-  date: string; // YYYY-MM-DD
-  requestTime: string; // HH:MM
-  
+  internalId: number; 
+  externalId?: string; 
+  date: string; 
+  requestTime: string; 
   requesterId: string;
-  requesterName?: string; // Snapshot do nome do usuário
-  
-  vehicleId: string; // Pode ser ID de veiculo ou 'EXTERNAL'
-  
-  // Se for veículo não cadastrado ou externo
-  externalType?: string; // Carro, Moto, Barco...
+  requesterName?: string; 
+  vehicleId: string; 
+  externalType?: string; 
   externalPlate?: string;
-  
   fuelType: FuelType;
   liters: number;
-  isFullTank?: boolean; // Novo campo: Completar Tanque
+  isFullTank?: boolean; 
   observation?: string;
-  municipality: string; // Snapshot ou input manual
-
+  municipality: string; 
   status: RequisitionStatus;
-  
-  // Campos preenchidos na aprovação
-  approvedBy?: string; // ID do Financeiro
+  approvedBy?: string; 
   approvalDate?: string;
   gasStationId?: string;
 }
