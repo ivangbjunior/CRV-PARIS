@@ -91,6 +91,9 @@ const Requisitions: React.FC = () => {
   const isGerencia = user?.role === UserRole.GERENCIA;
   const isAdmin = user?.role === UserRole.ADMIN;
   
+  // Permitir exclusão para ADMIN ou FINANCEIRO
+  const canManageDeletion = isAdmin || isFinanceiro;
+  
   // Helper for date
   const getTodayLocal = () => {
     const now = new Date();
@@ -143,13 +146,16 @@ const Requisitions: React.FC = () => {
     }
   };
 
-  // --- DELETE REQUISITION (ADMIN) ---
+  // --- DELETE REQUISITION (ADMIN/FINANCEIRO) ---
   const handleDelete = async (id: string) => {
-    if (!isAdmin) return;
-    if (confirm("ATENÇÃO ADMIN: Tem certeza que deseja excluir permanentemente esta requisição? Esta ação não pode ser desfeita.")) {
+    if (!canManageDeletion) return;
+    
+    if (confirm("Tem certeza que deseja excluir permanentemente esta requisição? Esta ação não pode ser desfeita.")) {
         setLoading(true);
         try {
             await storageService.deleteRequisition(id);
+            // Refresh local state immediately and then reload from storage
+            setRequisitions(prev => prev.filter(r => r.id !== id));
             await loadData();
         } catch (err: any) {
             console.error(err);
@@ -802,11 +808,11 @@ ${itemsList}
                                                 >
                                                     <Send size={16} />
                                                 </button>
-                                                {isAdmin && (
+                                                {canManageDeletion && (
                                                     <button 
                                                         onClick={() => handleDelete(req.id)}
                                                         className="text-red-600 hover:bg-red-50 p-2 rounded-full transition-colors"
-                                                        title="Excluir Requisição (ADMIN)"
+                                                        title="Excluir Requisição"
                                                     >
                                                         <Trash2 size={16} />
                                                     </button>
@@ -825,7 +831,7 @@ ${itemsList}
             </div>
         )}
 
-        {/* ... APPROVAL AND MANAGE USERS TABS (No changes needed there) ... */}
+        {/* --- TAB: APPROVAL --- */}
         {activeTab === 'APPROVAL' && (
              <div className="space-y-6">
                 {/* Filters */}
@@ -943,7 +949,7 @@ ${itemsList}
                                     <td className="px-6 py-3 text-center">
                                         <div className="flex justify-center gap-2">
                                             <button onClick={() => handleOpenApproval(req)} className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs font-bold">Analisar</button>
-                                            {isAdmin && (
+                                            {canManageDeletion && (
                                                 <button onClick={() => handleDelete(req.id)} className="text-red-600 hover:bg-red-50 px-2 py-1 rounded text-xs" title="Excluir"><Trash2 size={16} /></button>
                                             )}
                                         </div>
@@ -959,11 +965,9 @@ ${itemsList}
             </div>
         )}
 
-        {/* ... MANAGE USERS (Existing code) ... */}
+        {/* --- TAB: MANAGE USERS --- */}
         {activeTab === 'MANAGE_USERS' && (
-            // ... (Same as previous file content for Manage Users)
             <div className="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden">
-                {/* Inserted existing manage users code here for brevity, assuming it persists */}
                 {manageViewMode === 'LIST' ? (
                     <div className="p-6">
                         <div className="flex items-center gap-2 mb-6 border-b pb-4">
@@ -1276,7 +1280,7 @@ ${itemsList}
                         <button 
                             type="button" 
                             onClick={handleSaveCart}
-                            className="bg-orange-600 hover:bg-orange-700 text-white px-8 py-3 rounded-lg font-bold flex items-center gap-2 shadow-lg transform active:scale-95 transition-all text-sm"
+                            className="bg-orange-600 hover:bg-orange-700 text-white px-8 py-3 rounded-lg font-bold flex items-center justify-center gap-2 shadow-lg transform active:scale-95 transition-all text-sm"
                         >
                             <Send size={18} /> GERAR REQUISIÇÃO
                         </button>
@@ -1286,7 +1290,7 @@ ${itemsList}
             </div>
         )}
 
-        {/* Approval Modal Code remains the same */}
+        {/* Approval Modal */}
         {showApprovalModal && selectedRequisition && (
              <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-[9999] p-4 sm:p-6">
                 <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden">

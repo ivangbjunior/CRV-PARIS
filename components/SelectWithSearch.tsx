@@ -57,26 +57,26 @@ const SelectWithSearch: React.FC<SelectWithSearchProps> = ({
   return (
     <div className="w-full" ref={containerRef}>
       {label && (
-        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
+        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">
           {label} {required && <span className="text-red-500">*</span>}
         </label>
       )}
       
       <div
         onClick={() => !disabled && setIsOpen(!isOpen)}
-        className={`w-full min-h-[42px] rounded-lg border bg-white p-2.5 text-sm flex items-center justify-between cursor-pointer transition-all ${
+        className={`w-full h-[42px] rounded-lg border bg-white px-3 py-2 text-sm flex items-center justify-between cursor-pointer transition-all shadow-sm ${
           disabled ? 'bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200' : 
-          isOpen ? 'border-blue-600 ring-2 ring-blue-100' : 'border-slate-300 hover:border-slate-400 text-slate-800'
+          isOpen ? 'border-blue-600 ring-2 ring-blue-100' : 'border-slate-300 hover:border-slate-400 text-slate-700'
         }`}
       >
-        <span className={`truncate ${!selectedOption ? 'text-slate-400' : ''}`}>
+        <span className={`truncate ${!selectedOption ? 'text-slate-400' : 'font-medium'}`}>
           {selectedOption ? selectedOption.label : placeholder}
         </span>
-        <ChevronDown size={16} className={`text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown size={16} className={`text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
       </div>
 
       {isOpen && (
-        <div className="absolute z-[100] mt-1 w-full max-w-[inherit] bg-white border border-slate-200 rounded-lg shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+        <div className="absolute z-[110] mt-1 w-full max-w-[inherit] bg-white border border-slate-200 rounded-lg shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-100">
           <div className="p-2 border-b border-slate-100 bg-slate-50">
             <div className="relative">
               <Search size={14} className="absolute left-2.5 top-2.5 text-slate-400" />

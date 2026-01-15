@@ -6,11 +6,12 @@ import FuelManagement from './components/FuelManagement';
 import Requisitions from './components/Requisitions';
 import Login from './components/Login';
 import { useAuth } from './contexts/AuthContext';
-import { LayoutDashboard, Truck, FileSpreadsheet, Menu, X, Home, ChevronRight, Fuel, LogOut, UserCircle, ShieldCheck, AlertTriangle, DollarSign, FileText, Bell, Gauge, Clock, WifiOff, CheckCircle2, Loader2, Activity, CalendarDays, MapPin, Zap, TrendingUp, TrendingDown, Trophy, Droplet, Clock3, ArrowRightLeft } from 'lucide-react';
+import { LayoutDashboard, Truck, FileSpreadsheet, Menu, X, Home, ChevronRight, Fuel, LogOut, UserCircle, ShieldCheck, AlertTriangle, DollarSign, FileText, Bell, Gauge, Clock, WifiOff, CheckCircle2, Loader2, Activity, CalendarDays, MapPin, Zap, TrendingUp, TrendingDown, Trophy, Droplet, Clock3, ArrowRightLeft, Users } from 'lucide-react';
 import { UserRole, DailyLog, Vehicle, RefuelingLog, RequisitionStatus } from './types';
 import { storageService } from './services/storage';
 import { calculateDuration, formatMinutesToTime } from './utils/timeUtils';
 import { ParisLogo } from './components/ParisLogo';
+import SelectWithSearch from './components/SelectWithSearch';
 
 enum Tab {
   HOME = 'home',
@@ -25,6 +26,9 @@ enum Tab {
 const DashboardRankings: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'KM' | 'FUEL' | 'SPEED'>('KM');
   const [loading, setLoading] = useState(true);
+  const [selectedForeman, setSelectedForeman] = useState<string>('');
+  const [uniqueForemen, setUniqueForemen] = useState<string[]>([]);
+  
   const [rankings, setRankings] = useState({
     km: [] as { id: string; value: number; plate: string; municipality: string; driver: string }[],
     fuel: [] as { id: string; value: number; plate: string; municipality: string; driver: string }[],
@@ -37,125 +41,133 @@ const DashboardRankings: React.FC = () => {
     isIncrease: false
   });
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [logs, refuelings, vehicles] = await Promise.all([
-          storageService.getLogs(),
-          storageService.getRefuelings(),
-          storageService.getVehicles()
-        ]);
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const [logs, refuelings, vehicles] = await Promise.all([
+        storageService.getLogs(),
+        storageService.getRefuelings(),
+        storageService.getVehicles()
+      ]);
 
-        const now = new Date();
-        const currentMonth = now.getMonth();
-        const currentYear = now.getFullYear();
-        const currentDay = now.getDate();
+      // Process unique foremen
+      const foremen = Array.from(new Set(vehicles.map(v => v.foreman).filter(f => f && f !== '-'))).sort();
+      setUniqueForemen(foremen);
 
-        // 1. Process Financials (Month to Date Comparison)
-        let currentCost = 0;
-        let lastCost = 0;
+      const now = new Date();
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+      const currentDay = now.getDate();
 
-        refuelings.forEach(r => {
-          const rDate = new Date(r.date + 'T12:00:00'); // Fix timezone issue
-          const rMonth = rDate.getMonth();
-          const rYear = rDate.getFullYear();
-          const rDay = rDate.getDate();
+      // Helper to check if vehicle belongs to selected foreman (ONLY FOR FINANCIALS)
+      const isVehicleInSelectedTeam = (vId: string) => {
+        if (!selectedForeman) return true;
+        const v = vehicles.find(veh => veh.id === vId);
+        return v?.foreman === selectedForeman;
+      };
 
-          if (rYear === currentYear && rMonth === currentMonth) {
-            currentCost += r.totalCost;
-          }
+      // 1. Process Financials (Month to Date Comparison) - FILTERED BY TEAM
+      let currentCost = 0;
+      let lastCost = 0;
 
-          // Compare with same period last month
-          const lastMonthDate = new Date();
-          lastMonthDate.setMonth(now.getMonth() - 1);
-          
-          if (rYear === lastMonthDate.getFullYear() && rMonth === lastMonthDate.getMonth() && rDay <= currentDay) {
-            lastCost += r.totalCost;
-          }
-        });
+      refuelings.forEach(r => {
+        if (!isVehicleInSelectedTeam(r.vehicleId)) return;
 
-        let diff = 0;
-        if (lastCost > 0) {
-            diff = ((currentCost - lastCost) / lastCost) * 100;
-        } else if (currentCost > 0) {
-            diff = 100;
+        const rDate = new Date(r.date + 'T12:00:00'); 
+        const rMonth = rDate.getMonth();
+        const rYear = rDate.getFullYear();
+        const rDay = rDate.getDate();
+
+        if (rYear === currentYear && rMonth === currentMonth) {
+          currentCost += r.totalCost;
         }
 
-        setFinancials({
-          currentMonthCost: currentCost,
-          lastMonthCost: lastCost,
-          diffPercent: Math.abs(diff),
-          isIncrease: diff >= 0
-        });
+        const lastMonthDate = new Date();
+        lastMonthDate.setMonth(now.getMonth() - 1);
+        
+        if (rYear === lastMonthDate.getFullYear() && rMonth === lastMonthDate.getMonth() && rDay <= currentDay) {
+          lastCost += r.totalCost;
+        }
+      });
 
-        // 2. Process Rankings
-        const kmMap: Record<string, number> = {};
-        const fuelMap: Record<string, number> = {};
-        const speedMap: Record<string, number> = {};
-
-        // Helper to get vehicle details - UPDATED TO PLATE/MUNICIPALITY/DRIVER
-        const getVDetails = (id: string) => {
-             const v = vehicles.find(v => v.id === id);
-             return v ? { 
-               plate: v.plate, 
-               municipality: v.municipality, 
-               driver: v.driverName 
-             } : { 
-               plate: '?', 
-               municipality: '?', 
-               driver: '?' 
-             };
-        };
-
-        // KM & Speed Logic (Current Month)
-        logs.forEach(log => {
-          const lDate = new Date(log.date + 'T12:00:00');
-          if (lDate.getMonth() === currentMonth && lDate.getFullYear() === currentYear) {
-             // KM
-             kmMap[log.vehicleId] = (kmMap[log.vehicleId] || 0) + (log.kmDriven || 0);
-             // Speed
-             if (log.maxSpeed > 90) {
-                const count = log.speedingCount > 0 ? log.speedingCount : 1;
-                speedMap[log.vehicleId] = (speedMap[log.vehicleId] || 0) + count;
-             }
-          }
-        });
-
-        // Fuel Logic (Current Month - Liters)
-        refuelings.forEach(ref => {
-          const rDate = new Date(ref.date + 'T12:00:00');
-          if (rDate.getMonth() === currentMonth && rDate.getFullYear() === currentYear) {
-             fuelMap[ref.vehicleId] = (fuelMap[ref.vehicleId] || 0) + ref.liters;
-          }
-        });
-
-        const sortAndMap = (map: Record<string, number>) => {
-           return Object.entries(map)
-             .sort(([, a], [, b]) => b - a)
-             .slice(0, 3) // Adjusted to Top 3
-             .map(([id, val]) => ({ id, ...getVDetails(id), value: val }));
-        };
-
-        setRankings({
-           km: sortAndMap(kmMap),
-           fuel: sortAndMap(fuelMap),
-           speed: sortAndMap(speedMap)
-        });
-
-      } catch (error) {
-        console.error("Error loading dashboard metrics", error);
-      } finally {
-        setLoading(false);
+      let diff = 0;
+      if (lastCost > 0) {
+          diff = ((currentCost - lastCost) / lastCost) * 100;
+      } else if (currentCost > 0) {
+          diff = 100;
       }
-    };
-    fetchData();
-  }, []);
 
-  if (loading) return <div className="animate-pulse bg-white/50 h-24 w-64 rounded-xl"></div>;
+      setFinancials({
+        currentMonthCost: currentCost,
+        lastMonthCost: lastCost,
+        diffPercent: Math.abs(diff),
+        isIncrease: diff >= 0
+      });
+
+      // 2. Process Rankings (UNFILTERED - GLOBAL VIEW)
+      const kmMap: Record<string, number> = {};
+      const fuelMap: Record<string, number> = {};
+      const speedMap: Record<string, number> = {};
+
+      const getVDetails = (id: string) => {
+           const v = vehicles.find(v => v.id === id);
+           return v ? { 
+             plate: v.plate, 
+             municipality: v.municipality, 
+             driver: v.driverName 
+           } : { 
+             plate: '?', 
+             municipality: '?', 
+             driver: '?' 
+           };
+      };
+
+      logs.forEach(log => {
+        // Rankings ignore the foreman filter
+        const lDate = new Date(log.date + 'T12:00:00');
+        if (lDate.getMonth() === currentMonth && lDate.getFullYear() === currentYear) {
+           kmMap[log.vehicleId] = (kmMap[log.vehicleId] || 0) + (log.kmDriven || 0);
+           if (log.maxSpeed > 90) {
+              const count = log.speedingCount > 0 ? log.speedingCount : 1;
+              speedMap[log.vehicleId] = (speedMap[log.vehicleId] || 0) + count;
+           }
+        }
+      });
+
+      refuelings.forEach(ref => {
+        // Rankings ignore the foreman filter
+        const rDate = new Date(ref.date + 'T12:00:00');
+        if (rDate.getMonth() === currentMonth && rDate.getFullYear() === currentYear) {
+           fuelMap[ref.vehicleId] = (fuelMap[ref.vehicleId] || 0) + ref.liters;
+        }
+      });
+
+      const sortAndMap = (map: Record<string, number>) => {
+         return Object.entries(map)
+           .sort(([, a], [, b]) => b - a)
+           .slice(0, 3)
+           .map(([id, val]) => ({ id, ...getVDetails(id), value: val }));
+      };
+
+      setRankings({
+         km: sortAndMap(kmMap),
+         fuel: sortAndMap(fuelMap),
+         speed: sortAndMap(speedMap)
+      });
+
+    } catch (error) {
+      console.error("Error loading dashboard metrics", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, [selectedForeman]);
 
   const formatCurrency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
 
-  // Dynamic card style based on active tab
   const getCardStyle = () => {
     switch(activeTab) {
         case 'FUEL': return 'bg-orange-50 border-orange-200';
@@ -164,115 +176,151 @@ const DashboardRankings: React.FC = () => {
     }
   };
 
+  const foremanOptions = [
+    { value: '', label: 'TODAS AS EQUIPES' },
+    ...uniqueForemen.map(f => ({ value: f, label: f }))
+  ];
+
   return (
-    <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-stretch">
-       {/* Financial Widget - Blue Theme */}
-       <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 min-w-[200px] w-[240px] flex flex-col justify-between h-full shadow-sm hover:border-blue-300 transition-colors">
-          <div className="flex items-center gap-2 text-blue-700 mb-1">
-             <div className="p-1.5 bg-white rounded-lg shadow-sm text-blue-600">
-               <Fuel size={14} />
-             </div>
-             <span className="text-xs font-bold uppercase tracking-wider">Abastecimento</span>
-          </div>
-          
-          <div>
-            <div className="text-3xl font-black text-blue-900 tracking-tight">
-               {formatCurrency(financials.currentMonthCost)}
+    <div className="flex flex-col sm:flex-row gap-6 items-end sm:items-stretch">
+      {/* Financial Widget - Blue Theme */}
+      <div className="flex flex-col gap-3">
+        {/* Team Filter - Positioned specifically for the Fuel Card with standard alignment */}
+        <div className="w-[240px] relative z-[110]">
+          <SelectWithSearch 
+            label="EQUIPE (FILTRO)"
+            options={foremanOptions}
+            value={selectedForeman}
+            onChange={setSelectedForeman}
+            placeholder="TODAS..."
+          />
+        </div>
+
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-5 min-w-[200px] w-[240px] flex flex-col justify-between h-[300px] shadow-sm hover:border-blue-300 transition-colors">
+            <div className="flex items-center gap-2 text-blue-700 mb-1">
+              <div className="p-1.5 bg-white rounded-lg shadow-sm text-blue-600">
+                <Fuel size={14} />
+              </div>
+              <span className="text-xs font-bold uppercase tracking-wider">Abastecimento</span>
             </div>
             
-            <div className="mt-2 pt-2 border-t border-blue-200/60">
-               <span className="text-xs font-bold text-blue-800 block mb-0.5">Mês Anterior (Mesmo Período)</span>
-               <div className="flex items-baseline gap-2">
-                   <span className="text-lg font-bold text-blue-900">{formatCurrency(financials.lastMonthCost)}</span>
-                   <div className={`flex items-center gap-0.5 text-xs font-bold ${financials.isIncrease ? 'text-red-600' : 'text-emerald-600'}`}>
+            <div className="flex-1 flex flex-col justify-center py-4">
+              <div className="text-4xl font-black text-blue-900 tracking-tight">
+                {formatCurrency(financials.currentMonthCost)}
+              </div>
+              <p className="text-[10px] font-bold text-blue-400 uppercase mt-1">Acumulado do Mês</p>
+            </div>
+            
+            <div className="mt-auto pt-4 border-t border-blue-200/60">
+              <span className="text-[10px] font-bold text-blue-800/60 uppercase tracking-widest block mb-1">Mês Ant. (Mesmo Período)</span>
+              <div className="flex items-baseline gap-2">
+                  <span className="text-xl font-bold text-blue-900">{formatCurrency(financials.lastMonthCost)}</span>
+                  <div className={`flex items-center gap-0.5 text-xs font-bold ${financials.isIncrease ? 'text-red-600' : 'text-emerald-600'}`}>
                         {financials.isIncrease ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
                         <span>{financials.diffPercent.toFixed(1)}%</span>
-                   </div>
-               </div>
+                  </div>
+              </div>
             </div>
-          </div>
-       </div>
+        </div>
+      </div>
 
-       {/* Rankings Widget - Compact Card with Dynamic Background */}
-       <div className={`rounded-xl shadow-sm border overflow-hidden w-full sm:w-[320px] flex flex-col h-[260px] transition-colors duration-300 ${getCardStyle()}`}>
-          {/* Tabs Header */}
-          <div className="flex border-b border-slate-200/60 bg-white/50 backdrop-blur-sm">
-             <button 
-                onClick={() => setActiveTab('KM')}
-                className={`flex-1 py-2.5 flex justify-center items-center transition-colors ${activeTab === 'KM' ? 'bg-blue-100/50 text-blue-700 border-b-2 border-blue-600' : 'text-slate-400 hover:bg-white/50'}`}
-                title="Maior Rodagem (KM)"
-             >
-                <Gauge size={16} />
-             </button>
-             <button 
-                onClick={() => setActiveTab('FUEL')}
-                className={`flex-1 py-2.5 flex justify-center items-center transition-colors ${activeTab === 'FUEL' ? 'bg-orange-100/50 text-orange-700 border-b-2 border-orange-600' : 'text-slate-400 hover:bg-white/50'}`}
-                title="Maior Abastecimento (Litros)"
-             >
-                <Droplet size={16} />
-             </button>
-             <button 
-                onClick={() => setActiveTab('SPEED')}
-                className={`flex-1 py-2.5 flex justify-center items-center transition-colors ${activeTab === 'SPEED' ? 'bg-red-100/50 text-red-700 border-b-2 border-red-600' : 'text-slate-400 hover:bg-white/50'}`}
-                title="Infrações (>90km/h)"
-             >
-                <AlertTriangle size={16} />
-             </button>
-          </div>
+      {/* Rankings Widget - Expanded Card to 300px to avoid scrollbars */}
+      <div className="flex flex-col justify-end">
+        <div className={`rounded-xl shadow-md border overflow-hidden w-full sm:w-[420px] flex flex-col h-[300px] transition-all duration-300 ${getCardStyle()}`}>
+            {/* Tabs Header - Professional Dark Variant */}
+            <div className="flex border-b border-slate-200/60 bg-white/70 backdrop-blur-sm">
+              <button 
+                  onClick={() => setActiveTab('KM')}
+                  className={`flex-1 py-3.5 flex justify-center items-center gap-2 transition-all ${activeTab === 'KM' ? 'bg-blue-600 text-white shadow-inner' : 'text-slate-400 hover:bg-white/50'}`}
+                  title="Maior Rodagem (KM)"
+              >
+                  <Gauge size={18} />
+                  <span className="text-[10px] font-black uppercase hidden sm:inline">KM</span>
+              </button>
+              <button 
+                  onClick={() => setActiveTab('FUEL')}
+                  className={`flex-1 py-3.5 flex justify-center items-center gap-2 transition-all ${activeTab === 'FUEL' ? 'bg-orange-600 text-white shadow-inner' : 'text-slate-400 hover:bg-white/50'}`}
+                  title="Maior Abastecimento (Litros)"
+              >
+                  <Droplet size={18} />
+                  <span className="text-[10px] font-black uppercase hidden sm:inline">Consumo</span>
+              </button>
+              <button 
+                  onClick={() => setActiveTab('SPEED')}
+                  className={`flex-1 py-3.5 flex justify-center items-center gap-2 transition-all ${activeTab === 'SPEED' ? 'bg-red-600 text-white shadow-inner' : 'text-slate-400 hover:bg-white/50'}`}
+                  title="Infrações (>90km/h)"
+              >
+                  <AlertTriangle size={18} />
+                  <span className="text-[10px] font-black uppercase hidden sm:inline">Veloc.</span>
+              </button>
+            </div>
 
-          {/* List Content */}
-          <div className="p-3 flex-1 overflow-y-auto">
-             <div className="flex justify-between items-center mb-2">
-                <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider">
-                    {activeTab === 'KM' ? 'Top 3 - Rodagem (Mês)' : 
-                     activeTab === 'FUEL' ? 'Top 3 - Abastecimento (Mês)' : 
-                     'Top 3 - Excesso Vel. (Mês)'}
-                </span>
-                <Trophy size={12} className={activeTab === 'FUEL' ? "text-orange-500" : activeTab === 'SPEED' ? "text-red-500" : "text-blue-500"} />
-             </div>
-             
-             <div className="space-y-2">
-                {(() => {
-                   const list = activeTab === 'KM' ? rankings.km : activeTab === 'FUEL' ? rankings.fuel : rankings.speed;
-                   
-                   if (list.length === 0) return <div className="text-xs text-slate-400 text-center py-4 italic">Sem dados registrados neste mês.</div>;
-
-                   return list.map((item, idx) => (
-                      <div key={idx} className="flex items-center justify-between text-sm border-b border-slate-200/50 pb-2 last:border-0 mb-2 last:mb-0">
-                         <div className="flex items-start gap-3 w-full overflow-hidden">
-                            <span className={`w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center font-bold text-base mt-0.5 bg-white shadow-sm ${
-                                activeTab === 'FUEL' ? 'text-orange-700 ring-1 ring-orange-200' : 
-                                activeTab === 'SPEED' ? 'text-red-700 ring-1 ring-red-200' : 
-                                'text-blue-700 ring-1 ring-blue-200'
-                            }`}>
-                               {idx + 1}
-                            </span>
-                            <div className="flex flex-col w-full min-w-0 justify-center min-h-[32px]">
-                               <div className="flex items-center justify-between gap-1">
-                                 {/* SHOW PLATE */}
-                                 <span className="font-bold text-slate-800 truncate text-sm" title={item.plate}>{item.plate}</span>
-                                 <span className="font-mono font-bold text-slate-700 ml-auto whitespace-nowrap text-sm">
-                                    {activeTab === 'KM' ? `${item.value}km` : 
-                                     activeTab === 'FUEL' ? `${item.value.toFixed(0)}L` : 
-                                     `${item.value}x`}
-                                 </span>
-                               </div>
-                               <div className="flex items-center justify-between gap-2">
-                                   <div className="text-slate-600 text-xs truncate leading-tight" title={item.municipality}>
-                                     {item.municipality}
-                                   </div>
-                                   <div className="text-slate-500 text-xs font-bold truncate leading-tight" title={item.driver}>
-                                     {(item.driver || '?').split(' ')[0]}
-                                   </div>
-                               </div>
-                            </div>
-                         </div>
+            {/* List Content - overflow-hidden since size is now calibrated */}
+            <div className="p-4 flex-1 overflow-hidden">
+              <div className="flex justify-between items-center mb-3">
+                  <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest">
+                      {activeTab === 'KM' ? 'Top 3 Rodagem (Mensal Global)' : 
+                      activeTab === 'FUEL' ? 'Top 3 Consumo (Mensal Global)' : 
+                      'Top 3 Infrações (Mensal Global)'}
+                  </span>
+                  <Trophy size={14} className={activeTab === 'FUEL' ? "text-orange-500" : activeTab === 'SPEED' ? "text-red-500" : "text-blue-500"} />
+              </div>
+              
+              <div className="space-y-3">
+                  {(() => {
+                    const list = activeTab === 'KM' ? rankings.km : activeTab === 'FUEL' ? rankings.fuel : rankings.speed;
+                    
+                    if (list.length === 0) return (
+                      <div className="flex flex-col items-center justify-center py-10 text-slate-400">
+                        <Activity size={40} className="opacity-20 mb-3" />
+                        <span className="text-xs italic">Sem dados registrados neste mês.</span>
                       </div>
-                   ));
-                })()}
-             </div>
-          </div>
-       </div>
+                    );
+
+                    return list.map((item, idx) => (
+                        <div key={idx} className="flex items-center gap-4 bg-white/40 p-3 rounded-lg border border-white/60 shadow-sm transition-transform hover:scale-[1.01]">
+                            {/* Rank Indicator */}
+                            <div className={`w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center font-black text-lg shadow-sm border-2 ${
+                                activeTab === 'FUEL' ? 'bg-orange-50 text-orange-600 border-orange-100' : 
+                                activeTab === 'SPEED' ? 'bg-red-50 text-red-600 border-red-100' : 
+                                'bg-blue-50 text-blue-600 border-blue-100'
+                            }`}>
+                              {idx + 1}
+                            </div>
+
+                            {/* Main Info */}
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between">
+                                  <span className="font-black text-slate-900 text-sm tracking-tight truncate" title={item.plate}>
+                                    {item.plate}
+                                  </span>
+                                  <span className={`font-mono font-black px-2 py-0.5 rounded text-xs ${
+                                      activeTab === 'FUEL' ? 'text-orange-700 bg-orange-100/50' : 
+                                      activeTab === 'SPEED' ? 'text-red-700 bg-red-100/50' : 
+                                      'text-blue-700 bg-blue-100/50'
+                                  }`}>
+                                      {activeTab === 'KM' ? `${item.value.toLocaleString()} km` : 
+                                      activeTab === 'FUEL' ? `${item.value.toFixed(0)} L` : 
+                                      `${item.value}x`}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                    <span className="text-[10px] font-bold text-slate-500 uppercase truncate" title={item.driver}>
+                                      {item.driver || '?'}
+                                    </span>
+                                    <span className="text-slate-300">•</span>
+                                    <span className="text-[10px] font-medium text-slate-400 truncate" title={item.municipality}>
+                                      {item.municipality}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    ));
+                  })()}
+              </div>
+            </div>
+        </div>
+      </div>
     </div>
   );
 };
@@ -322,14 +370,12 @@ const HomeMenu: React.FC<HomeMenuProps> = ({ onNavigate, role, userName }) => {
       cutOffDate.setDate(cutOffDate.getDate() - 5); 
       const cutOffStr = cutOffDate.toISOString().split('T')[0];
 
-      // --- ALERTS FOR ADMIN, GESTOR, GERENCIA, OPERADOR (Safety) ---
       if (role === UserRole.ADMIN || role === UserRole.GESTOR || role === UserRole.GERENCIA || role === UserRole.OPERADOR || role === UserRole.RH) {
          const [logs, vehicles] = await Promise.all([
             storageService.getLogs(),
             storageService.getVehicles()
          ]);
          
-         // 1. Safety Alerts (Speeding, Extra Time, No Signal)
          const recentLogs = logs.filter(l => l.date >= cutOffStr).sort((a,b) => b.date.localeCompare(a.date));
 
          recentLogs.forEach(log => {
@@ -346,23 +392,18 @@ const HomeMenu: React.FC<HomeMenuProps> = ({ onNavigate, role, userName }) => {
              }
          });
          
-         // NO SIGNAL Logic
          const vehicleLogs: Record<string, DailyLog[]> = {};
          logs.forEach(log => {
             if (!vehicleLogs[log.vehicleId]) vehicleLogs[log.vehicleId] = [];
             vehicleLogs[log.vehicleId].push(log);
          });
          
-         // PROCESS MOVEMENT ALERTS (FOR ADMIN, GERENCIA, RH)
          if (role === UserRole.ADMIN || role === UserRole.GERENCIA || role === UserRole.RH) {
              const normalize = (s?: string) => s ? s.trim().toUpperCase() : '';
 
              Object.keys(vehicleLogs).forEach(vId => {
-                 // Sort descending (newest first)
                  const vLogs = vehicleLogs[vId].sort((a, b) => b.date.localeCompare(a.date));
                  
-                 // Iterate to check changes against *previous* record
-                 // Only check logs within the cutoff period
                  for(let i = 0; i < vLogs.length - 1; i++) {
                      const currentLog = vLogs[i];
                      if (currentLog.date < cutOffStr) break;
@@ -371,8 +412,6 @@ const HomeMenu: React.FC<HomeMenuProps> = ({ onNavigate, role, userName }) => {
                      
                      const changes: string[] = [];
                      
-                     // Only compare if previous log has historical data (implies it's a valid comparison point)
-                     // or if we decide to fallback to vehicle data, but let's stick to recorded history
                      if (normalize(currentLog.historicalDriver) !== normalize(previousLog.historicalDriver)) changes.push('Motorista');
                      if (normalize(currentLog.historicalMunicipality) !== normalize(previousLog.historicalMunicipality)) changes.push('Município');
                      if (normalize(currentLog.historicalContract) !== normalize(previousLog.historicalContract)) changes.push('Contrato');
@@ -414,14 +453,11 @@ const HomeMenu: React.FC<HomeMenuProps> = ({ onNavigate, role, userName }) => {
              }
          });
 
-         // 2. OPERADOR ALERTS: MISSING LOG FOR YESTERDAY
-         // Lógica: Para todos os veículos ATIVOS, verificar se existe log na data de ontem
          if (role === UserRole.OPERADOR || role === UserRole.ADMIN) {
              const yesterday = new Date();
              yesterday.setDate(yesterday.getDate() - 1);
-             const yStr = yesterday.toLocaleDateString('pt-BR').split('/').reverse().join('-'); // Formata YYYY-MM-DD
+             const yStr = yesterday.toLocaleDateString('pt-BR').split('/').reverse().join('-'); 
              
-             // Veículos ativos
              const activeVehicles = vehicles.filter(v => v.status !== 'INATIVO');
              
              activeVehicles.forEach(v => {
@@ -437,14 +473,12 @@ const HomeMenu: React.FC<HomeMenuProps> = ({ onNavigate, role, userName }) => {
          }
       }
 
-      // --- ALERTS FOR FINANCEIRO & ADMIN ---
       if (role === UserRole.FINANCEIRO || role === UserRole.ADMIN || role === UserRole.GERENCIA) {
           const [refuelings, requisitions] = await Promise.all([
              storageService.getRefuelings(),
              storageService.getRequisitions()
           ]);
 
-          // 1. Pending Refueling Payment (Cost = 0)
           const pendingRefuelings = refuelings.filter(r => r.totalCost === 0 && r.date >= cutOffStr);
           pendingRefuelings.forEach(r => {
                generatedAlerts.push({
@@ -454,12 +488,10 @@ const HomeMenu: React.FC<HomeMenuProps> = ({ onNavigate, role, userName }) => {
                });
           });
 
-          // 2. Pending Requisition Analysis > 24h
           const pendingReqs = requisitions.filter(r => r.status === RequisitionStatus.PENDING);
           const msPerDay = 24 * 60 * 60 * 1000;
           
           pendingReqs.forEach(r => {
-               // Combine date and time if available, or just date
                const reqDateTimeStr = r.requestTime ? `${r.date}T${r.requestTime}:00` : `${r.date}T00:00:00`;
                const reqTime = new Date(reqDateTimeStr).getTime();
                const diff = now.getTime() - reqTime;
@@ -525,7 +557,6 @@ const HomeMenu: React.FC<HomeMenuProps> = ({ onNavigate, role, userName }) => {
   return (
     <div className="relative min-h-full w-full p-6 lg:p-8 font-sans flex flex-col print:p-0 print:block">
       
-      {/* Modernized Background */}
       <div className="fixed inset-0 pointer-events-none z-0 h-screen w-screen overflow-hidden bg-slate-50 print:hidden">
           <div className="absolute top-0 left-0 w-[800px] h-[800px] bg-blue-200/20 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob"></div>
           <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-indigo-200/20 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob animation-delay-2000"></div>
@@ -534,7 +565,6 @@ const HomeMenu: React.FC<HomeMenuProps> = ({ onNavigate, role, userName }) => {
           <div className="absolute inset-0 opacity-[0.4]" style={{backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.1'/%3E%3C/svg%3E")`}}></div>
       </div>
 
-      {/* Notifications Drawer (Slide-over) */}
       {isNotificationsOpen && (
           <div className="fixed inset-0 z-50 flex justify-end print:hidden">
               <div 
@@ -606,10 +636,8 @@ const HomeMenu: React.FC<HomeMenuProps> = ({ onNavigate, role, userName }) => {
 
       <div className="relative z-10 max-w-7xl mx-auto w-full flex-1 print:max-w-none print:w-full">
         
-        {/* --- Header Section (Redesigned) --- */}
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 mb-10 animate-in slide-in-from-top-4 duration-700 print:hidden">
             
-            {/* Left Side: Greeting & Bell */}
             <div className="flex items-start gap-4">
                 {canSeeNotifications && (
                     <button 
@@ -645,7 +673,6 @@ const HomeMenu: React.FC<HomeMenuProps> = ({ onNavigate, role, userName }) => {
                 </div>
             </div>
 
-            {/* Right Side: Dashboard Widgets (Admin/Gerencia) */}
             {canSeeDashboard && (
                 <div className="w-full lg:w-auto self-end lg:self-center">
                     <DashboardRankings />
@@ -653,7 +680,6 @@ const HomeMenu: React.FC<HomeMenuProps> = ({ onNavigate, role, userName }) => {
             )}
         </div>
 
-        {/* --- Main Content (Full Width Cards) --- */}
         <div className="w-full animate-in slide-in-from-bottom-8 fade-in duration-1000 delay-200 print:animate-none">
             
             <div className="mb-6 flex items-center gap-3 print:hidden">
@@ -957,13 +983,11 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans print:block print:h-auto print:overflow-visible">
       
-      {/* Sidebar (Desktop) - Modernized */}
       <aside className="hidden md:flex print:hidden flex-col w-72 h-screen sticky top-0 shadow-2xl z-50 bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 border-r border-slate-800/50">
         <div 
           className="p-4 flex justify-center cursor-pointer hover:bg-white/5 transition-colors border-b border-slate-800/50 relative overflow-hidden"
           onClick={() => setActiveTab(Tab.HOME)}
         >
-           {/* Logo Glow Effect */}
            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl pointer-events-none"></div>
            <div className="relative z-10">
                <ParisLogo variant="light" size="normal" />
@@ -988,7 +1012,6 @@ const App: React.FC = () => {
           </div>
         </nav>
 
-        {/* Modernized User Profile Section */}
         <div className="p-4 bg-slate-950/50 border-t border-slate-800 backdrop-blur-sm">
           <div className="bg-slate-900/50 rounded-xl p-3 border border-slate-800 shadow-inner">
             <div className="flex items-center gap-3 mb-3">
@@ -1012,7 +1035,6 @@ const App: React.FC = () => {
         </div>
       </aside>
 
-      {/* Mobile Header */}
       <header className="md:hidden print:hidden bg-slate-900 text-white p-4 flex justify-between items-center sticky top-0 z-40 shadow-md border-b border-slate-800">
         <div onClick={() => setActiveTab(Tab.HOME)} className="cursor-pointer">
           <ParisLogo variant="light" size="normal" />
@@ -1022,7 +1044,6 @@ const App: React.FC = () => {
         </button>
       </header>
 
-      {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
         <div className="md:hidden fixed inset-0 bg-slate-900 z-30 pt-24 px-4 pb-8 animate-in slide-in-from-top-10 duration-200 flex flex-col h-full overflow-y-auto">
            <nav className="space-y-2">
@@ -1052,7 +1073,6 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* Main Content */}
       <main className="flex-1 p-0 md:p-0 overflow-y-auto h-full relative print:p-0 print:overflow-visible print:h-auto">
         <div className="absolute inset-0 opacity-[0.015] pointer-events-none z-0 print:hidden" 
              style={{ backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '24px 24px' }}>

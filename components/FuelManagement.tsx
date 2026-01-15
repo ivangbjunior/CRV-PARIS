@@ -4,7 +4,7 @@ import { storageService } from '../services/storage';
 import PasswordModal from './PasswordModal';
 import { useAuth } from '../contexts/AuthContext';
 import { 
-  Fuel, Plus, Save, Trash2, Edit2, Droplet, Filter, X, Calendar, Printer, AlertCircle, Users, ChevronDown, ChevronUp, MapPin, Clock, ClipboardList, ChevronLeft, ChevronRight, Loader2, DollarSign, Receipt, Package
+  Fuel, Plus, Save, Trash2, Edit2, Droplet, Filter, X, Calendar, Printer, AlertCircle, Users, ChevronDown, ChevronUp, MapPin, Clock, ClipboardList, ChevronLeft, ChevronRight, Loader2, DollarSign, Receipt, Package, RefreshCw
 } from 'lucide-react';
 import { PrintHeader } from './PrintHeader';
 import MultiSelect, { MultiSelectOption } from './MultiSelect';
@@ -17,8 +17,6 @@ const EXTERNAL_EQUIPMENT_TYPES = [
   'BARCO', 'BALSA', 'MOTO', 'CARRO', 'LANCHA', 'MOTOR DE POUPA', 'MOTOPODA', 'GERADOR', 'GALÃO', 'TAMBOR'
 ];
 
-const ITEMS_PER_PAGE = 50;
-
 const FuelManagement: React.FC = () => {
   const { user } = useAuth();
   const isReadOnly = user?.role === UserRole.GERENCIA;
@@ -30,6 +28,8 @@ const FuelManagement: React.FC = () => {
   const [refuelings, setRefuelings] = useState<RefuelingLog[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
 
+  // Pagination State - Standardized with Reports
+  const [itemsPerPage, setItemsPerPage] = useState(25);
   const [currentPage, setCurrentPage] = useState(1);
 
   const [filterDateStart, setFilterDateStart] = useState('');
@@ -103,9 +103,10 @@ const FuelManagement: React.FC = () => {
     loadData();
   }, []);
 
+  // Reset page when filters or itemsPerPage change
   useEffect(() => {
     setCurrentPage(1);
-  }, [filterDateStart, filterDateEnd, filterPlate, filterStation, filterContract, filterMunicipality, filterFuel, filterForeman, filterInvoice]);
+  }, [filterDateStart, filterDateEnd, filterPlate, filterStation, filterContract, filterMunicipality, filterFuel, filterForeman, filterInvoice, itemsPerPage]);
 
   const loadData = async () => {
     setLoading(true);
@@ -425,10 +426,11 @@ const FuelManagement: React.FC = () => {
       return matchesDate && matchesPlate && matchesStation && matchesContract && matchesCity && matchesFuel && matchesForeman && matchesInvoice;
   }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-  const totalPages = Math.ceil(filteredRefuelings.length / ITEMS_PER_PAGE);
+  // Dynamic Pagination Logic
+  const totalPages = Math.ceil(filteredRefuelings.length / itemsPerPage);
   const paginatedRefuelings = filteredRefuelings.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
   );
 
   const totalLitersCalculated = filteredRefuelings.reduce((acc, curr) => acc + (curr.liters || 0), 0);
@@ -460,6 +462,8 @@ const FuelManagement: React.FC = () => {
       value: s.id,
       label: `${s.name} - ${s.municipality}`
   }));
+
+  const foremanSelectOptions = uniqueForemen.map(f => ({ value: f, label: f }));
 
   return (
     <div className="space-y-6">
@@ -736,9 +740,21 @@ const FuelManagement: React.FC = () => {
                             />
                         </div>
 
-                        <div>
-                            <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Equipe</label>
-                            <input type="text" value={refuelingForm.foremanSnapshot || ''} onChange={e => setRefuelingForm({...refuelingForm, foremanSnapshot: e.target.value.toUpperCase()})} className={inputClass} />
+                        <div className="relative">
+                            {isExternal ? (
+                                <SelectWithSearch 
+                                    label="Equipe"
+                                    options={foremanSelectOptions}
+                                    value={refuelingForm.foremanSnapshot || ''}
+                                    onChange={(val) => setRefuelingForm({...refuelingForm, foremanSnapshot: val})}
+                                    placeholder="Selecione a equipe..."
+                                />
+                            ) : (
+                                <>
+                                    <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Equipe</label>
+                                    <input type="text" value={refuelingForm.foremanSnapshot || ''} onChange={e => setRefuelingForm({...refuelingForm, foremanSnapshot: e.target.value.toUpperCase()})} className={inputClass} />
+                                </>
+                            )}
                         </div>
                         
                         <div>
@@ -845,6 +861,29 @@ const FuelManagement: React.FC = () => {
              </div>
 
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden print:border-none print:shadow-none print:overflow-visible relative z-0">
+                <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center print:hidden">
+                    <h3 className="font-bold text-slate-700 flex items-center gap-2">
+                      <ClipboardList size={18} /> Histórico Detalhado
+                      <span className="ml-2 text-sm font-normal text-slate-500 bg-white px-2 py-0.5 border rounded-full shadow-sm">{filteredRefuelings.length} Registros</span>
+                    </h3>
+                    
+                    {/* Items Per Page Selector - Mirroring Reports */}
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs text-slate-500 font-bold">Exibir:</span>
+                        <select 
+                            value={itemsPerPage} 
+                            onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}
+                            className="text-xs border border-slate-300 rounded p-1 bg-white outline-none focus:border-blue-500"
+                        >
+                            <option value={25}>25</option>
+                            <option value={50}>50</option>
+                            <option value={100}>100</option>
+                            <option value={1000000}>Todos</option>
+                        </select>
+                        <button onClick={loadData} className="p-1 hover:bg-slate-200 rounded ml-2 text-slate-500" title="Recarregar"><RefreshCw size={16}/></button>
+                    </div>
+                </div>
+
                 <div className="overflow-x-auto print:overflow-visible">
                     <table className="w-full text-sm text-left">
                         <thead className="bg-slate-100 text-slate-600 font-bold uppercase text-[10px] print:bg-slate-200 print:text-slate-900 border-b border-slate-200">
@@ -864,7 +903,6 @@ const FuelManagement: React.FC = () => {
                             ) : (
                                 paginatedRefuelings.map(item => {
                                     const station = stations.find(s => s.id === item.gasStationId);
-                                    // Pendência: Se faltar valor OU faltar litros
                                     const isPending = (item.totalCost || 0) <= 0 || (item.liters || 0) <= 0;
 
                                     return (
@@ -913,7 +951,7 @@ const FuelManagement: React.FC = () => {
                         </tbody>
                          <tfoot className="bg-slate-50 font-black text-slate-800 border-t-2 border-slate-300">
                              <tr>
-                                 <td colSpan={4} className="px-6 py-4 text-right uppercase text-xs tracking-widest text-slate-500">Somatório Geral:</td>
+                                 <td colSpan={4} className="px-6 py-4 text-right uppercase text-[10px] tracking-widest text-slate-500">Somatório Geral Listado:</td>
                                  <td className="px-6 py-4 text-blue-900 text-lg bg-blue-50/50">{totalLitersCalculated.toFixed(2)} L</td>
                                  <td className="px-6 py-4 text-green-800 text-lg bg-green-50/50">{formatCurrency(totalCostCalculated)}</td>
                                  <td className="print:hidden"></td>
@@ -922,19 +960,52 @@ const FuelManagement: React.FC = () => {
                     </table>
                 </div>
 
+                {/* Pagination Controls - Mirroring Reports */}
                 {totalPages > 1 && (
                   <div className="flex items-center justify-between border-t border-slate-200 bg-white px-4 py-3 sm:px-6 print:hidden">
+                    <div className="flex flex-1 justify-between sm:hidden">
+                        <button
+                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                            disabled={currentPage === 1}
+                            className="relative inline-flex items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                        >
+                            Anterior
+                        </button>
+                        <button
+                            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                            disabled={currentPage === totalPages}
+                            className="relative ml-3 inline-flex items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                        >
+                            Próximo
+                        </button>
+                    </div>
                     <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
                       <div>
                         <p className="text-sm text-slate-700">
-                          Mostrando <span className="font-medium">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span> até <span className="font-medium">{Math.min(currentPage * ITEMS_PER_PAGE, filteredRefuelings.length)}</span> de <span className="font-medium">{filteredRefuelings.length}</span> resultados
+                          Mostrando <span className="font-bold">{(currentPage - 1) * itemsPerPage + 1}</span> até <span className="font-bold">{Math.min(currentPage * itemsPerPage, filteredRefuelings.length)}</span> de <span className="font-bold">{filteredRefuelings.length}</span> resultados
                         </p>
                       </div>
                       <div>
                         <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
-                          <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="relative inline-flex items-center rounded-l-md px-2 py-2 text-slate-400 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50"><span className="sr-only">Anterior</span><ChevronLeft className="h-5 w-5" aria-hidden="true" /></button>
-                          <span className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-slate-900 ring-1 ring-inset ring-slate-300 focus:outline-offset-0">Página {currentPage} de {totalPages}</span>
-                          <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="relative inline-flex items-center rounded-r-md px-2 py-2 text-slate-400 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50"><span className="sr-only">Próximo</span><ChevronRight className="h-5 w-5" aria-hidden="true" /></button>
+                          <button 
+                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))} 
+                            disabled={currentPage === 1} 
+                            className="relative inline-flex items-center rounded-l-md px-2 py-2 text-slate-400 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50"
+                          >
+                            <span className="sr-only">Anterior</span>
+                            <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+                          </button>
+                          <span className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-slate-700 ring-1 ring-inset ring-slate-300 focus:outline-offset-0">
+                            Página {currentPage} de {totalPages}
+                          </span>
+                          <button 
+                            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} 
+                            disabled={currentPage === totalPages} 
+                            className="relative inline-flex items-center rounded-r-md px-2 py-2 text-slate-400 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50"
+                          >
+                            <span className="sr-only">Próximo</span>
+                            <ChevronRight className="h-5 w-5" aria-hidden="true" />
+                          </button>
                         </nav>
                       </div>
                     </div>
