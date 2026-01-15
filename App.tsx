@@ -36,6 +36,7 @@ const DashboardRankings: React.FC = () => {
   });
   const [financials, setFinancials] = useState({
     currentMonthCost: 0,
+    currentMonthLiters: 0,
     lastMonthCost: 0,
     diffPercent: 0,
     isIncrease: false
@@ -68,6 +69,7 @@ const DashboardRankings: React.FC = () => {
 
       // 1. Process Financials (Month to Date Comparison) - FILTERED BY TEAM
       let currentCost = 0;
+      let currentLiters = 0;
       let lastCost = 0;
 
       refuelings.forEach(r => {
@@ -79,14 +81,15 @@ const DashboardRankings: React.FC = () => {
         const rDay = rDate.getDate();
 
         if (rYear === currentYear && rMonth === currentMonth) {
-          currentCost += r.totalCost;
+          currentCost += (r.totalCost || 0);
+          currentLiters += (r.liters || 0);
         }
 
         const lastMonthDate = new Date();
         lastMonthDate.setMonth(now.getMonth() - 1);
         
         if (rYear === lastMonthDate.getFullYear() && rMonth === lastMonthDate.getMonth() && rDay <= currentDay) {
-          lastCost += r.totalCost;
+          lastCost += (r.totalCost || 0);
         }
       });
 
@@ -99,6 +102,7 @@ const DashboardRankings: React.FC = () => {
 
       setFinancials({
         currentMonthCost: currentCost,
+        currentMonthLiters: currentLiters,
         lastMonthCost: lastCost,
         diffPercent: Math.abs(diff),
         isIncrease: diff >= 0
@@ -204,11 +208,21 @@ const DashboardRankings: React.FC = () => {
               <span className="text-[10px] font-bold uppercase tracking-wider">Abastecimento</span>
             </div>
             
-            <div className="flex-1 flex flex-col justify-center">
-              <div className="text-3xl font-black text-blue-900 tracking-tight">
-                {formatCurrency(financials.currentMonthCost)}
+            <div className="flex-1 flex flex-col justify-center gap-2">
+              <div>
+                <div className="text-3xl font-black text-blue-900 tracking-tight leading-none">
+                  {formatCurrency(financials.currentMonthCost)}
+                </div>
+                <p className="text-[9px] font-bold text-blue-400 uppercase mt-0.5">Valor Acumulado</p>
               </div>
-              <p className="text-[10px] font-bold text-blue-400 uppercase mt-1">Acumulado do Mês</p>
+              
+              <div className="bg-white/40 border border-blue-100 rounded-lg p-2 flex items-center gap-2">
+                 <Droplet size={14} className="text-blue-500" />
+                 <div>
+                    <span className="text-sm font-black text-blue-800">{financials.currentMonthLiters.toFixed(1)} L</span>
+                    <p className="text-[8px] font-bold text-blue-400 uppercase leading-none">Volume Total</p>
+                 </div>
+              </div>
             </div>
             
             <div className="mt-auto pt-3 border-t border-blue-200/60">
@@ -294,7 +308,7 @@ const DashboardRankings: React.FC = () => {
                                   <span className="font-black text-slate-900 text-[13px] tracking-tight truncate" title={item.plate}>
                                     {item.plate}
                                   </span>
-                                  <span className={`font-mono font-black px-1.5 py-0.5 rounded text-[10px] ${
+                                  <span className={`font-mono font-black px-2 py-0.5 rounded text-sm shadow-sm ${
                                       activeTab === 'FUEL' ? 'text-orange-700 bg-orange-100/50' : 
                                       activeTab === 'SPEED' ? 'text-red-700 bg-red-100/50' : 
                                       'text-blue-700 bg-blue-100/50'
