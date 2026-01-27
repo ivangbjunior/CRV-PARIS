@@ -439,17 +439,17 @@ const Reports: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 print:space-y-1">
        
        <PrintHeader 
-        title="Relatório Geral de Frota"
-        subtitle="Diário de Bordo e Métricas"
+        title="Relatório de Frota"
+        subtitle="Diário de Bordo Detalhado"
         details={
             <>
-                <span>Período: {dateRange.start ? formatDateDisplay(dateRange.start) : 'Início'} até {dateRange.end ? formatDateDisplay(dateRange.end) : 'Hoje'}</span>
+                <span>Período: {dateRange.start ? formatDateDisplay(dateRange.start) : 'Início'} / {dateRange.end ? formatDateDisplay(dateRange.end) : 'Hoje'}</span>
                 <span>Registros: {filteredLogs.length}</span>
-                <span>KM Total: {summary.totalKm}</span>
-                <span>Horas Totais: {summary.formattedTime}</span>
+                <span>KM: {summary.totalKm}</span>
+                <span>Horas: {summary.formattedTime}</span>
             </>
         }
       />
@@ -465,7 +465,7 @@ const Reports: React.FC = () => {
 
       {/* Error Banner */}
       {errorState && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4 flex items-center justify-between" role="alert">
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4 flex items-center justify-between no-print" role="alert">
               <div>
                   <strong className="font-bold">Erro ao carregar dados: </strong>
                   <span className="block sm:inline">{errorState}</span>
@@ -478,7 +478,7 @@ const Reports: React.FC = () => {
 
       {/* Obs Modal */}
       {obsModalData && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4 print:hidden animate-in fade-in duration-200">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4 no-print animate-in fade-in duration-200">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full overflow-hidden">
              <div className="bg-blue-600 p-4 flex justify-between items-center text-white">
                 <div className="flex items-center gap-2">
@@ -513,7 +513,7 @@ const Reports: React.FC = () => {
 
       {/* Edit Modal */}
       {showEditModal && editingLog && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 overflow-y-auto print:hidden">
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 overflow-y-auto no-print">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl my-8 flex flex-col max-h-[90vh]">
             <div className="bg-blue-900 p-4 text-white flex justify-between items-center rounded-t-xl sticky top-0 z-10">
               <div className="flex items-center gap-3">
@@ -688,7 +688,7 @@ const Reports: React.FC = () => {
       )}
 
       {/* Modernized Collapsible Filters */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm print:hidden relative z-20">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm no-print relative z-20">
         <div 
             onClick={() => setShowFilters(!showFilters)} 
             className="p-4 bg-white flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors rounded-xl"
@@ -740,15 +740,15 @@ const Reports: React.FC = () => {
       </div>
 
       {/* Resumo Compacto & Minimalista para Impressão */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-2 print:w-full print:flex print:flex-row print:justify-between print:items-center print:gap-4 print:border-b print:border-slate-200 print:pb-2 print:mb-2 relative z-0 print:max-h-[40px] print:overflow-hidden">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-2 print:w-full print:flex print:flex-row print:justify-between print:items-center print:gap-4 print:border-b print:border-slate-200 print:pb-1 print:mb-1 relative z-0 print:max-h-[30px] print:overflow-hidden">
             {/* Time */}
             <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4 hover:border-blue-300 transition-all group print:border-none print:shadow-none print:p-0 print:bg-transparent print:flex print:items-center print:gap-1 print:m-0">
                 <div className="p-3 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors print:hidden">
                     <Clock size={20} strokeWidth={2} />
                 </div>
                 <div className="print:flex print:items-center print:gap-1">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider print:text-slate-600 print:text-[9px] print:m-0">Tempo Operação:</p>
-                    <p className="text-xl font-black text-slate-800 leading-none mt-1 print:text-xs print:m-0">{summary.formattedTime}</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider print:text-slate-900 print:text-[8px] print:m-0">Tempo:</p>
+                    <p className="text-xl font-black text-slate-800 leading-none mt-1 print:text-[10px] print:m-0">{summary.formattedTime}</p>
                 </div>
             </div>
 
@@ -758,8 +758,8 @@ const Reports: React.FC = () => {
                     <MapPin size={20} strokeWidth={2} />
                 </div>
                 <div className="print:flex print:items-center print:gap-1">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider print:text-slate-600 print:text-[9px] print:m-0">KM Total:</p>
-                    <p className="text-xl font-black text-slate-800 leading-none mt-1 print:text-xs print:m-0">{summary.totalKm} <span className="text-xs font-bold text-slate-400 print:hidden">km</span></p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider print:text-slate-900 print:text-[8px] print:m-0">KM Total:</p>
+                    <p className="text-xl font-black text-slate-800 leading-none mt-1 print:text-[10px] print:m-0">{summary.totalKm}</p>
                 </div>
             </div>
 
@@ -769,8 +769,8 @@ const Reports: React.FC = () => {
                     <WifiOff size={20} strokeWidth={2} />
                 </div>
                 <div className="print:flex print:items-center print:gap-1">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider print:text-slate-600 print:text-[9px] print:m-0">Sem Sinal:</p>
-                    <p className="text-xl font-black text-slate-800 leading-none mt-1 print:text-xs print:m-0">{summary.daysNoSignal} <span className="text-xs font-bold text-slate-400 print:hidden">dias</span></p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider print:text-slate-900 print:text-[8px] print:m-0">Sem Sinal:</p>
+                    <p className="text-xl font-black text-slate-800 leading-none mt-1 print:text-[10px] print:m-0">{summary.daysNoSignal}</p>
                 </div>
             </div>
 
@@ -780,20 +780,19 @@ const Reports: React.FC = () => {
                     <Ban size={20} strokeWidth={2} />
                 </div>
                 <div className="print:flex print:items-center print:gap-1">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider print:text-slate-600 print:text-[9px] print:m-0">Parado:</p>
-                    <p className="text-xl font-black text-slate-800 leading-none mt-1 print:text-xs print:m-0">{summary.daysStopped} <span className="text-xs font-bold text-slate-400 print:hidden">dias</span></p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider print:text-slate-900 print:text-[8px] print:m-0">Parado:</p>
+                    <p className="text-xl font-black text-slate-800 leading-none mt-1 print:text-[10px] print:m-0">{summary.daysStopped}</p>
                 </div>
             </div>
         </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden print:shadow-none print:border-none print:overflow-visible relative z-0">
-         <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center print:hidden">
+         <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center no-print">
             <h3 className="font-bold text-slate-700 flex items-center gap-2">
               <FileText size={18} /> Listagem Detalhada
               <span className="ml-2 text-sm font-normal text-slate-500 bg-white px-2 py-0.5 border rounded-full shadow-sm">{filteredLogs.length} Registros</span>
             </h3>
             
-            {/* Items Per Page Selector */}
             <div className="flex items-center gap-2">
                 <span className="text-xs text-slate-500 font-bold">Exibir:</span>
                 <select 
@@ -815,95 +814,75 @@ const Reports: React.FC = () => {
              <thead className="bg-slate-100 text-slate-600 font-semibold uppercase tracking-wider text-sm print:bg-slate-200 print:text-slate-900">
                <tr>
                  <th className="px-4 py-3 border-b print:px-1 print:py-1">Data</th>
-                 <th className="px-4 py-3 border-b min-w-[200px] print:px-1 print:py-1">Veículo / Motorista / Local</th>
+                 <th className="px-4 py-3 border-b min-w-[150px] print:px-1 print:py-1">Veículo / Local</th>
                  <th className="px-4 py-3 border-b bg-blue-50 print:bg-transparent print:px-1 print:py-1">Expediente</th>
-                 <th className="px-4 py-3 border-b bg-blue-50 print:bg-transparent print:px-1 print:py-1">Int./Extras</th>
-                 <th className="px-4 py-3 border-b bg-green-50 text-green-700 print:bg-transparent print:text-black print:px-1 print:py-1">T.Ligado</th>
-                 <th className="px-4 py-3 border-b print:px-1 print:py-1">KM Rodado</th>
+                 <th className="px-4 py-3 border-b bg-green-50 text-green-700 print:bg-transparent print:text-black print:px-1 print:py-1">Ligado</th>
+                 <th className="px-4 py-3 border-b print:px-1 print:py-1">KM</th>
                  <th className="px-4 py-3 border-b print:px-1 print:py-1">Vel. Máx</th>
-                 <th className="px-4 py-3 border-b min-w-[160px] print:px-1 print:py-1">Últ. Abast.</th>
-                 {!isReadOnly && <th className="px-4 py-3 border-b text-center print:hidden">Ações</th>}
+                 <th className="px-4 py-3 border-b min-w-[120px] print:px-1 print:py-1">Últ. Abast.</th>
+                 {!isReadOnly && <th className="px-4 py-3 border-b text-center no-print">Ações</th>}
                </tr>
              </thead>
              <tbody className="divide-y divide-slate-100">
                {paginatedLogs.length === 0 ? (
-                 <tr><td colSpan={isReadOnly ? 8 : 9} className="px-6 py-12 text-center text-slate-400">Nenhum registro encontrado.</td></tr>
+                 <tr><td colSpan={isReadOnly ? 7 : 8} className="px-6 py-12 text-center text-slate-400">Nenhum registro encontrado.</td></tr>
                ) : (
                  paginatedLogs.map(log => {
                    const displayContract = log.historicalContract || log.vehicle.contract;
                    return (
                    <tr key={log.id} className="hover:bg-slate-50 transition-colors print:hover:bg-transparent">
-                     <td className="px-4 py-3 font-medium text-slate-900 align-top print:px-1 print:py-1 print:text-xs">
+                     <td className="px-4 py-3 font-medium text-slate-900 align-top print:px-1 print:py-1 print:text-[8px] print:font-bold">
                         <div>{formatDateDisplay(log.date)}</div>
-                        {log.lastRefuelingInfo && log.lastRefuelingInfo.date === log.date && (
-                           <div className="flex items-center gap-1 mt-1 text-orange-600 text-[10px] font-bold bg-orange-50 px-1.5 py-0.5 rounded w-fit border border-orange-100" title="Abastecimento registrado neste dia">
-                                <Fuel size={10} />
-                                <span>Abast.</span>
-                           </div>
-                        )}
-                        {log.observations && (
-                          <button onClick={(e) => { e.stopPropagation(); openObsModal(log); }} className="mt-1 text-yellow-600 hover:text-yellow-800 hover:bg-yellow-100 rounded-full p-1 transition-colors print:hidden">
-                              <MessageSquareText size={16} className="fill-yellow-100" />
-                          </button>
-                        )}
+                        <div className="print:hidden">
+                            {log.lastRefuelingInfo && log.lastRefuelingInfo.date === log.date && (
+                            <div className="flex items-center gap-1 mt-1 text-orange-600 text-[10px] font-bold bg-orange-50 px-1.5 py-0.5 rounded w-fit border border-orange-100">
+                                    <Fuel size={10} /> <span>Abast.</span>
+                            </div>
+                            )}
+                            {log.observations && (
+                            <button onClick={(e) => { e.stopPropagation(); openObsModal(log); }} className="mt-1 text-yellow-600 hover:text-yellow-800 hover:bg-yellow-100 rounded-full p-1 transition-colors">
+                                <MessageSquareText size={16} className="fill-yellow-100" />
+                            </button>
+                            )}
+                        </div>
                      </td>
                      <td className="px-4 py-3 align-top print:px-1 print:py-1">
-                        <div className="flex flex-col gap-1">
-                           <div className="flex items-center gap-2">
-                              <span className={`font-mono font-bold ${log.vehicle.plate === 'VEÍCULO EXCLUÍDO' ? 'text-red-500' : 'text-slate-800'} print:text-black print:text-xs`}>{log.vehicle.plate}</span>
-                              <span className={`px-2 py-0.5 rounded-[4px] text-xs font-bold border uppercase ${getContractColor(displayContract)} print:border-none print:p-0 print:text-black`}>{displayContract.substring(0,3)}</span>
+                        <div className="flex flex-col gap-0.5">
+                           <div className="flex items-center gap-2 print:gap-1">
+                              <span className={`font-mono font-bold ${log.vehicle.plate === 'VEÍCULO EXCLUÍDO' ? 'text-red-500' : 'text-slate-800'} print:text-black print:text-[9px]`}>{log.vehicle.plate}</span>
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border uppercase ${getContractColor(displayContract)} print:border-none print:p-0 print:text-black print:text-[7px]`}>{displayContract.substring(0,3)}</span>
                            </div>
-                           <div className="flex items-center gap-1 text-slate-600 text-sm truncate max-w-[220px] print:text-xs print:whitespace-normal">
-                              <User size={14} className="text-slate-400 print:hidden" />
-                              <span className="font-medium truncate" title={log.historicalDriver || log.vehicle.driverName}>
-                                 {log.historicalDriver || log.vehicle.driverName}
-                              </span>
+                           <div className="flex flex-col text-slate-600 text-sm print:text-[8px] print:text-black leading-tight">
+                              <span className="font-medium truncate max-w-[150px]">{log.historicalDriver || log.vehicle.driverName}</span>
+                              <span className="text-slate-400 print:text-black italic">{log.historicalMunicipality || log.vehicle.municipality}</span>
                            </div>
-                           
-                           {/* MUNICÍPIO MERGED HERE */}
-                           <div className="flex items-center gap-1 text-slate-500 text-xs truncate max-w-[220px]">
-                                <MapPin size={12} className="text-slate-400 print:hidden" />
-                                <span>{log.historicalMunicipality || log.vehicle.municipality}</span>
-                           </div>
-
-                           {log.vehicle.foreman && log.vehicle.foreman !== '-' && (
-                             <div className="flex items-center gap-1 text-slate-400 text-[10px] truncate max-w-[220px] print:hidden" title={`Equipe: ${log.vehicle.foreman}`}>
-                                <HardHat size={10} className="text-slate-300" />
-                                <span>{log.vehicle.foreman}</span>
-                             </div>
-                           )}
                         </div>
                      </td>
                      
                      {log.nonOperatingReason ? (
-                        <td colSpan={5} className="px-4 py-3 align-middle print:px-1 print:py-1">
-                           <div className={`flex items-center gap-2 p-2 rounded-lg border ${getNonOperatingColor(log.nonOperatingReason)} print:border-none print:p-0`}>
-                             <AlertTriangle size={18} className="print:hidden"/>
-                             <span className="font-bold text-sm print:text-xs">{log.nonOperatingReason}</span>
+                        <td colSpan={4} className="px-4 py-3 align-middle print:px-1 print:py-1">
+                           <div className={`flex items-center gap-2 p-2 rounded-lg border ${getNonOperatingColor(log.nonOperatingReason)} print:border-none print:p-0 print:bg-transparent print:text-black`}>
+                             <AlertTriangle size={18} className="no-print"/>
+                             <span className="font-bold text-sm print:text-[9px]">{log.nonOperatingReason}</span>
                            </div>
                         </td>
                      ) : (
                        <>
                           <td className="px-4 py-3 align-top bg-blue-50/30 print:bg-transparent print:px-1 print:py-1">
-                             <div className="flex flex-col gap-1">
-                                <span className="font-medium text-slate-700 print:text-xs">{log.startTime} - {log.endTime}</span>
-                                <span className="text-sm text-slate-500 flex items-center gap-1 print:text-xs" title="1ª Ignição"><Key size={14} className="print:hidden" /> (1ª: {log.firstIgnition || '--:--'})</span>
-                             </div>
-                          </td>
-                          <td className="px-4 py-3 align-top bg-blue-50/30 print:bg-transparent print:px-1 print:py-1">
-                             <div className="flex flex-col gap-1">
-                                <span className="text-slate-600 text-sm print:text-xs" title="Intervalo">Int: {log.lunchStart && log.lunchEnd ? `${log.lunchStart}-${log.lunchEnd}` : '-'}</span>
-                                {(log.extraTimeStart && log.extraTimeEnd) && (<span className="text-orange-600 font-medium text-sm print:text-xs print:text-black" title="Hora Extra">Ext: {log.extraTimeStart}-{log.extraTimeEnd}</span>)}
+                             <div className="flex flex-col gap-0.5 print:text-[8px] print:text-black">
+                                <span className="font-medium text-slate-700 print:text-black">{log.startTime} - {log.endTime}</span>
+                                <span className="text-xs text-slate-500 no-print" title="1ª Ignição">(1ª: {log.firstIgnition || '--:--'})</span>
+                                {log.extraTimeStart && <span className="text-orange-600 text-[10px] font-bold print:text-black">Ext: {log.extraTimeStart}-{log.extraTimeEnd}</span>}
                              </div>
                           </td>
                           <td className="px-4 py-3 align-top bg-green-50/30 print:bg-transparent print:px-1 print:py-1">
-                             <div className="flex flex-col"><span className="font-bold text-green-700 text-sm print:text-xs print:text-black">{log.calculatedHours}h</span></div>
+                             <span className="font-bold text-green-700 text-sm print:text-[9px] print:text-black">{log.calculatedHours}h</span>
                           </td>
-                          <td className="px-4 py-3 align-top print:px-1 print:py-1"><span className="text-slate-600 font-medium print:text-xs">{log.kmDriven} km</span></td>
+                          <td className="px-4 py-3 align-top print:px-1 print:py-1"><span className="text-slate-600 font-medium print:text-[9px] print:text-black">{log.kmDriven}</span></td>
                           <td className="px-4 py-3 align-top print:px-1 print:py-1">
-                             <div className="flex flex-col gap-1">
-                                <div className="flex items-center gap-1"><span className={`${log.maxSpeed > 90 ? "text-red-600 font-bold" : "text-slate-600"} print:text-xs print:text-black`}>{log.maxSpeed} km/h</span>{log.maxSpeed > 90 && <AlertTriangle size={16} className="text-red-600 print:hidden" />}</div>
-                                {log.speedingCount > 0 && (<span className="text-sm text-red-500 font-medium print:text-xs print:text-black">Exc: {log.speedingCount}x</span>)}
+                             <div className="flex flex-col gap-0.5">
+                                <span className={`${log.maxSpeed > 90 ? "text-red-600 font-bold" : "text-slate-600"} print:text-[9px] print:text-black`}>{log.maxSpeed}</span>
+                                {log.speedingCount > 0 && (<span className="text-[10px] text-red-500 font-bold no-print">Exc: {log.speedingCount}x</span>)}
                              </div>
                           </td>
                        </>
@@ -911,34 +890,24 @@ const Reports: React.FC = () => {
                      
                      <td className="px-4 py-3 align-top print:px-1 print:py-1">
                         {log.lastRefuelingInfo ? (
-                            <div className="flex flex-col gap-1 text-sm">
-                                <div className={`flex items-center gap-1 font-bold ${log.lastRefuelingInfo.date === log.date ? 'text-orange-700' : 'text-slate-700'}`}>
-                                    <Fuel size={14} className="text-orange-600 print:hidden" />
-                                    <span>{formatRefuelingDate(log.lastRefuelingInfo.date)}</span>
-                                    <span className="text-slate-400 text-xs font-normal mx-1">|</span>
-                                    <span>{log.lastRefuelingInfo.liters} L</span>
+                            <div className="flex flex-col gap-0.5 text-sm print:text-[7px] print:text-black leading-none">
+                                <div className={`font-bold ${log.lastRefuelingInfo.date === log.date ? 'text-orange-700 print:text-black' : 'text-slate-700 print:text-black'}`}>
+                                    {formatRefuelingDate(log.lastRefuelingInfo.date)} | {log.lastRefuelingInfo.liters}L
                                 </div>
-                                <div className="flex items-center gap-1 text-slate-500 text-xs">
-                                    <Droplet size={12} className="text-blue-400 print:hidden" />
-                                    <span>{log.lastRefuelingInfo.date === log.date ? 'Rodou após:' : 'Acumulado:'}</span>
-                                    <span className="font-bold text-slate-700">{log.lastRefuelingInfo.kmSince} km</span>
+                                <div className="text-slate-500 text-[10px] print:text-[7px] print:text-black">
+                                    {log.lastRefuelingInfo.date === log.date ? 'Rodou dps:' : 'Acum:'} <b>{log.lastRefuelingInfo.kmSince}km</b>
                                 </div>
-                                {log.lastRefuelingInfo.date === log.date && log.kmBeforeRefueling === undefined && (
-                                    <span className="text-[10px] text-red-400 italic leading-tight">
-                                        *KM Antes n/ inf.
-                                    </span>
-                                )}
                             </div>
                         ) : (
-                            <span className="text-xs text-slate-400 italic">Sem registro</span>
+                            <span className="text-xs text-slate-400 italic print:text-[7px]">S/ Reg.</span>
                         )}
                      </td>
 
                      {!isReadOnly && (
-                      <td className="px-4 py-3 align-middle text-center print:hidden">
+                      <td className="px-4 py-3 align-middle text-center no-print">
                         <div className="flex justify-center gap-1">
-                            <button onClick={() => handleEditClick(log)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Editar"><Edit3 size={18} /></button>
-                          <button onClick={() => confirmDelete(log.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors" title="Excluir"><Trash2 size={18} /></button>
+                          <button onClick={() => handleEditClick(log)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"><Edit3 size={18} /></button>
+                          <button onClick={() => confirmDelete(log.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors"><Trash2 size={18} /></button>
                         </div>
                       </td>
                      )}
@@ -951,7 +920,7 @@ const Reports: React.FC = () => {
 
          {/* Pagination Controls */}
          {totalPages > 1 && (
-             <div className="flex items-center justify-between border-t border-slate-200 bg-white px-4 py-3 sm:px-6 print:hidden">
+             <div className="flex items-center justify-between border-t border-slate-200 bg-white px-4 py-3 sm:px-6 no-print">
                  <div className="flex flex-1 justify-between sm:hidden">
                      <button
                          onClick={() => setCurrentPage(p => Math.max(1, p - 1))}

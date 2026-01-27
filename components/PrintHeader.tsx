@@ -10,25 +10,26 @@ interface PrintHeaderProps {
 
 export const PrintHeader: React.FC<PrintHeaderProps> = ({ title, subtitle, reportId, details }) => {
   return (
-    <div className="hidden print:block mb-6 w-full">
-      {/* Top Header Row */}
-      <div className="flex items-center justify-between border-b-2 border-slate-800 pb-4 mb-2">
-        <ParisLogo variant="dark" size="normal" />
+    <div className="hidden print:block mb-2 w-full">
+      {/* Top Header Row - More compact */}
+      <div className="flex items-center justify-between border-b border-slate-900 pb-1 mb-1">
+        <div className="scale-75 origin-left">
+          <ParisLogo variant="dark" size="normal" />
+        </div>
         
         <div className="text-right">
-          <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tight">{title}</h1>
-          {subtitle && <p className="text-slate-500 text-sm font-medium uppercase tracking-wider mt-1">{subtitle}</p>}
+          <h1 className="text-xl font-black text-slate-900 uppercase tracking-tight">{title}</h1>
+          {subtitle && <p className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">{subtitle}</p>}
         </div>
       </div>
 
-      {/* Metadata Row */}
-      <div className="flex justify-between items-end text-[10px] text-slate-600 bg-slate-50 p-2 border border-slate-200 rounded-sm">
-         <div className="flex gap-6 font-medium">
+      {/* Metadata Row - Compact */}
+      <div className="flex justify-between items-center text-[8px] text-slate-600 bg-slate-50 p-1 border border-slate-200">
+         <div className="flex gap-4 font-bold uppercase">
             {details}
          </div>
-         <div className="text-right flex flex-col items-end">
-            <span>PARIS ENGENHARIA LTDA</span>
-            <span>Gerado em: <strong>{new Date().toLocaleDateString()} às {new Date().toLocaleTimeString()}</strong></span>
+         <div className="text-right">
+            <span>PARIS ENGENHARIA | Gerado: <strong>{new Date().toLocaleDateString()} {new Date().toLocaleTimeString().substring(0,5)}</strong></span>
          </div>
       </div>
     </div>
