@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { DailyLogReport, Vehicle, ContractType, VehicleType, UserRole, DailyLog } from '../types';
+import { DailyLogReport, Vehicle, ContractType, VehicleType, UserRole, DailyLog, FUEL_TYPES_LIST } from '../types';
 import { storageService } from '../services/storage';
 import { calculateWorkHours } from '../utils/timeUtils';
 import PasswordModal from './PasswordModal';
@@ -92,7 +92,7 @@ const Reports: React.FC = () => {
         }
 
         const relevantRefuelings = refuelingsData
-            .filter(r => r.vehicleId === log.vehicleId && r.date <= log.date)
+            .filter(r => r.vehicleId === log.vehicleId && r.date <= log.date && FUEL_TYPES_LIST.includes(r.fuelType))
             .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
         let lastRefuelingInfo = undefined;
