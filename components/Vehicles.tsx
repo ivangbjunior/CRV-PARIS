@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Vehicle, ContractType, VehicleType, DailyLog, UserRole, UserProfile } from '../types';
 import { storageService } from '../services/storage';
@@ -340,7 +339,7 @@ const Vehicles: React.FC = () => {
               </button>
             </div>
             
-            {/* Date Filter Bar - UPDATED to bg-white per user request */}
+            {/* Date Filter Bar - UPDATED with Icons */}
             <div className="bg-white border-b border-slate-200 p-3 flex flex-wrap items-center gap-4 justify-end px-6">
                 <div className="flex items-center gap-2 text-slate-600 mr-auto">
                     <Filter size={16} />
@@ -348,21 +347,33 @@ const Vehicles: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-slate-500">De</span>
-                    <input 
-                        type="date" 
-                        value={historyDateRange.start}
-                        onChange={(e) => setHistoryDateRange(prev => ({ ...prev, start: e.target.value }))}
-                        className="border border-slate-300 rounded pl-2 pr-2 py-1 text-sm text-slate-900 bg-white focus:ring-2 focus:ring-blue-100 outline-none"
-                    />
+                    <div className="relative">
+                        <input 
+                            type="date" 
+                            value={historyDateRange.start}
+                            onClick={(e) => e.currentTarget.showPicker()}
+                            onChange={(e) => setHistoryDateRange(prev => ({ ...prev, start: e.target.value }))}
+                            className="border border-slate-300 rounded pl-2 pr-10 py-1 text-sm text-slate-900 bg-white focus:ring-2 focus:ring-blue-100 outline-none cursor-pointer"
+                        />
+                        <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none text-slate-400">
+                            <CalendarIcon size={14} />
+                        </div>
+                    </div>
                 </div>
                 <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-slate-500">Até</span>
-                    <input 
-                        type="date" 
-                        value={historyDateRange.end}
-                        onChange={(e) => setHistoryDateRange(prev => ({ ...prev, end: e.target.value }))}
-                        className="border border-slate-300 rounded pl-2 pr-2 py-1 text-sm text-slate-900 bg-white focus:ring-2 focus:ring-blue-100 outline-none"
-                    />
+                    <div className="relative">
+                        <input 
+                            type="date" 
+                            value={historyDateRange.end}
+                            onClick={(e) => e.currentTarget.showPicker()}
+                            onChange={(e) => setHistoryDateRange(prev => ({ ...prev, end: e.target.value }))}
+                            className="border border-slate-300 rounded pl-2 pr-10 py-1 text-sm text-slate-900 bg-white focus:ring-2 focus:ring-blue-100 outline-none cursor-pointer"
+                        />
+                        <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none text-slate-400">
+                            <CalendarIcon size={14} />
+                        </div>
+                    </div>
                 </div>
             </div>
 

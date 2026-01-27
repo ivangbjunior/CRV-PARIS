@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Requisition, RequisitionStatus, Vehicle, FuelType, ContractType, UserRole, UserVehicle, UserProfile, GasStation, RefuelingLog, FUEL_TYPES_LIST, SUPPLY_TYPES_LIST } from '../types';
 import { storageService } from '../services/storage';
@@ -770,7 +769,8 @@ ${itemsList}
                                                 req.status === RequisitionStatus.APPROVED ? 'bg-green-50 text-green-700 border-green-200' :
                                                 'bg-red-50 text-red-700 border-red-200'
                                             }`}>
-                                                {(req.status === 'REPROVADA' || req.status === 'RECUSADA') ? 'RECUSADA' : req.status}
+                                                {/* Fix: Simplified status display and removed invalid check */}
+                                                {req.status}
                                             </span>
                                         </td>
                                         <td className="px-6 py-3 text-xs">

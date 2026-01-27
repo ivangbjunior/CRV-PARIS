@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Vehicle, DailyLog, RefuelingLog, UserRole, VehicleType } from '../types';
 import { storageService } from '../services/storage';
@@ -281,7 +280,7 @@ const DailyLogs: React.FC = () => {
                      Seu perfil de <strong>GERENCIA</strong> permite visualizar dados, mas não realizar novos lançamentos neste menu.
                  </p>
                  <p className="text-sm text-blue-600 mt-4">
-                    Para consultar o histórico de atividades, acesse o menu <strong>Relatórios</strong>.
+                    Para consultar o histórico de atividades, acesse o menu <strong>Registros</strong>.
                  </p>
             </div>
         ) : (

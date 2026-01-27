@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { DailyLogReport, Vehicle, ContractType, VehicleType, UserRole, DailyLog } from '../types';
 import { storageService } from '../services/storage';
@@ -616,7 +615,7 @@ const Reports: React.FC = () => {
                                 <span className="text-xs font-black text-orange-800 uppercase tracking-wide block mb-2">Extras</span>
                                 <div className="grid grid-cols-2 gap-3">
                                     <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">Início</label><input type="time" name="extraTimeStart" value={editingLog.extraTimeStart} onChange={handleEditChange} className={`${editInputClass} focus:border-orange-500 focus:ring-orange-200`} /></div>
-                                    <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">Fim</label><input type="time" name="extraTimeEnd" value={editingLog.extraTimeEnd} onChange={handleEditChange} className={`${editInputClass} focus:border-orange-500 focus:ring-orange-200`} /></div>
+                                    <div><label className="block text-[10px] font-bold text-slate-500 uppercase mb-0.5">Fim</label><input type="time" name="extraTimeEnd" value={editingLog.extraTimeEnd} onChange={handleEditChange} className={`${editInputClass} focus:border-orange-500 focus:ring-orange-200`} /></div>
                                 </div>
                             </div>
                         </div>

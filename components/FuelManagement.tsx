@@ -436,11 +436,12 @@ const FuelManagement: React.FC = () => {
   const totalLitersCalculated = filteredRefuelings.reduce((acc, curr) => acc + (curr.liters || 0), 0);
   const totalCostCalculated = filteredRefuelings.reduce((acc, curr) => acc + (curr.totalCost || 0), 0);
 
+  // Fix: Explicitly type the reduce accumulator as number to prevent operator '+' errors on mixed string/number arrays.
   const activeFiltersCount = [
     filterDateStart, filterDateEnd, 
     filterPlate.length, filterStation.length, 
     filterContract.length, filterMunicipality.length, filterFuel.length, filterForeman.length, filterInvoice.length
-  ].filter(Boolean).reduce((a, b) => a + (typeof b === 'number' ? b : 1), 0);
+  ].filter(Boolean).reduce<number>((a, b) => a + (typeof b === 'number' ? b : 1), 0);
 
   const inputClass = "w-full rounded-lg border border-slate-300 bg-slate-50 p-2.5 text-slate-800 focus:border-blue-600 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none transition-all";
   const selectClass = "w-full rounded-lg border border-slate-300 bg-white p-2 text-slate-700 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none h-[42px] shadow-sm";
