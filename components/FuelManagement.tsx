@@ -319,6 +319,7 @@ const FuelManagement: React.FC = () => {
     setShowForm(false);
     setIsEditing(false);
     setEditingRecordId(null);
+    setCurrentStation({});
     setRefuelingForm({
       date: getTodayLocal(),
       time: getCurrentTime(),

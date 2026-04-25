@@ -810,12 +810,13 @@ const Reports: React.FC = () => {
          </div>
 
          <div className="overflow-x-auto print:overflow-visible">
-           <table className="w-full text-base text-left whitespace-nowrap">
-             <thead className="bg-slate-100 text-slate-600 font-semibold uppercase tracking-wider text-sm print:bg-slate-200 print:text-slate-900">
+           <table className="w-full text-lg text-left whitespace-nowrap">
+             <thead className="bg-slate-100 text-slate-600 font-bold uppercase tracking-wider text-base print:bg-slate-200 print:text-slate-900">
                <tr>
                  <th className="px-4 py-3 border-b print:px-1 print:py-1">Data</th>
                  <th className="px-4 py-3 border-b min-w-[150px] print:px-1 print:py-1">Veículo / Local</th>
                  <th className="px-4 py-3 border-b bg-blue-50 print:bg-transparent print:px-1 print:py-1">Expediente</th>
+                 <th className="px-4 py-3 border-b print:px-1 print:py-1 text-center">Intervalo / Extras</th>
                  <th className="px-4 py-3 border-b bg-green-50 text-green-700 print:bg-transparent print:text-black print:px-1 print:py-1">Ligado</th>
                  <th className="px-4 py-3 border-b print:px-1 print:py-1">KM</th>
                  <th className="px-4 py-3 border-b print:px-1 print:py-1">Vel. Máx</th>
@@ -825,7 +826,7 @@ const Reports: React.FC = () => {
              </thead>
              <tbody className="divide-y divide-slate-100">
                {paginatedLogs.length === 0 ? (
-                 <tr><td colSpan={isReadOnly ? 7 : 8} className="px-6 py-12 text-center text-slate-400">Nenhum registro encontrado.</td></tr>
+                 <tr><td colSpan={isReadOnly ? 8 : 9} className="px-6 py-12 text-center text-slate-400">Nenhum registro encontrado.</td></tr>
                ) : (
                  paginatedLogs.map(log => {
                    const displayContract = log.historicalContract || log.vehicle.contract;
@@ -852,37 +853,46 @@ const Reports: React.FC = () => {
                               <span className={`font-mono font-bold ${log.vehicle.plate === 'VEÍCULO EXCLUÍDO' ? 'text-red-500' : 'text-slate-800'} print:text-black print:text-[9px]`}>{log.vehicle.plate}</span>
                               <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border uppercase ${getContractColor(displayContract)} print:border-none print:p-0 print:text-black print:text-[7px]`}>{displayContract.substring(0,3)}</span>
                            </div>
-                           <div className="flex flex-col text-slate-600 text-sm print:text-[8px] print:text-black leading-tight">
-                              <span className="font-medium truncate max-w-[150px]">{log.historicalDriver || log.vehicle.driverName}</span>
-                              <span className="text-slate-400 print:text-black italic">{log.historicalMunicipality || log.vehicle.municipality}</span>
+                           <div className="flex flex-col text-slate-600 text-base print:text-[8px] print:text-black leading-tight">
+                              <span className="font-bold truncate max-w-[150px] uppercase">{log.historicalDriver || log.vehicle.driverName}</span>
+                              <span className="text-slate-400 print:text-black italic text-sm">{log.historicalMunicipality || log.vehicle.municipality}</span>
                            </div>
                         </div>
                      </td>
                      
                      {log.nonOperatingReason ? (
-                        <td colSpan={4} className="px-4 py-3 align-middle print:px-1 print:py-1">
+                        <td colSpan={5} className="px-4 py-3 align-middle print:px-1 print:py-1">
                            <div className={`flex items-center gap-2 p-2 rounded-lg border ${getNonOperatingColor(log.nonOperatingReason)} print:border-none print:p-0 print:bg-transparent print:text-black`}>
                              <AlertTriangle size={18} className="no-print"/>
-                             <span className="font-bold text-sm print:text-[9px]">{log.nonOperatingReason}</span>
+                             <span className="font-bold text-base print:text-[9px]">{log.nonOperatingReason}</span>
                            </div>
                         </td>
                      ) : (
                        <>
                           <td className="px-4 py-3 align-top bg-blue-50/30 print:bg-transparent print:px-1 print:py-1">
                              <div className="flex flex-col gap-0.5 print:text-[8px] print:text-black">
-                                <span className="font-medium text-slate-700 print:text-black">{log.startTime} - {log.endTime}</span>
+                                <span className="font-bold text-slate-700 print:text-black text-lg">{log.startTime} - {log.endTime}</span>
                                 <span className="text-xs text-slate-500 no-print" title="1ª Ignição">(1ª: {log.firstIgnition || '--:--'})</span>
-                                {log.extraTimeStart && <span className="text-orange-600 text-[10px] font-bold print:text-black">Ext: {log.extraTimeStart}-{log.extraTimeEnd}</span>}
+                             </div>
+                          </td>
+                          <td className="px-4 py-3 align-top print:px-1 print:py-1 text-center">
+                             <div className="flex flex-col gap-0.5 print:text-[8px] print:text-black">
+                                {log.lunchStart ? (
+                                    <span className="text-slate-600 font-bold text-lg">Int: {log.lunchStart}-{log.lunchEnd}</span>
+                                ) : <span className="text-slate-300">-</span>}
+                                {log.extraTimeStart && (
+                                    <span className="text-orange-600 font-black text-lg">Ext: {log.extraTimeStart}-{log.extraTimeEnd}</span>
+                                )}
                              </div>
                           </td>
                           <td className="px-4 py-3 align-top bg-green-50/30 print:bg-transparent print:px-1 print:py-1">
-                             <span className="font-bold text-green-700 text-sm print:text-[9px] print:text-black">{log.calculatedHours}h</span>
+                             <span className="font-black text-green-700 text-lg print:text-[9px] print:text-black">{log.calculatedHours}h</span>
                           </td>
-                          <td className="px-4 py-3 align-top print:px-1 print:py-1"><span className="text-slate-600 font-medium print:text-[9px] print:text-black">{log.kmDriven}</span></td>
+                          <td className="px-4 py-3 align-top print:px-1 print:py-1"><span className="text-slate-700 font-bold text-lg print:text-[9px] print:text-black">{log.kmDriven}</span></td>
                           <td className="px-4 py-3 align-top print:px-1 print:py-1">
                              <div className="flex flex-col gap-0.5">
-                                <span className={`${log.maxSpeed > 90 ? "text-red-600 font-bold" : "text-slate-600"} print:text-[9px] print:text-black`}>{log.maxSpeed}</span>
-                                {log.speedingCount > 0 && (<span className="text-[10px] text-red-500 font-bold no-print">Exc: {log.speedingCount}x</span>)}
+                                <span className={`${log.maxSpeed > 90 ? "text-red-600 font-bold" : "text-slate-600"} text-lg print:text-[9px] print:text-black`}>{log.maxSpeed}</span>
+                                {log.speedingCount > 0 && (<span className="text-xs text-red-500 font-bold no-print">Exc: {log.speedingCount}x</span>)}
                              </div>
                           </td>
                        </>
@@ -890,24 +900,24 @@ const Reports: React.FC = () => {
                      
                      <td className="px-4 py-3 align-top print:px-1 print:py-1">
                         {log.lastRefuelingInfo ? (
-                            <div className="flex flex-col gap-0.5 text-sm print:text-[7px] print:text-black leading-none">
+                            <div className="flex flex-col gap-0.5 text-base print:text-[7px] print:text-black leading-none">
                                 <div className={`font-bold ${log.lastRefuelingInfo.date === log.date ? 'text-orange-700 print:text-black' : 'text-slate-700 print:text-black'}`}>
                                     {formatRefuelingDate(log.lastRefuelingInfo.date)} | {log.lastRefuelingInfo.liters}L
                                 </div>
-                                <div className="text-slate-500 text-[10px] print:text-[7px] print:text-black">
+                                <div className="text-slate-500 text-xs print:text-[7px] print:text-black mt-1">
                                     {log.lastRefuelingInfo.date === log.date ? 'Rodou dps:' : 'Acum:'} <b>{log.lastRefuelingInfo.kmSince}km</b>
                                 </div>
                             </div>
                         ) : (
-                            <span className="text-xs text-slate-400 italic print:text-[7px]">S/ Reg.</span>
+                            <span className="text-sm text-slate-400 italic print:text-[7px]">S/ Reg.</span>
                         )}
                      </td>
 
                      {!isReadOnly && (
                       <td className="px-4 py-3 align-middle text-center no-print">
                         <div className="flex justify-center gap-1">
-                          <button onClick={() => handleEditClick(log)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"><Edit3 size={18} /></button>
-                          <button onClick={() => confirmDelete(log.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors"><Trash2 size={18} /></button>
+                          <button onClick={() => handleEditClick(log)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"><Edit3 size={20} /></button>
+                          <button onClick={() => confirmDelete(log.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors"><Trash2 size={20} /></button>
                         </div>
                       </td>
                      )}
@@ -971,6 +981,7 @@ const Reports: React.FC = () => {
              </div>
          )}
       </div>
+      <p className="text-[9px] text-slate-400 italic print:hidden mt-2">* A coluna "Últ. Abast." considera exclusivamente registros da categoria Combustível.</p>
     </div>
   );
 };

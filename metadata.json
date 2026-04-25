@@ -1,5 +1,6 @@
 {
   "name": "CRV-PARIS",
   "description": "Sistema de gestão de frota e controle de diário de bordo para Paris Engenharia.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [],
+  "majorCapabilities": []
 }
