@@ -951,11 +951,11 @@ const FuelManagement: React.FC = () => {
                                 })
                             )}
                         </tbody>
-                         <tfoot className="bg-slate-50 font-black text-slate-800 border-t-2 border-slate-300">
+                         <tfoot className="bg-white font-black text-slate-800 border-t-2 border-slate-300">
                              <tr>
                                  <td colSpan={4} className="px-6 py-4 text-right uppercase text-[10px] tracking-widest text-slate-500">Somatório Geral Listado:</td>
-                                 <td className="px-6 py-4 text-blue-900 text-lg bg-blue-50/50">{totalLitersCalculated.toFixed(2)} L</td>
-                                 <td className="px-6 py-4 text-green-800 text-lg bg-green-50/50">{formatCurrency(totalCostCalculated)}</td>
+                                 <td className="px-6 py-4 text-blue-900 text-lg">{totalLitersCalculated.toFixed(2)} L</td>
+                                 <td className="px-6 py-4 text-green-800 text-lg">{formatCurrency(totalCostCalculated)}</td>
                                  <td className="print:hidden"></td>
                              </tr>
                          </tfoot>

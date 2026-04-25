@@ -423,12 +423,12 @@ const ConsolidatedReports: React.FC = () => {
                                     </tbody>
                                 </>
                             )}
-                            <tfoot className="bg-slate-900 text-white font-bold">
+                            <tfoot className="bg-white border-t-2 border-slate-200 text-slate-900 font-bold">
                                  <tr>
                                      <td colSpan={detailViewMode === 'RECORDS' ? 3 : 2} className="px-6 py-4 text-right uppercase text-xs tracking-widest">Totais Conferidos:</td>
-                                     <td className="px-6 py-4 text-right font-mono">{stationDetailData.records.reduce((acc, r) => acc + r.liters, 0).toFixed(2)} L</td>
+                                     <td className="px-6 py-4 text-right font-mono text-blue-700">{stationDetailData.records.reduce((acc, r) => acc + r.liters, 0).toFixed(2)} L</td>
                                      {detailViewMode === 'RECORDS' && <td className="px-6 py-4"></td>}
-                                     <td className="px-6 py-4 text-right font-mono">{formatCurrency(stationDetailData.records.reduce((acc, r) => acc + r.totalCost, 0))}</td>
+                                     <td className="px-6 py-4 text-right font-mono text-emerald-700">{formatCurrency(stationDetailData.records.reduce((acc, r) => acc + r.totalCost, 0))}</td>
                                      <td className="px-6 py-4"></td>
                                  </tr>
                             </tfoot>
@@ -617,12 +617,12 @@ const ConsolidatedReports: React.FC = () => {
                                         ))
                                     )}
                                 </tbody>
-                                <tfoot className="bg-slate-900 text-white font-bold">
+                                <tfoot className="bg-white border-t-2 border-slate-200 text-slate-900 font-bold">
                                      <tr>
                                          <td colSpan={2} className="px-6 py-4 text-right uppercase text-xs">Totais do Período:</td>
                                          <td className="px-6 py-4 text-center"></td>
-                                         <td className="px-6 py-4 text-right font-mono">{totals.liters.toFixed(1)} L</td>
-                                         <td className="px-6 py-4 text-right font-mono">{formatCurrency(totals.cost)}</td>
+                                         <td className="px-6 py-4 text-right font-mono text-blue-700">{totals.liters.toFixed(1)} L</td>
+                                         <td className="px-6 py-4 text-right font-mono text-emerald-700">{formatCurrency(totals.cost)}</td>
                                          {fuelSubTab === 'BY_STATION' && <td className="print:hidden"></td>}
                                      </tr>
                                 </tfoot>
@@ -689,13 +689,13 @@ const ConsolidatedReports: React.FC = () => {
                                     ))
                                 )}
                             </tbody>
-                            <tfoot className="bg-slate-900 text-white font-bold">
+                            <tfoot className="bg-white border-t-2 border-slate-200 text-slate-900 font-bold">
                                  <tr>
                                      <td colSpan={3} className="px-6 py-4 text-right uppercase text-xs">Totais Consolidados:</td>
                                      <td className="px-6 py-4 text-right font-mono">{totals.km.toLocaleString()} km</td>
                                      <td className="px-6 py-4"></td>
-                                     <td className="px-6 py-4 text-right font-mono">{totals.liters.toFixed(1)} L</td>
-                                     <td className="px-6 py-4 text-right font-mono">{formatCurrency(totals.cost)}</td>
+                                     <td className="px-6 py-4 text-right font-mono text-orange-700">{totals.liters.toFixed(1)} L</td>
+                                     <td className="px-6 py-4 text-right font-mono text-emerald-700">{formatCurrency(totals.cost)}</td>
                                      <td className="px-6 py-4"></td>
                                  </tr>
                             </tfoot>
