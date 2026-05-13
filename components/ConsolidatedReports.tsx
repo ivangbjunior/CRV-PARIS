@@ -1,9 +1,27 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { storageService } from '../services/storage';
-import { DailyLog, RefuelingLog, Vehicle, ContractType, GasStation, FUEL_TYPES_LIST } from '../types';
+import { DailyLog, RefuelingLog, Vehicle, ContractType, GasStation, FUEL_TYPES_LIST, UserRole } from '../types';
 import { PrintHeader } from './PrintHeader';
 import MultiSelect, { MultiSelectOption } from './MultiSelect';
-import { BarChart3, Filter, Loader2, Printer, X, Search, Fuel, Gauge, TrendingUp, DollarSign, ArrowUpRight, ArrowUpDown, ChevronUp, ChevronDown, Building2, Truck, ClipboardList, ArrowLeft, Eye, Receipt, Calendar } from 'lucide-react';
+import { BarChart3, Filter, Loader2, Printer, X, Search, Fuel, Gauge, TrendingUp, DollarSign, ArrowUpRight, ArrowUpDown, ChevronUp, ChevronDown, Building2, Truck, ClipboardList, ArrowLeft, Eye, Receipt, Calendar, LayoutGrid, PieChart as PieChartIcon, TrendingDown } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import {
+    BarChart,
+    Bar,
+    XAxis,
+    YAxis,
+    CartesianGrid,
+    Tooltip,
+    Legend,
+    ResponsiveContainer,
+    LineChart,
+    Line,
+    Cell,
+    PieChart,
+    Pie,
+    AreaChart,
+    Area
+} from 'recharts';
 
 interface ConsolidatedItem {
     plate: string;
@@ -35,7 +53,7 @@ interface VehicleFuelConsolidated {
     cost: number;
 }
 
-type MainTab = 'PERFORMANCE' | 'FUEL_ANALYSIS';
+type MainTab = 'PERFORMANCE' | 'FUEL_ANALYSIS' | 'GRAPHIC_SUMMARY';
 type FuelSubTab = 'BY_STATION' | 'BY_VEHICLE';
 type DetailMode = 'RECORDS' | 'BY_VEHICLE';
 
@@ -43,6 +61,9 @@ type SortKey = string;
 type SortOrder = 'asc' | 'desc';
 
 const ConsolidatedReports: React.FC = () => {
+    const { user } = useAuth();
+    const isPowerUser = user?.role === UserRole.ADMIN || user?.role === UserRole.GERENCIA;
+
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<MainTab>('PERFORMANCE');
     const [fuelSubTab, setFuelSubTab] = useState<FuelSubTab>('BY_STATION');
@@ -258,6 +279,80 @@ const ConsolidatedReports: React.FC = () => {
         };
     }, [selectedStationId, refuelings, dateRange, filterContracts, filterInvoice]);
 
+    // --- CALCULATIONS: GRAPHIC SUMMARY ---
+    const graphicData = useMemo(() => {
+        if (activeTab !== 'GRAPHIC_SUMMARY') return null;
+
+        const periodRefuelings = refuelings.filter(r => 
+            r.date >= dateRange.start && 
+            r.date <= dateRange.end &&
+            (filterContracts.length === 0 || filterContracts.includes(r.contractSnapshot)) &&
+            (filterForeman.length === 0 || filterForeman.includes(r.foremanSnapshot || ''))
+        );
+
+        // 1. Monthly History
+        const monthMap: Record<string, { month: string; cost: number; liters: number }> = {};
+        periodRefuelings.forEach(r => {
+            const date = new Date(r.date + 'T12:00:00');
+            const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+            const label = date.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }).toUpperCase();
+            
+            if (!monthMap[key]) {
+                monthMap[key] = { month: label, cost: 0, liters: 0 };
+            }
+            monthMap[key].cost += r.totalCost;
+            monthMap[key].liters += r.liters;
+        });
+
+        // 2. Bi-weekly History (Fortnightly)
+        const fortnightMap: Record<string, { label: string; cost: number; liters: number }> = {};
+        periodRefuelings.forEach(r => {
+            const date = new Date(r.date + 'T12:00:00');
+            const day = date.getDate();
+            const fortnight = day <= 15 ? 'Q1' : 'Q2';
+            const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${fortnight}`;
+            const monthLabel = date.toLocaleDateString('pt-BR', { month: 'short' }).toUpperCase();
+            
+            if (!fortnightMap[key]) {
+                fortnightMap[key] = { label: `${monthLabel} ${fortnight}`, cost: 0, liters: 0 };
+            }
+            fortnightMap[key].cost += r.totalCost;
+            fortnightMap[key].liters += r.liters;
+        });
+
+        // 3. By Station (Top 5)
+        const stationMap: Record<string, number> = {};
+        periodRefuelings.forEach(r => {
+            const name = stations.find(s => s.id === r.gasStationId)?.name || 'OUTROS';
+            stationMap[name] = (stationMap[name] || 0) + r.totalCost;
+        });
+
+        // 4. By Vehicle (Top 8)
+        const vMap: Record<string, number> = {};
+        periodRefuelings.forEach(r => {
+            vMap[r.plateSnapshot] = (vMap[r.plateSnapshot] || 0) + r.totalCost;
+        });
+
+        const sortedMonths = Object.keys(monthMap).sort().map(k => monthMap[k]);
+        const sortedFortnights = Object.keys(fortnightMap).sort().map(k => fortnightMap[k]);
+        const sortedStations = Object.entries(stationMap)
+            .sort(([, a], [, b]) => b - a)
+            .slice(0, 5)
+            .map(([name, value]) => ({ name, value }));
+        
+        const sortedVehicles = Object.entries(vMap)
+            .sort(([, a], [, b]) => b - a)
+            .slice(0, 8)
+            .map(([plate, value]) => ({ plate, value }));
+
+        return {
+            monthly: sortedMonths,
+            fortnightly: sortedFortnights,
+            stations: sortedStations,
+            vehicles: sortedVehicles
+        };
+    }, [refuelings, stations, dateRange, filterContracts, filterForeman, activeTab]);
+
     const handleSort = (key: string) => {
         setSortConfig(prev => ({
             key,
@@ -311,7 +406,7 @@ const ConsolidatedReports: React.FC = () => {
         setActiveTab(tab);
         setSelectedStationId(null);
         if (tab === 'PERFORMANCE') setSortConfig({ key: 'kmTotal', order: 'desc' });
-        else setSortConfig({ key: 'cost', order: 'desc' });
+        else if (tab === 'FUEL_ANALYSIS') setSortConfig({ key: 'cost', order: 'desc' });
     };
 
     const currentStationName = stations.find(s => s.id === selectedStationId)?.name || 'Detalhamento do Posto';
@@ -516,6 +611,14 @@ const ConsolidatedReports: React.FC = () => {
                 >
                     <Fuel size={18} /> Abastecimento
                 </button>
+                {isPowerUser && (
+                    <button 
+                        onClick={() => handleTabChange('GRAPHIC_SUMMARY')}
+                        className={`px-6 py-3 text-sm font-bold transition-all border-b-2 flex items-center gap-2 ${activeTab === 'GRAPHIC_SUMMARY' ? 'border-emerald-600 text-emerald-600 bg-emerald-50/50' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                    >
+                        <PieChartIcon size={18} /> Resumo Gráfico
+                    </button>
+                )}
             </div>
 
             {/* Filtros Analíticos */}
@@ -658,6 +761,120 @@ const ConsolidatedReports: React.FC = () => {
                                      </tr>
                                 </tfoot>
                             </table>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* CONTEÚDO DA ABA: GRAPHIC SUMMARY */}
+            {activeTab === 'GRAPHIC_SUMMARY' && graphicData && (
+                <div className="space-y-6 animate-in fade-in duration-500">
+                    {/* Linha 1: Histórico Geral */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 text-slate-900">
+                        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                            <div className="flex items-center justify-between mb-6">
+                                <div>
+                                    <h3 className="font-bold flex items-center gap-2">
+                                        <TrendingUp className="text-blue-600" size={18} /> Histórico Mensal de Custos
+                                    </h3>
+                                    <p className="text-xs text-slate-500 font-medium">Evolução dos gastos ao longo dos meses</p>
+                                </div>
+                            </div>
+                            <div className="h-[300px]">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <AreaChart data={graphicData.monthly}>
+                                        <defs>
+                                            <linearGradient id="colorCost" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#2563eb" stopOpacity={0.1}/>
+                                                <stop offset="95%" stopColor="#2563eb" stopOpacity={0}/>
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                        <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#64748b'}} />
+                                        <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#64748b'}} tickFormatter={(v) => `R$ ${v >= 1000 ? (v/1000).toFixed(0) + 'k' : v}`} />
+                                        <Tooltip 
+                                            contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}}
+                                            formatter={(value: number) => [formatCurrency(value), 'Custo Total']}
+                                        />
+                                        <Area type="monotone" dataKey="cost" stroke="#2563eb" strokeWidth={3} fillOpacity={1} fill="url(#colorCost)" />
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+
+                        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                            <div className="flex items-center justify-between mb-6">
+                                <div>
+                                    <h3 className="font-bold flex items-center gap-2">
+                                        <TrendingUp className="text-emerald-600" size={18} /> Análise Quinzenal
+                                    </h3>
+                                    <p className="text-xs text-slate-500 font-medium">Comparação de custos entre quinzenas</p>
+                                </div>
+                            </div>
+                            <div className="h-[300px]">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={graphicData.fortnightly}>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                        <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#64748b'}} />
+                                        <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#64748b'}} tickFormatter={(v) => `R$ ${v >= 1000 ? (v/1000).toFixed(0) + 'k' : v}`} />
+                                        <Tooltip 
+                                            cursor={{fill: '#f8fafc'}}
+                                            contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}}
+                                            formatter={(value: number) => [formatCurrency(value), 'Custo Quinzena']}
+                                        />
+                                        <Bar dataKey="cost" fill="#10b981" radius={[4, 4, 0, 0]} />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Linha 2: Breakdowns */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 text-slate-900">
+                        <div className="lg:col-span-1 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                            <h3 className="font-bold flex items-center gap-2 mb-6">
+                                <Building2 className="text-orange-600" size={18} /> Concentração por Posto (Top 5)
+                            </h3>
+                            <div className="h-[250px]">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <PieChart>
+                                        <Pie
+                                            data={graphicData.stations}
+                                            innerRadius={60}
+                                            outerRadius={80}
+                                            paddingAngle={5}
+                                            dataKey="value"
+                                        >
+                                            {graphicData.stations.map((entry, index) => (
+                                                <Cell key={`cell-${index}`} fill={['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'][index % 5]} />
+                                            ))}
+                                        </Pie>
+                                        <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                                        <Legend verticalAlign="bottom" wrapperStyle={{fontSize: '10px', fontWeight: 600, color: '#64748b'}} />
+                                    </PieChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+
+                        <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                            <h3 className="font-bold flex items-center gap-2 mb-6">
+                                <Truck className="text-rose-600" size={18} /> Top 8 Veículos com Maior Custo
+                            </h3>
+                            <div className="h-[250px]">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart layout="vertical" data={graphicData.vehicles} margin={{ left: 20 }}>
+                                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+                                        <XAxis type="number" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#64748b'}} tickFormatter={(v) => `R$ ${v}`} />
+                                        <YAxis dataKey="plate" type="category" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 800, fill: '#1e293b'}} />
+                                        <Tooltip 
+                                            cursor={{fill: '#f8fafc'}}
+                                            contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}}
+                                            formatter={(value: number) => [formatCurrency(value), 'Investimento']}
+                                        />
+                                        <Bar dataKey="value" fill="#f43f5e" radius={[0, 4, 4, 0]} />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
                         </div>
                     </div>
                 </div>
