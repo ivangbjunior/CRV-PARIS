@@ -350,7 +350,7 @@ const Reports: React.FC = () => {
   const formatDateDisplay = (dateString: string) => {
     if (!dateString) return '-';
     const [year, month, day] = dateString.split('-');
-    return `${day}/${month}/${year.slice(-2)}`;
+    return `${day}/${month}/${year}`;
   };
 
   const formatRefuelingDate = (dateString: string) => {

@@ -50,6 +50,7 @@ const ConsolidatedReports: React.FC = () => {
     // Drill-down states
     const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
     const [detailViewMode, setDetailViewMode] = useState<DetailMode>('RECORDS');
+    const [filterInvoice, setFilterInvoice] = useState('');
     
     // Raw Data
     const [logs, setLogs] = useState<DailyLog[]>([]);
@@ -229,7 +230,8 @@ const ConsolidatedReports: React.FC = () => {
                 r.gasStationId === selectedStationId && 
                 r.date >= dateRange.start && 
                 r.date <= dateRange.end &&
-                (filterContracts.length === 0 || filterContracts.includes(r.contractSnapshot))
+                (filterContracts.length === 0 || filterContracts.includes(r.contractSnapshot)) &&
+                (filterInvoice === '' || (r.invoiceNumber && r.invoiceNumber.toUpperCase().includes(filterInvoice.toUpperCase())))
             )
             .sort((a, b) => b.date.localeCompare(a.date));
 
@@ -254,7 +256,7 @@ const ConsolidatedReports: React.FC = () => {
             records: stationRefuelings,
             byVehicle: Object.values(vehicleMap).sort((a, b) => b.cost - a.cost)
         };
-    }, [selectedStationId, refuelings, dateRange, filterContracts]);
+    }, [selectedStationId, refuelings, dateRange, filterContracts, filterInvoice]);
 
     const handleSort = (key: string) => {
         setSortConfig(prev => ({
@@ -276,6 +278,15 @@ const ConsolidatedReports: React.FC = () => {
     const foremanOptions: MultiSelectOption[] = uniqueForemen.map(f => ({ value: f, label: f }));
 
     const formatCurrency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+
+    const formatDate = (dateStr: string) => {
+        if (!dateStr) return '-';
+        // Handle ISO strings or YYYY-MM-DD
+        const datePart = dateStr.split('T')[0];
+        const [y, m, d] = datePart.split('-');
+        if (!y || !m || !d) return dateStr;
+        return `${d}/${m}/${y}`;
+    };
 
     const SortableHeader: React.FC<{ label: string; sortKey: string; align?: 'left' | 'right' | 'center' }> = ({ label, sortKey, align = 'left' }) => {
         const isActive = sortConfig.key === sortKey;
@@ -320,10 +331,30 @@ const ConsolidatedReports: React.FC = () => {
                         </button>
                         <div>
                             <h2 className="text-2xl font-bold text-slate-900 uppercase tracking-tight">{currentStationName}</h2>
-                            <p className="text-slate-500 text-sm">Conferência de abastecimentos no período de {dateRange.start} a {dateRange.end}</p>
+                            <p className="text-slate-500 text-sm">Conferência de abastecimentos no período de {formatDate(dateRange.start)} a {formatDate(dateRange.end)}</p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                        {detailViewMode === 'RECORDS' && (
+                            <div className="relative">
+                                <input 
+                                    type="text" 
+                                    placeholder="FILTRAR POR NOTA..." 
+                                    value={filterInvoice}
+                                    onChange={(e) => setFilterInvoice(e.target.value.toUpperCase())}
+                                    className="pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-xs font-bold focus:ring-2 focus:ring-blue-100 outline-none w-48 transition-all"
+                                />
+                                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                {filterInvoice && (
+                                    <button 
+                                        onClick={() => setFilterInvoice('')}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-rose-500"
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                )}
+                            </div>
+                        )}
                         <div className="flex bg-slate-200 p-1 rounded-lg">
                             <button 
                                 onClick={() => setDetailViewMode('RECORDS')}
@@ -367,7 +398,7 @@ const ConsolidatedReports: React.FC = () => {
                                             stationDetailData.records.map(r => (
                                                 <tr key={r.id} className="hover:bg-slate-50 transition-colors">
                                                     <td className="px-6 py-4 font-medium text-slate-900">
-                                                        {r.date} <span className="text-[10px] text-slate-400 font-normal ml-1">{r.time}</span>
+                                                        {formatDate(r.date)} <span className="text-[10px] text-slate-400 font-normal ml-1">{r.time}</span>
                                                     </td>
                                                     <td className="px-6 py-4">
                                                         <div className="font-bold text-slate-800">{r.plateSnapshot}</div>
@@ -446,7 +477,7 @@ const ConsolidatedReports: React.FC = () => {
                 subtitle={activeTab === 'FUEL_ANALYSIS' ? (fuelSubTab === 'BY_STATION' ? 'Agrupado por Posto' : 'Agrupado por Veículo') : 'Rodagem e Consumo'}
                 details={
                     <>
-                        <span>Período: {dateRange.start} até {dateRange.end}</span>
+                        <span>Período: {formatDate(dateRange.start)} até {formatDate(dateRange.end)}</span>
                         <span>Total Litros: {totals.liters.toFixed(1)} L</span>
                         <span>Custo Total: {formatCurrency(totals.cost)}</span>
                     </>
