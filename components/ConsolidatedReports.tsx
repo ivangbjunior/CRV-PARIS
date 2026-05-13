@@ -14,13 +14,15 @@ import {
     Tooltip,
     Legend,
     ResponsiveContainer,
+    ComposedChart,
     LineChart,
     Line,
     Cell,
     PieChart,
     Pie,
     AreaChart,
-    Area
+    Area,
+    LabelList
 } from 'recharts';
 
 interface ConsolidatedItem {
@@ -84,7 +86,7 @@ const ConsolidatedReports: React.FC = () => {
     const [filterForeman, setFilterForeman] = useState<string[]>([]);
     const [uniqueForemen, setUniqueForemen] = useState<string[]>([]);
     const [dateRange, setDateRange] = useState({ 
-        start: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0], 
+        start: '2026-01-01', 
         end: new Date().toISOString().split('T')[0] 
     });
 
@@ -112,7 +114,19 @@ const ConsolidatedReports: React.FC = () => {
             setRefuelings(rData);
             setVehicles(vData);
             setStations(sData);
-            setUniqueForemen(Array.from(new Set(vData.map(v => v.foreman).filter(f => f && f !== '-'))).sort());
+            
+            // Collect unique foremen from vehicles and historical logs
+            const foremenFromVehicles = vData.map(v => v.foreman);
+            const foremenFromLogs = lData.map(l => l.historicalDriver);
+            const foremenFromRefuelings = rData.map(r => r.foremanSnapshot);
+            
+            const allForemen = Array.from(new Set([
+                ...foremenFromVehicles,
+                ...foremenFromLogs,
+                ...foremenFromRefuelings
+            ])).filter(f => f && f !== '-' && f !== '').sort();
+            
+            setUniqueForemen(allForemen as string[]);
         } catch (error) {
             console.error("Erro ao carregar dados consolidados:", error);
         } finally {
@@ -120,21 +134,53 @@ const ConsolidatedReports: React.FC = () => {
         }
     };
 
+    // --- UNIFIED FILTERED DATA ---
+    const filteredBase = useMemo(() => {
+        const periodLogs = logs.filter(l => {
+            const matchesDate = l.date >= dateRange.start && l.date <= dateRange.end;
+            if (!matchesDate) return false;
+            
+            const vehicle = vehicles.find(v => v.id === l.vehicleId || v.plate === l.historicalPlate);
+            const contract = l.historicalContract || vehicle?.contract || '-';
+            const matchesContract = filterContracts.length === 0 || filterContracts.includes(contract);
+            const matchesForeman = filterForeman.length === 0 || 
+                                   filterForeman.includes(l.historicalDriver || '') || 
+                                   (vehicle?.foreman && filterForeman.includes(vehicle.foreman));
+            
+            return matchesContract && matchesForeman;
+        });
+
+        const periodRefuelings = refuelings.filter(r => {
+            const matchesDate = r.date >= dateRange.start && r.date <= dateRange.end;
+            if (!matchesDate) return false;
+
+            const vehicle = vehicles.find(v => v.id === r.vehicleId || v.plate === r.plateSnapshot);
+            const contract = r.contractSnapshot || vehicle?.contract || '-';
+            const matchesContract = filterContracts.length === 0 || filterContracts.includes(contract);
+            const matchesForeman = filterForeman.length === 0 || 
+                                   filterForeman.includes(r.foremanSnapshot || '') || 
+                                   (vehicle?.foreman && filterForeman.includes(vehicle.foreman));
+
+            return matchesContract && matchesForeman;
+        });
+
+        return { periodLogs, periodRefuelings };
+    }, [logs, refuelings, vehicles, dateRange, filterContracts, filterForeman]);
+
     // --- CALCULATIONS: PERFORMANCE TAB ---
     const performanceData = useMemo(() => {
-        const periodLogs = logs.filter(l => l.date >= dateRange.start && l.date <= dateRange.end);
-        const periodRefuelings = refuelings.filter(r => r.date >= dateRange.start && r.date <= dateRange.end);
-
         const plates = Array.from(new Set([
             ...vehicles.map(v => v.plate),
-            ...periodLogs.map(l => l.historicalPlate || ''),
-            ...periodRefuelings.map(r => r.plateSnapshot || '')
+            ...filteredBase.periodLogs.map(l => l.historicalPlate || ''),
+            ...filteredBase.periodRefuelings.map(r => r.plateSnapshot || '')
         ])).filter(p => p !== '');
 
-        return plates.map(plate => {
+        const results = plates.map(plate => {
             const vehicle = vehicles.find(v => v.plate === plate);
-            const vLogs = periodLogs.filter(l => (l.historicalPlate || '') === plate || (vehicle && l.vehicleId === vehicle.id));
-            const vRefuelings = periodRefuelings.filter(r => (r.plateSnapshot || '') === plate || (vehicle && r.vehicleId === vehicle.id));
+            const vLogs = filteredBase.periodLogs.filter(l => (l.historicalPlate || '') === plate || (vehicle && l.vehicleId === vehicle.id));
+            const vRefuelings = filteredBase.periodRefuelings.filter(r => (r.plateSnapshot || '') === plate || (vehicle && r.vehicleId === vehicle.id));
+
+            if (vLogs.length === 0 && vRefuelings.length === 0) return null;
 
             const kmTotal = vLogs.reduce((acc, log) => acc + (log.kmDriven || 0), 0);
             let totalMin = 0;
@@ -150,11 +196,18 @@ const ConsolidatedReports: React.FC = () => {
             const costTotal = vRefuelings.reduce((acc, r) => acc + (r.totalCost || 0), 0);
             const averageKmPerL = litersTotal > 0 ? kmTotal / litersTotal : 0;
 
+            const itemForeman = vehicle?.foreman || vLogs[0]?.historicalDriver || vRefuelings[0]?.foremanSnapshot || '-';
+
             return {
                 plate,
                 model: vehicle?.model || vLogs[0]?.historicalModel || '-',
                 contract: vehicle?.contract || vLogs[0]?.historicalContract || '-',
-                foreman: vehicle?.foreman || vLogs[0]?.historicalDriver || '-',
+                foreman: itemForeman,
+                allForemen: Array.from(new Set([
+                    vehicle?.foreman,
+                    ...vLogs.map(l => l.historicalDriver),
+                    ...vRefuelings.map(r => r.foremanSnapshot)
+                ])).filter(f => f && f !== '-'),
                 kmTotal,
                 minutesTotal: totalMin,
                 hoursTotal: `${Math.floor(totalMin / 60)}h ${totalMin % 60}m`,
@@ -162,27 +215,20 @@ const ConsolidatedReports: React.FC = () => {
                 costTotal,
                 averageKmPerL
             };
-        }).filter(item => {
-            const matchesContract = filterContracts.length === 0 || filterContracts.includes(item.contract);
-            const matchesForeman = filterForeman.length === 0 || filterForeman.includes(item.foreman);
-            return matchesContract && matchesForeman;
-        }).sort((a: any, b: any) => {
+        }).filter((i): i is any => i !== null);
+
+        return results.sort((a: any, b: any) => {
             const aVal = a[sortConfig.key] || 0;
             const bVal = b[sortConfig.key] || 0;
             return sortConfig.order === 'asc' ? (aVal > bVal ? 1 : -1) : (aVal < bVal ? 1 : -1);
         });
-    }, [logs, refuelings, vehicles, dateRange, filterContracts, filterForeman, sortConfig, activeTab]);
+    }, [filteredBase, vehicles, sortConfig]);
 
     // --- CALCULATIONS: FUEL BY STATION ---
     const stationData = useMemo(() => {
-        const periodRefuelings = refuelings.filter(r => 
-            r.date >= dateRange.start && 
-            r.date <= dateRange.end &&
-            (filterContracts.length === 0 || filterContracts.includes(r.contractSnapshot))
-        );
         const map: Record<string, StationConsolidated> = {};
 
-        periodRefuelings.forEach(r => {
+        filteredBase.periodRefuelings.forEach(r => {
             const station = stations.find(s => s.id === r.gasStationId);
             const sId = r.gasStationId;
             if (!map[sId]) {
@@ -205,18 +251,13 @@ const ConsolidatedReports: React.FC = () => {
             const bVal = b[sortConfig.key] || 0;
             return sortConfig.order === 'asc' ? (aVal > bVal ? 1 : -1) : (aVal < bVal ? 1 : -1);
         });
-    }, [refuelings, stations, dateRange, filterContracts, sortConfig, activeTab, fuelSubTab]);
+    }, [filteredBase, stations, sortConfig]);
 
     // --- CALCULATIONS: FUEL BY VEHICLE ---
     const vehicleFuelData = useMemo(() => {
-        const periodRefuelings = refuelings.filter(r => 
-            r.date >= dateRange.start && 
-            r.date <= dateRange.end &&
-            (filterContracts.length === 0 || filterContracts.includes(r.contractSnapshot))
-        );
         const map: Record<string, VehicleFuelConsolidated> = {};
 
-        periodRefuelings.forEach(r => {
+        filteredBase.periodRefuelings.forEach(r => {
             const plate = r.plateSnapshot;
             if (!map[plate]) {
                 map[plate] = {
@@ -232,15 +273,12 @@ const ConsolidatedReports: React.FC = () => {
             map[plate].cost += (r.totalCost || 0);
         });
 
-        return Object.values(map).filter(item => {
-            const matchesForeman = filterForeman.length === 0 || filterForeman.includes(item.foreman);
-            return matchesForeman;
-        }).sort((a: any, b: any) => {
+        return Object.values(map).sort((a: any, b: any) => {
             const aVal = a[sortConfig.key] || 0;
             const bVal = b[sortConfig.key] || 0;
             return sortConfig.order === 'asc' ? (aVal > bVal ? 1 : -1) : (aVal < bVal ? 1 : -1);
         });
-    }, [refuelings, dateRange, filterContracts, filterForeman, sortConfig, activeTab, fuelSubTab]);
+    }, [filteredBase, sortConfig]);
 
     // --- CALCULATIONS: STATION DETAIL DATA ---
     const stationDetailData = useMemo(() => {
@@ -283,30 +321,72 @@ const ConsolidatedReports: React.FC = () => {
     const graphicData = useMemo(() => {
         if (activeTab !== 'GRAPHIC_SUMMARY') return null;
 
-        const periodRefuelings = refuelings.filter(r => 
-            r.date >= dateRange.start && 
-            r.date <= dateRange.end &&
-            (filterContracts.length === 0 || filterContracts.includes(r.contractSnapshot)) &&
-            (filterForeman.length === 0 || filterForeman.includes(r.foremanSnapshot || ''))
-        );
+        const periodRefuelings = refuelings.filter(r => {
+            const matchesDate = r.date >= dateRange.start && r.date <= dateRange.end;
+            if (!matchesDate) return false;
+
+            const vehicle = vehicles.find(v => v.id === r.vehicleId || v.plate === r.plateSnapshot);
+            const contract = r.contractSnapshot || vehicle?.contract || '-';
+            
+            const matchesContract = filterContracts.length === 0 || filterContracts.includes(contract);
+            const matchesForeman = filterForeman.length === 0 || 
+                                   filterForeman.includes(r.foremanSnapshot || '') || 
+                                   (vehicle?.foreman && filterForeman.includes(vehicle.foreman));
+
+            return matchesContract && matchesForeman;
+        });
+
+        const periodLogs = logs.filter(l => {
+            const matchesDate = l.date >= dateRange.start && l.date <= dateRange.end;
+            if (!matchesDate) return false;
+            
+            const vehicle = vehicles.find(v => v.id === l.vehicleId || v.plate === l.historicalPlate);
+            const contract = l.historicalContract || vehicle?.contract || '-';
+            
+            const matchesContract = filterContracts.length === 0 || filterContracts.includes(contract);
+            const matchesForeman = filterForeman.length === 0 || 
+                                   filterForeman.includes(l.historicalDriver || '') || 
+                                   (vehicle?.foreman && filterForeman.includes(vehicle.foreman));
+            
+            return matchesContract && matchesForeman;
+        });
+
+        const getExpectedKml = (model: string) => {
+            const m = model.toUpperCase();
+            if (m.includes('STRADA') || m.includes('SAVEIRO') || m.includes('PICK') || m.includes('S10') || m.includes('HILUX')) return 10.5;
+            if (m.includes('CAMINHÃO') || m.includes('CAMINHAO') || m.includes('V-W') || m.includes('VW') || m.includes('FORD')) return 4.2;
+            if (m.includes('LINHA VIVA')) return 4.0;
+            return 7.5; // Generic
+        };
 
         // 1. Monthly History
-        const monthMap: Record<string, { month: string; cost: number; liters: number }> = {};
-        periodRefuelings.forEach(r => {
+        const monthMap: Record<string, { month: string; cost: number; liters: number; km: number; avgKml: number }> = {};
+        filteredBase.periodRefuelings.forEach(r => {
             const date = new Date(r.date + 'T12:00:00');
             const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
             const label = date.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }).toUpperCase();
             
             if (!monthMap[key]) {
-                monthMap[key] = { month: label, cost: 0, liters: 0 };
+                monthMap[key] = { month: label, cost: 0, liters: 0, km: 0, avgKml: 0 };
             }
             monthMap[key].cost += r.totalCost;
             monthMap[key].liters += r.liters;
         });
 
+        filteredBase.periodLogs.forEach(l => {
+            const date = new Date(l.date + 'T12:00:00');
+            const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+            const label = date.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }).toUpperCase();
+            
+            if (!monthMap[key]) {
+                monthMap[key] = { month: label, cost: 0, liters: 0, km: 0, avgKml: 0 };
+            }
+            monthMap[key].km += (l.kmDriven || 0);
+        });
+
         // 2. Bi-weekly History (Fortnightly)
-        const fortnightMap: Record<string, { label: string; cost: number; liters: number }> = {};
-        periodRefuelings.forEach(r => {
+        const fortnightMap: Record<string, { label: string; cost: number; liters: number; km: number; avgKml: number; expectedKml: number; kmWeightTotal: number; costPerKm: number; minutesOn: number; monthIndex: number }> = {};
+        filteredBase.periodRefuelings.forEach(r => {
             const date = new Date(r.date + 'T12:00:00');
             const day = date.getDate();
             const fortnight = day <= 15 ? 'Q1' : 'Q2';
@@ -314,22 +394,86 @@ const ConsolidatedReports: React.FC = () => {
             const monthLabel = date.toLocaleDateString('pt-BR', { month: 'short' }).toUpperCase();
             
             if (!fortnightMap[key]) {
-                fortnightMap[key] = { label: `${monthLabel} ${fortnight}`, cost: 0, liters: 0 };
+                fortnightMap[key] = { 
+                    label: `${monthLabel} ${fortnight}`, 
+                    cost: 0, 
+                    liters: 0, 
+                    km: 0, 
+                    avgKml: 0, 
+                    expectedKml: 0, 
+                    kmWeightTotal: 0, 
+                    costPerKm: 0,
+                    minutesOn: 0,
+                    monthIndex: date.getMonth()
+                };
             }
             fortnightMap[key].cost += r.totalCost;
             fortnightMap[key].liters += r.liters;
         });
 
+        filteredBase.periodLogs.forEach(l => {
+            const date = new Date(l.date + 'T12:00:00');
+            const day = date.getDate();
+            const fortnight = day <= 15 ? 'Q1' : 'Q2';
+            const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${fortnight}`;
+            const monthLabel = date.toLocaleDateString('pt-BR', { month: 'short' }).toUpperCase();
+            
+            if (!fortnightMap[key]) {
+                fortnightMap[key] = { 
+                    label: `${monthLabel} ${fortnight}`, 
+                    cost: 0, 
+                    liters: 0, 
+                    km: 0, 
+                    avgKml: 0, 
+                    expectedKml: 0, 
+                    kmWeightTotal: 0, 
+                    costPerKm: 0,
+                    minutesOn: 0,
+                    monthIndex: date.getMonth()
+                };
+            }
+            const km = (l.kmDriven || 0);
+            fortnightMap[key].km += km;
+
+            if (l.startTime && l.endTime) {
+                const [sH, sM] = l.startTime.split(':').map(Number);
+                const [eH, eM] = l.endTime.split(':').map(Number);
+                fortnightMap[key].minutesOn += (eH * 60 + eM) - (sH * 60 + sM);
+            }
+            
+            // Weight expected KML by KM driven
+            const vehicle = vehicles.find(v => v.id === l.vehicleId || v.plate === l.historicalPlate);
+            const model = l.historicalModel || vehicle?.model || '';
+            const baseExpected = getExpectedKml(model);
+            fortnightMap[key].expectedKml += (baseExpected * km);
+            fortnightMap[key].kmWeightTotal += km;
+        });
+
+        // Calculate averages for Efficiency (KM/L) and Cost per KM
+        Object.keys(fortnightMap).forEach(k => {
+            if (fortnightMap[k].liters > 0) {
+                fortnightMap[k].avgKml = Number((fortnightMap[k].km / fortnightMap[k].liters).toFixed(2));
+            }
+            if (fortnightMap[k].km > 0) {
+                fortnightMap[k].costPerKm = Number((fortnightMap[k].cost / fortnightMap[k].km).toFixed(2));
+            }
+            if (fortnightMap[k].kmWeightTotal > 0) {
+                fortnightMap[k].expectedKml = Number((fortnightMap[k].expectedKml / fortnightMap[k].kmWeightTotal).toFixed(2));
+            } else {
+                fortnightMap[k].expectedKml = 0;
+            }
+        });
+
         // 3. By Station (Top 5)
         const stationMap: Record<string, number> = {};
-        periodRefuelings.forEach(r => {
+        filteredBase.periodRefuelings.forEach(r => {
             const name = stations.find(s => s.id === r.gasStationId)?.name || 'OUTROS';
             stationMap[name] = (stationMap[name] || 0) + r.totalCost;
         });
 
         // 4. By Vehicle (Top 8)
         const vMap: Record<string, number> = {};
-        periodRefuelings.forEach(r => {
+        filteredBase.periodRefuelings.forEach(r => {
             vMap[r.plateSnapshot] = (vMap[r.plateSnapshot] || 0) + r.totalCost;
         });
 
@@ -351,7 +495,7 @@ const ConsolidatedReports: React.FC = () => {
             stations: sortedStations,
             vehicles: sortedVehicles
         };
-    }, [refuelings, stations, dateRange, filterContracts, filterForeman, activeTab]);
+    }, [refuelings, logs, vehicles, stations, dateRange, filterContracts, filterForeman, activeTab]);
 
     const handleSort = (key: string) => {
         setSortConfig(prev => ({
@@ -361,13 +505,11 @@ const ConsolidatedReports: React.FC = () => {
     };
 
     const totals = useMemo(() => {
-        const dataToSum = activeTab === 'PERFORMANCE' ? performanceData : (fuelSubTab === 'BY_STATION' ? stationData : vehicleFuelData);
-        return dataToSum.reduce((acc, curr: any) => ({
-            km: acc.km + (curr.kmTotal || 0),
-            liters: acc.liters + (curr.litersTotal || curr.liters || 0),
-            cost: acc.cost + (curr.costTotal || curr.cost || 0)
-        }), { km: 0, liters: 0, cost: 0 });
-    }, [performanceData, stationData, vehicleFuelData, activeTab, fuelSubTab]);
+        const km = filteredBase.periodLogs.reduce((acc, curr) => acc + (curr.kmDriven || 0), 0);
+        const liters = filteredBase.periodRefuelings.reduce((acc, curr) => acc + (curr.liters || 0), 0);
+        const cost = filteredBase.periodRefuelings.reduce((acc, curr) => acc + (curr.totalCost || 0), 0);
+        return { km, liters, cost };
+    }, [filteredBase]);
 
     const contractOptions: MultiSelectOption[] = Object.values(ContractType).map(c => ({ value: c, label: c }));
     const foremanOptions: MultiSelectOption[] = uniqueForemen.map(f => ({ value: f, label: f }));
@@ -653,19 +795,17 @@ const ConsolidatedReports: React.FC = () => {
 
             {/* Cards de Resumo */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 print:hidden">
-                {activeTab === 'PERFORMANCE' && (
-                    <div className="bg-gradient-to-br from-blue-600 to-blue-700 p-5 rounded-2xl text-white shadow-lg">
-                        <p className="text-blue-100 text-xs font-bold uppercase tracking-wider mb-1">Rodagem Total</p>
-                        <p className="text-3xl font-black">{totals.km.toLocaleString()} <span className="text-lg font-normal">km</span></p>
-                    </div>
-                )}
-                <div className={`${activeTab === 'PERFORMANCE' ? 'bg-gradient-to-br from-orange-500 to-orange-600' : 'bg-gradient-to-br from-blue-600 to-blue-700'} p-5 rounded-2xl text-white shadow-lg`}>
-                    <p className="opacity-80 text-xs font-bold uppercase tracking-wider mb-1">Combustível Total</p>
+                <div className="bg-gradient-to-br from-blue-600 to-blue-700 p-5 rounded-2xl text-white shadow-lg">
+                    <p className="text-blue-100 text-xs font-bold uppercase tracking-wider mb-1">Combustível Total</p>
                     <p className="text-3xl font-black">{totals.liters.toFixed(1)} <span className="text-lg font-normal">L</span></p>
                 </div>
                 <div className="bg-gradient-to-br from-emerald-600 to-emerald-700 p-5 rounded-2xl text-white shadow-lg">
                     <p className="text-emerald-100 text-xs font-bold uppercase tracking-wider mb-1">Investimento Total</p>
                     <p className="text-3xl font-black">{formatCurrency(totals.cost)}</p>
+                </div>
+                <div className="bg-gradient-to-br from-orange-500 to-orange-600 p-5 rounded-2xl text-white shadow-lg">
+                    <p className="text-orange-100 text-xs font-bold uppercase tracking-wider mb-1">Quilometragem Total</p>
+                    <p className="text-3xl font-black">{totals.km.toLocaleString()} <span className="text-lg font-normal">km</span></p>
                 </div>
             </div>
 
@@ -782,7 +922,7 @@ const ConsolidatedReports: React.FC = () => {
                             </div>
                             <div className="h-[300px]">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <AreaChart data={graphicData.monthly}>
+                                    <ComposedChart data={graphicData.monthly}>
                                         <defs>
                                             <linearGradient id="colorCost" x1="0" y1="0" x2="0" y2="1">
                                                 <stop offset="5%" stopColor="#2563eb" stopOpacity={0.1}/>
@@ -791,13 +931,31 @@ const ConsolidatedReports: React.FC = () => {
                                         </defs>
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                                         <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#64748b'}} />
-                                        <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#64748b'}} tickFormatter={(v) => `R$ ${v >= 1000 ? (v/1000).toFixed(0) + 'k' : v}`} />
+                                        <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#64748b'}} tickFormatter={(v) => `R$ ${(v/1000).toFixed(0)}k`} domain={['auto', 'dataMax * 1.3']} />
+                                        <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#64748b'}} tickFormatter={(v) => `${(v/1000).toFixed(0)}k km`} domain={['auto', 'dataMax * 1.3']} />
                                         <Tooltip 
                                             contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}}
-                                            formatter={(value: number) => [formatCurrency(value), 'Custo Total']}
                                         />
-                                        <Area type="monotone" dataKey="cost" stroke="#2563eb" strokeWidth={3} fillOpacity={1} fill="url(#colorCost)" />
-                                    </AreaChart>
+                                        <Legend verticalAlign="top" iconType="circle" wrapperStyle={{ paddingBottom: '20px', fontSize: '11px', fontWeight: 'bold' }} />
+                                        <Bar yAxisId="left" dataKey="cost" name="Custo Total" fill="#10b981" radius={[4, 4, 0, 0]} barSize={40}>
+                                            <LabelList 
+                                                dataKey="cost" 
+                                                position="top" 
+                                                offset={8}
+                                                style={{ fontSize: '10px', fontWeight: 'bold', fill: '#065f46' }}
+                                                formatter={(v: number) => `R$ ${v >= 1000 ? (v/1000).toFixed(1) + 'k' : v.toFixed(0)}`}
+                                            />
+                                        </Bar>
+                                        <Line yAxisId="right" type="monotone" dataKey="km" name="Quilometragem" stroke="#2563eb" strokeWidth={3} dot={{ r: 4, fill: '#2563eb' }}>
+                                            <LabelList 
+                                                dataKey="km" 
+                                                position="top" 
+                                                offset={-25} 
+                                                formatter={(v: number) => `${(v/1000).toFixed(1)}k km`} 
+                                                style={{ fontSize: '9px', fontWeight: 'bold', fill: '#1e3a8a', paintOrder: 'stroke', stroke: '#fff', strokeWidth: '2px' }} 
+                                            />
+                                        </Line>
+                                    </ComposedChart>
                                 </ResponsiveContainer>
                             </div>
                         </div>
@@ -822,7 +980,17 @@ const ConsolidatedReports: React.FC = () => {
                                             contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}}
                                             formatter={(value: number) => [formatCurrency(value), 'Custo Quinzena']}
                                         />
-                                        <Bar dataKey="cost" fill="#10b981" radius={[4, 4, 0, 0]} />
+                                        <Bar dataKey="cost" radius={[4, 4, 0, 0]}>
+                                            {graphicData.fortnightly.map((entry, index) => (
+                                                <Cell key={`cell-${index}`} fill={['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16', '#6366f1', '#f97316', '#0ea5e9', '#6366f1'][entry.monthIndex % 12]} />
+                                            ))}
+                                            <LabelList 
+                                                dataKey="cost" 
+                                                position="top" 
+                                                style={{ fontSize: '9px', fontWeight: 'bold', fill: '#334155' }}
+                                                formatter={(v: number) => `R$ ${v >= 1000 ? (v/1000).toFixed(1) + 'k' : v.toFixed(0)}`}
+                                            />
+                                        </Bar>
                                     </BarChart>
                                 </ResponsiveContainer>
                             </div>
@@ -833,45 +1001,68 @@ const ConsolidatedReports: React.FC = () => {
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 text-slate-900">
                         <div className="lg:col-span-1 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                             <h3 className="font-bold flex items-center gap-2 mb-6">
-                                <Building2 className="text-orange-600" size={18} /> Concentração por Posto (Top 5)
+                                <Gauge className="text-orange-600" size={18} /> Eficiência de Consumo (KM/L) Quinzenal
                             </h3>
                             <div className="h-[250px]">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <PieChart>
-                                        <Pie
-                                            data={graphicData.stations}
-                                            innerRadius={60}
-                                            outerRadius={80}
-                                            paddingAngle={5}
-                                            dataKey="value"
-                                        >
-                                            {graphicData.stations.map((entry, index) => (
-                                                <Cell key={`cell-${index}`} fill={['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'][index % 5]} />
-                                            ))}
-                                        </Pie>
-                                        <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                                        <Legend verticalAlign="bottom" wrapperStyle={{fontSize: '10px', fontWeight: 600, color: '#64748b'}} />
-                                    </PieChart>
+                                    <ComposedChart data={graphicData.fortnightly}>
+                                        <defs>
+                                            <linearGradient id="colorAvg" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.1}/>
+                                                <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                        <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 700, fill: '#64748b'}} />
+                                        <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#64748b'}} />
+                                        <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#94a3b8'}} tickFormatter={(v) => `R$ ${v}/km`} />
+                                        <Tooltip 
+                                            contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}}
+                                        />
+                                        <Legend verticalAlign="top" wrapperStyle={{ paddingBottom: '10px' }} />
+                                        <Area yAxisId="left" type="monotone" dataKey="avgKml" name="Média Real (km/l)" stroke="#f59e0b" strokeWidth={3} fillOpacity={1} fill="url(#colorAvg)">
+                                            <LabelList 
+                                                dataKey="avgKml" 
+                                                position="top" 
+                                                offset={10}
+                                                style={{ fontSize: '10px', fontWeight: 'bold', fill: '#9a3412' }}
+                                                formatter={(v: number) => `${v} ${v < 6 ? '⚠️' : ''}`}
+                                            />
+                                        </Area>
+                                        <Line yAxisId="left" type="stepAfter" dataKey="expectedKml" name="Meta (km/l)" stroke="#64748b" strokeDasharray="3 3" dot={false} strokeWidth={2} />
+                                        <Line yAxisId="right" type="monotone" dataKey="costPerKm" name="Custo/KM (R$)" stroke="#ef4444" strokeWidth={2} dot={{ r: 4 }} />
+                                    </ComposedChart>
                                 </ResponsiveContainer>
                             </div>
                         </div>
 
                         <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                             <h3 className="font-bold flex items-center gap-2 mb-6">
-                                <Truck className="text-rose-600" size={18} /> Top 8 Veículos com Maior Custo
+                                <TrendingUp className="text-rose-600" size={18} /> Tempo Ligado por Quinzena (Horas)
                             </h3>
                             <div className="h-[250px]">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart layout="vertical" data={graphicData.vehicles} margin={{ left: 20 }}>
-                                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
-                                        <XAxis type="number" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#64748b'}} tickFormatter={(v) => `R$ ${v}`} />
-                                        <YAxis dataKey="plate" type="category" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 800, fill: '#1e293b'}} />
+                                    <BarChart data={graphicData.fortnightly}>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                        <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#64748b'}} />
+                                        <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#64748b'}} tickFormatter={(v) => `${v}h`} />
                                         <Tooltip 
                                             cursor={{fill: '#f8fafc'}}
                                             contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}}
-                                            formatter={(value: number) => [formatCurrency(value), 'Investimento']}
+                                            formatter={(value: number) => [`${value.toFixed(1)}h`, 'Tempo Ligado']}
                                         />
-                                        <Bar dataKey="value" fill="#f43f5e" radius={[0, 4, 4, 0]} />
+                                        <Bar dataKey="minutesOn" radius={[4, 4, 0, 0]}>
+                                            {graphicData.fortnightly.map((entry, index) => {
+                                                const hours = Number((entry.minutesOn / 60).toFixed(1));
+                                                return <Cell key={`cell-${index}`} fill={['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16', '#6366f1', '#f97316', '#0ea5e9', '#6366f1'][entry.monthIndex % 12]} />;
+                                            })}
+                                            <LabelList 
+                                                dataKey="minutesOn" 
+                                                position="top" 
+                                                style={{ fontSize: '9px', fontWeight: 'bold', fill: '#334155' }}
+                                                formatter={(v: number) => `${(v / 60).toFixed(1)}h`}
+                                            />
+                                        </Bar>
                                     </BarChart>
                                 </ResponsiveContainer>
                             </div>
