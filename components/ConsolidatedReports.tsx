@@ -385,7 +385,7 @@ const ConsolidatedReports: React.FC = () => {
         });
 
         // 2. Bi-weekly History (Fortnightly)
-        const fortnightMap: Record<string, { label: string; cost: number; liters: number; km: number; avgKml: number; expectedKml: number; kmWeightTotal: number; costPerKm: number; minutesOn: number; monthIndex: number }> = {};
+        const fortnightMap: Record<string, { label: string; cost: number; liters: number; km: number; avgKml: number; expectedKml: number; kmWeightTotal: number; costPerKm: number; avgFuelPrice: number; minutesOn: number; monthIndex: number }> = {};
         filteredBase.periodRefuelings.forEach(r => {
             const date = new Date(r.date + 'T12:00:00');
             const day = date.getDate();
@@ -403,6 +403,7 @@ const ConsolidatedReports: React.FC = () => {
                     expectedKml: 0, 
                     kmWeightTotal: 0, 
                     costPerKm: 0,
+                    avgFuelPrice: 0,
                     minutesOn: 0,
                     monthIndex: date.getMonth()
                 };
@@ -428,6 +429,7 @@ const ConsolidatedReports: React.FC = () => {
                     expectedKml: 0, 
                     kmWeightTotal: 0, 
                     costPerKm: 0,
+                    avgFuelPrice: 0,
                     minutesOn: 0,
                     monthIndex: date.getMonth()
                 };
@@ -449,10 +451,11 @@ const ConsolidatedReports: React.FC = () => {
             fortnightMap[key].kmWeightTotal += km;
         });
 
-        // Calculate averages for Efficiency (KM/L) and Cost per KM
+        // Calculate averages for Efficiency (KM/L), Cost per KM and Fuel Price
         Object.keys(fortnightMap).forEach(k => {
             if (fortnightMap[k].liters > 0) {
                 fortnightMap[k].avgKml = Number((fortnightMap[k].km / fortnightMap[k].liters).toFixed(2));
+                fortnightMap[k].avgFuelPrice = Number((fortnightMap[k].cost / fortnightMap[k].liters).toFixed(2));
             }
             if (fortnightMap[k].km > 0) {
                 fortnightMap[k].costPerKm = Number((fortnightMap[k].cost / fortnightMap[k].km).toFixed(2));
@@ -709,6 +712,14 @@ const ConsolidatedReports: React.FC = () => {
 
     return (
         <div className="space-y-6">
+            <style>
+                {`
+                @media print {
+                    @page { size: landscape; }
+                    .print\\:landscape { width: 100% !important; }
+                }
+                `}
+            </style>
             <PrintHeader 
                 title={activeTab === 'PERFORMANCE' ? "Relatório Consolidado de Performance" : "Análise Consolidada de Abastecimento"}
                 subtitle={activeTab === 'FUEL_ANALYSIS' ? (fuelSubTab === 'BY_STATION' ? 'Agrupado por Posto' : 'Agrupado por Veículo') : 'Rodagem e Consumo'}
@@ -1001,7 +1012,7 @@ const ConsolidatedReports: React.FC = () => {
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 text-slate-900">
                         <div className="lg:col-span-1 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                             <h3 className="font-bold flex items-center gap-2 mb-6">
-                                <Gauge className="text-orange-600" size={18} /> Eficiência de Consumo (KM/L) Quinzenal
+                                <Gauge className="text-orange-600" size={18} /> Eficiência e Custos Quinzenais
                             </h3>
                             <div className="h-[250px]">
                                 <ResponsiveContainer width="100%" height="100%">
@@ -1014,13 +1025,13 @@ const ConsolidatedReports: React.FC = () => {
                                         </defs>
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                                         <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 700, fill: '#64748b'}} />
-                                        <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#64748b'}} />
-                                        <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#94a3b8'}} tickFormatter={(v) => `R$ ${v}/km`} />
+                                        <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#64748b'}} tickFormatter={(v) => `${v} KM/L`} />
+                                        <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#94a3b8'}} tickFormatter={(v) => `R$ ${v}`} />
                                         <Tooltip 
                                             contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}}
                                         />
-                                        <Legend verticalAlign="top" wrapperStyle={{ paddingBottom: '10px' }} />
-                                        <Area yAxisId="left" type="monotone" dataKey="avgKml" name="Média Real (km/l)" stroke="#f59e0b" strokeWidth={3} fillOpacity={1} fill="url(#colorAvg)">
+                                        <Legend verticalAlign="top" wrapperStyle={{ paddingBottom: '10px', fontSize: '11px' }} />
+                                        <Area yAxisId="left" type="monotone" dataKey="avgKml" name="Consumo Médio (km/l)" stroke="#f59e0b" strokeWidth={3} fillOpacity={1} fill="url(#colorAvg)">
                                             <LabelList 
                                                 dataKey="avgKml" 
                                                 position="top" 
@@ -1030,6 +1041,7 @@ const ConsolidatedReports: React.FC = () => {
                                             />
                                         </Area>
                                         <Line yAxisId="left" type="stepAfter" dataKey="expectedKml" name="Meta (km/l)" stroke="#64748b" strokeDasharray="3 3" dot={false} strokeWidth={2} />
+                                        <Line yAxisId="right" type="monotone" dataKey="avgFuelPrice" name="Preço Médio Comb. (R$/L)" stroke="#10b981" strokeWidth={2} dot={{ r: 4 }} />
                                         <Line yAxisId="right" type="monotone" dataKey="costPerKm" name="Custo/KM (R$)" stroke="#ef4444" strokeWidth={2} dot={{ r: 4 }} />
                                     </ComposedChart>
                                 </ResponsiveContainer>
