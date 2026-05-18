@@ -715,17 +715,32 @@ const ConsolidatedReports: React.FC = () => {
             <style>
                 {`
                 @media print {
-                    @page { size: landscape; }
-                    .print\\:landscape { width: 100% !important; }
+                    @page { 
+                        size: A4 landscape; 
+                        margin: 10mm;
+                    }
+                    body { 
+                        -webkit-print-color-adjust: exact;
+                        background: white !important;
+                    }
+                    /* Scale content to help fit on one page */
+                    .print-container {
+                        zoom: 0.78;
+                        width: 100% !important;
+                    }
+                    .print\\:hidden { display: none !important; }
+                    .shadow-sm, .shadow-lg { box-shadow: none !important; border: 1px solid #e2e8f0 !important; }
                 }
                 `}
             </style>
+            <div className="print-container">
             <PrintHeader 
                 title={activeTab === 'PERFORMANCE' ? "Relatório Consolidado de Performance" : "Análise Consolidada de Abastecimento"}
                 subtitle={activeTab === 'FUEL_ANALYSIS' ? (fuelSubTab === 'BY_STATION' ? 'Agrupado por Posto' : 'Agrupado por Veículo') : 'Rodagem e Consumo'}
                 details={
                     <>
                         <span>Período: {formatDate(dateRange.start)} até {formatDate(dateRange.end)}</span>
+                        <span>Quilometragem: {totals.km.toLocaleString()} km</span>
                         <span>Total Litros: {totals.liters.toFixed(1)} L</span>
                         <span>Custo Total: {formatCurrency(totals.cost)}</span>
                     </>
@@ -1031,7 +1046,7 @@ const ConsolidatedReports: React.FC = () => {
                                             contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}}
                                         />
                                         <Legend verticalAlign="top" wrapperStyle={{ paddingBottom: '10px', fontSize: '11px' }} />
-                                        <Area yAxisId="left" type="monotone" dataKey="avgKml" name="Consumo Médio (km/l)" stroke="#f59e0b" strokeWidth={3} fillOpacity={1} fill="url(#colorAvg)">
+                                        <Area yAxisId="left" type="monotone" dataKey="avgKml" name="Consumo Médio (KM/L)" stroke="#f59e0b" strokeWidth={3} fillOpacity={1} fill="url(#colorAvg)">
                                             <LabelList 
                                                 dataKey="avgKml" 
                                                 position="top" 
@@ -1040,9 +1055,9 @@ const ConsolidatedReports: React.FC = () => {
                                                 formatter={(v: number) => `${v} ${v < 6 ? '⚠️' : ''}`}
                                             />
                                         </Area>
-                                        <Line yAxisId="left" type="stepAfter" dataKey="expectedKml" name="Meta (km/l)" stroke="#64748b" strokeDasharray="3 3" dot={false} strokeWidth={2} />
-                                        <Line yAxisId="right" type="monotone" dataKey="avgFuelPrice" name="Preço Médio Comb. (R$/L)" stroke="#10b981" strokeWidth={2} dot={{ r: 4 }} />
-                                        <Line yAxisId="right" type="monotone" dataKey="costPerKm" name="Custo/KM (R$)" stroke="#ef4444" strokeWidth={2} dot={{ r: 4 }} />
+                                        <Line yAxisId="left" type="stepAfter" dataKey="expectedKml" name="Meta (KM/L)" stroke="#64748b" strokeDasharray="3 3" dot={false} strokeWidth={2} />
+                                        <Line yAxisId="right" type="monotone" dataKey="avgFuelPrice" name="Preço Médio do Combustível (R$/L)" stroke="#10b981" strokeWidth={2} dot={{ r: 4 }} />
+                                        <Line yAxisId="right" type="monotone" dataKey="costPerKm" name="Custo por Quilômetro Rodado (R$/KM)" stroke="#ef4444" strokeWidth={2} dot={{ r: 4 }} />
                                     </ComposedChart>
                                 </ResponsiveContainer>
                             </div>
@@ -1157,6 +1172,7 @@ const ConsolidatedReports: React.FC = () => {
 
             <div className="print:hidden text-center text-slate-400 text-xs pb-10">
                 * As consolidações consideram apenas registros contidos no intervalo de datas selecionado.
+            </div>
             </div>
         </div>
     );
